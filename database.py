@@ -87,7 +87,7 @@ def init_db():
     defaults = [
         ("whatsapp_token", ""),
         ("trial_days", "2"),
-        ("site_name", "حراج مونيتور"),
+        ("site_name", "راصد حراج"),
     ]
     for key, value in defaults:
         c.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (key, value))
