@@ -9,14 +9,14 @@
     .form-label { display: block; font-weight: 700; margin-bottom: 8px; }
     .form-control { width: 100%; padding: 12px 15px; border: 1px solid var(--border); border-radius: 10px; font-family: 'Tajawal', sans-serif; font-size: 15px; background: var(--bg); transition: 0.3s; }
     .form-control:focus { outline: none; border-color: var(--primary); background: #fff; }
-    .btn-submit { width: 100%; padding: 14px; font-size: 16px; }
+    .btn-submit { width: 100%; padding: 14px; font-size: 16px; font-family: 'Tajawal', sans-serif; font-weight: bold;}
     .alert { background: #fee2e2; color: #991b1b; padding: 12px; border-radius: 10px; margin-bottom: 20px; font-weight: 700; text-align: center; }
 </style>
 {% endblock %}
 {% block body %}
 <div class="auth-container">
     <h2 class="auth-title">إنشاء حساب جديد 🚀</h2>
-    <p class="auth-sub">سجل مجاناً واستمتع بالتجربة الفورية</p>
+    <p class="auth-sub">سجل مجاناً في "راصد حراج" واستمتع بالتجربة الفورية</p>
     {% if error %}<div class="alert">{{ error }}</div>{% endif %}
     <form method="post" action="/register">
         <div class="form-group">
