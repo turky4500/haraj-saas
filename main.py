@@ -1,7 +1,7 @@
 """
 راصد حراج - التطبيق الرئيسي
 """
-import json, logging, os
+import json, logging, os, random
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
@@ -180,27 +180,70 @@ async def register_post(request: Request,
                         phone: str = Form(...), password: str = Form(...)):
     conn = get_db()
     existing = conn.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone()
+    conn.close()
     if existing:
-        conn.close()
         return templates.TemplateResponse("register.html", {"request": request, "error": "البريد مسجل مسبقاً"})
+
+    # إنشاء كود تحقق عشوائي
+    otp_code = str(random.randint(1000, 9999))
+    
+    # حفظ بيانات المستخدم مؤقتاً في الجلسة
+    request.session["pending_user"] = {
+        "name": name,
+        "email": email,
+        "phone": phone,
+        "password": password,
+        "otp": otp_code
+    }
+
+    # رسالة كود التحقق
+    otp_msg = f"مرحباً {name} 👋\n\nرمز التحقق الخاص بك للتسجيل في راصد حراج هو:\n*{otp_code}*"
+    send_whatsapp(phone, otp_msg)
+
+    return RedirectResponse("/verify", status_code=302)
+
+# ====== نظام التحقق (جديد) ======
+
+@app.get("/verify", response_class=HTMLResponse)
+async def verify_page(request: Request):
+    if "pending_user" not in request.session:
+        return RedirectResponse("/register", status_code=302)
+    return templates.TemplateResponse("verify.html", {"request": request})
+
+@app.post("/verify")
+async def verify_post(request: Request, otp: str = Form(...)):
+    pending = request.session.get("pending_user")
+    if not pending:
+        return RedirectResponse("/register", status_code=302)
+
+    if otp != pending["otp"]:
+        return templates.TemplateResponse("verify.html", {"request": request, "error": "رمز التحقق غير صحيح، يرجى التأكد"})
+
+    # في حال الكود صحيح، نقوم بتسجيل المستخدم
+    conn = get_db()
     cursor = conn.execute("INSERT INTO users (name, email, phone, password_hash) VALUES (?,?,?,?)",
-                          (name, email, phone, hash_password(password)))
+                          (pending["name"], pending["email"], pending["phone"], hash_password(pending["password"])))
     user_id = cursor.lastrowid
+    
     trial_row = conn.execute("SELECT value FROM settings WHERE key='trial_days'").fetchone()
     trial_days = int(trial_row["value"]) if trial_row else 2
     expires = datetime.now() + timedelta(days=trial_days)
+    
     conn.execute("""INSERT INTO subscriptions (user_id, name, whatsapp_number, expires_at, status, keywords)
                     VALUES (?,?,?,?,?,?)""",
-                 (user_id, f"اشتراك {name}", phone, expires.isoformat(), "active", "[]"))
+                 (user_id, f"اشتراك {pending['name']}", pending["phone"], expires.isoformat(), "active", "[]"))
     conn.commit()
     conn.close()
 
-    # رسالة التحقق من رقم الواتساب
-    verify_msg = f"""مرحباً {name} 👋
+    # حذف البيانات المؤقتة
+    del request.session["pending_user"]
+
+    # رسالة الشكر والترحيب
+    welcome_msg = f"""مرحباً {pending['name']} 👋
 
 شكراً لتسجيلك في *راصد حراج* 🔍
 
-تم تفعيل اشتراكك التجريبي لمدة {trial_days} أيام.
+تم التحقق من رقمك وتفعيل اشتراكك التجريبي لمدة {trial_days} أيام.
 
 للبدء، افتح حسابك وأضف كلمات البحث التي تريد مراقبتها على حراج.
 
@@ -208,9 +251,9 @@ async def register_post(request: Request,
 
 نتمنى لك تجربة ممتعة! 🎉"""
 
-    send_whatsapp(phone, verify_msg)
+    send_whatsapp(pending["phone"], welcome_msg)
 
-    request.session["user"] = {"id": user_id, "name": name, "email": email, "role": "user"}
+    request.session["user"] = {"id": user_id, "name": pending["name"], "email": pending["email"], "role": "user"}
     return RedirectResponse("/dashboard", status_code=302)
 
 @app.get("/logout")
@@ -275,26 +318,17 @@ async def edit_sub_post(request: Request, sub_id: int):
     keywords = [k.strip() for k in form.get("keywords","").split("\n") if k.strip()]
     cities = [c.strip() for c in form.get("cities","").split("\n") if c.strip()]
     excluded = [e.strip() for e in form.get("excluded_words","").split("\n") if e.strip()]
-    # مدة الفحص من إعدادات الأدمن وليس من المستخدم
-    sleep_minutes = int(get_setting("bot_sleep_minutes", "15"))
+    
     conn = get_db()
+    # تم إزالة تحديث أوقات النوم والراحة من هنا (أصبحت خاصة بالأدمن)
     conn.execute("""UPDATE subscriptions SET
         keywords=?, cities=?, excluded_words=?,
-        city_filter_enabled=?, quiet_enabled=?,
-        quiet_start_hour=?, quiet_start_minute=?,
-        quiet_end_hour=?, quiet_end_minute=?,
-        sleep_minutes=?, name=?
+        city_filter_enabled=?, name=?
         WHERE id=? AND user_id=?""",
         (json.dumps(keywords, ensure_ascii=False),
          json.dumps(cities, ensure_ascii=False),
          json.dumps(excluded, ensure_ascii=False),
          1 if form.get("city_filter_enabled") else 0,
-         1 if form.get("quiet_enabled") else 0,
-         int(form.get("quiet_start_hour", 1)),
-         int(form.get("quiet_start_minute", 0)),
-         int(form.get("quiet_end_hour", 6)),
-         int(form.get("quiet_end_minute", 0)),
-         sleep_minutes,
          form.get("name","").strip() or "اشتراكي",
          sub_id, user["id"]))
     conn.commit()
@@ -372,17 +406,7 @@ async def admin_new_user_post(request: Request,
     conn.close()
     # رسالة ترحيب
     site_name = get_setting("site_name", "راصد حراج")
-    welcome_msg = f"""مرحباً {name} 👋
-
-تم إنشاء حسابك في *{site_name}* 🔍
-
-بيانات الدخول:
-📧 البريد: {email}
-🔑 كلمة المرور: {password}
-
-🌐 رابط الموقع: https://haraj-saas.onrender.com
-
-أضف كلمات البحث وابدأ الاستلام فوراً! 🎉"""
+    welcome_msg = f"""مرحباً {name} 👋\n\nتم إنشاء حسابك في *{site_name}* 🔍\n\nبيانات الدخول:\n📧 البريد: {email}\n🔑 كلمة المرور: {password}\n\n🌐 رابط الموقع: https://haraj-saas.onrender.com\n\nأضف كلمات البحث وابدأ الاستلام فوراً! 🎉"""
     send_whatsapp(phone, welcome_msg)
     return RedirectResponse(f"/admin/users/{user_id}", status_code=302)
 
