@@ -15,21 +15,16 @@ from starlette.middleware.sessions import SessionMiddleware
 from database import get_db, hash_password, init_db, DB_PATH
 from bot.haraj_bot import BotManager
 
-# ===== إعداد التطبيق =====
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger("haraj_app")
 
-# إنشاء المجلدات المطلوبة تلقائياً
 Path("static").mkdir(exist_ok=True)
 Path("templates").mkdir(exist_ok=True)
 
 app = FastAPI(title="Haraj SaaS")
 app.add_middleware(SessionMiddleware, secret_key=os.environ.get("SECRET_KEY", "haraj-secret-2024"))
-Path("static").mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
-
-# ===== دوال قاعدة البيانات للبوت =====
 
 def db_get_all_active_subs():
     conn = get_db()
@@ -77,7 +72,6 @@ def db_update_total(sub_id: int, total: int):
     conn.commit()
     conn.close()
 
-# ===== تشغيل البوت =====
 bot = BotManager(db_get_all_active_subs, db_get_token, db_mark_sent,
                  db_add_log, db_update_total, db_get_sub)
 
@@ -85,24 +79,10 @@ bot = BotManager(db_get_all_active_subs, db_get_token, db_mark_sent,
 async def startup():
     init_db()
     bot.start_all_active()
-    logger.info("✅ التطبيق بدأ والبوت يعمل")
-
-# ===== مساعدات الجلسة =====
+    logger.info("التطبيق بدأ والبوت يعمل")
 
 def get_current_user(request: Request):
     return request.session.get("user")
-
-def require_login(request: Request):
-    user = get_current_user(request)
-    if not user:
-        raise HTTPException(status_code=303, headers={"Location": "/login"})
-    return user
-
-def require_admin(request: Request):
-    user = require_login(request)
-    if user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="ممنوع")
-    return user
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
@@ -144,23 +124,18 @@ async def register_post(request: Request,
     if existing:
         conn.close()
         return templates.TemplateResponse("register.html", {"request": request, "error": "البريد مسجل مسبقاً"})
-
     cursor = conn.execute("INSERT INTO users (name, email, phone, password_hash) VALUES (?,?,?,?)",
                           (name, email, phone, hash_password(password)))
     user_id = cursor.lastrowid
-
     trial_row = conn.execute("SELECT value FROM settings WHERE key='trial_days'").fetchone()
     trial_days = int(trial_row["value"]) if trial_row else 2
     expires = datetime.now() + timedelta(days=trial_days)
-    conn.execute("""INSERT INTO subscriptions (user_id, name, whatsapp_number, expires_at, status)
-                    VALUES (?,?,?,?,?)""",
-                 (user_id, f"اشتراك {name}", phone, expires.isoformat(), "active"))
+    # البوت لا يبدأ حتى يضيف المستخدم كلمات البحث
+    conn.execute("""INSERT INTO subscriptions (user_id, name, whatsapp_number, expires_at, status, keywords)
+                    VALUES (?,?,?,?,?,?)""",
+                 (user_id, f"اشتراك {name}", phone, expires.isoformat(), "active", "[]"))
     conn.commit()
-    sub_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
     conn.close()
-
-    bot.start_sub(sub_id)
-
     request.session["user"] = {"id": user_id, "name": name, "email": email, "role": "user"}
     return RedirectResponse("/dashboard", status_code=302)
 
@@ -219,7 +194,6 @@ async def edit_sub_post(request: Request, sub_id: int):
     keywords = [k.strip() for k in form.get("keywords","").split("\n") if k.strip()]
     cities = [c.strip() for c in form.get("cities","").split("\n") if c.strip()]
     excluded = [e.strip() for e in form.get("excluded_words","").split("\n") if e.strip()]
-
     conn = get_db()
     conn.execute("""UPDATE subscriptions SET
         keywords=?, cities=?, excluded_words=?,
@@ -242,8 +216,12 @@ async def edit_sub_post(request: Request, sub_id: int):
          sub_id, user["id"]))
     conn.commit()
     conn.close()
+    # تشغيل البوت بعد إضافة الكلمات
+    bot.start_sub(sub_id)
     bot.reload_sub(sub_id)
     return RedirectResponse("/dashboard", status_code=302)
+
+# ====== لوحة الأدمن ======
 
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_dashboard(request: Request):
@@ -280,6 +258,39 @@ async def admin_users(request: Request):
     conn.close()
     return templates.TemplateResponse("admin_users.html", {"request": request, "user": user, "users": [dict(u) for u in users]})
 
+# إضافة مستخدم جديد من الأدمن
+@app.get("/admin/users/new", response_class=HTMLResponse)
+async def admin_new_user_page(request: Request):
+    user = get_current_user(request)
+    if not user or user["role"] != "admin":
+        return RedirectResponse("/login", status_code=302)
+    return templates.TemplateResponse("admin_new_user.html", {"request": request, "user": user})
+
+@app.post("/admin/users/new")
+async def admin_new_user_post(request: Request,
+                               name: str = Form(...), email: str = Form(...),
+                               phone: str = Form(...), password: str = Form(...),
+                               days: int = Form(7)):
+    user = get_current_user(request)
+    if not user or user["role"] != "admin":
+        return RedirectResponse("/login", status_code=302)
+    conn = get_db()
+    existing = conn.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone()
+    if existing:
+        conn.close()
+        return templates.TemplateResponse("admin_new_user.html", {
+            "request": request, "user": user, "error": "البريد مسجل مسبقاً"})
+    cursor = conn.execute("INSERT INTO users (name, email, phone, password_hash) VALUES (?,?,?,?)",
+                          (name, email, phone, hash_password(password)))
+    user_id = cursor.lastrowid
+    expires = datetime.now() + timedelta(days=days)
+    conn.execute("""INSERT INTO subscriptions (user_id, name, whatsapp_number, expires_at, status, keywords)
+                    VALUES (?,?,?,?,?,?)""",
+                 (user_id, f"اشتراك {name}", phone, expires.isoformat(), "active", "[]"))
+    conn.commit()
+    conn.close()
+    return RedirectResponse(f"/admin/users/{user_id}", status_code=302)
+
 @app.get("/admin/users/{uid}", response_class=HTMLResponse)
 async def admin_user_detail(request: Request, uid: int):
     user = get_current_user(request)
@@ -305,10 +316,30 @@ async def admin_user_detail(request: Request, uid: int):
             d["expired"] = True
         d["bot_running"] = bot.threads.get(d["id"]) and bot.threads[d["id"]].is_alive()
         subs_data.append(d)
+    saved = request.query_params.get("saved")
     return templates.TemplateResponse("admin_user_detail.html", {
         "request": request, "user": user,
-        "target": dict(target), "subs": subs_data
+        "target": dict(target), "subs": subs_data, "saved": saved
     })
+
+# تعديل بيانات المستخدم من الأدمن
+@app.post("/admin/users/{uid}/edit")
+async def admin_edit_user(request: Request, uid: int,
+                           name: str = Form(...), email: str = Form(...),
+                           phone: str = Form(...), password: str = Form("")):
+    user = get_current_user(request)
+    if not user or user["role"] != "admin":
+        return JSONResponse({"error": "ممنوع"}, status_code=403)
+    conn = get_db()
+    if password:
+        conn.execute("UPDATE users SET name=?, email=?, phone=?, password_hash=? WHERE id=?",
+                     (name, email, phone, hash_password(password), uid))
+    else:
+        conn.execute("UPDATE users SET name=?, email=?, phone=? WHERE id=?",
+                     (name, email, phone, uid))
+    conn.commit()
+    conn.close()
+    return RedirectResponse(f"/admin/users/{uid}?saved=1", status_code=302)
 
 @app.post("/admin/users/{uid}/toggle")
 async def admin_toggle_user(request: Request, uid: int):
@@ -356,12 +387,10 @@ async def admin_add_sub(request: Request,
         return RedirectResponse("/admin/users", status_code=302)
     expires = datetime.now() + timedelta(days=days)
     conn = get_db()
-    conn.execute("""INSERT INTO subscriptions (user_id, name, whatsapp_number, expires_at, status)
-                    VALUES (?,?,?,?,?)""", (user_id, name, whatsapp, expires.isoformat(), "active"))
+    conn.execute("""INSERT INTO subscriptions (user_id, name, whatsapp_number, expires_at, status, keywords)
+                    VALUES (?,?,?,?,?,?)""", (user_id, name, whatsapp, expires.isoformat(), "active", "[]"))
     conn.commit()
-    sub_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
     conn.close()
-    bot.start_sub(sub_id)
     return RedirectResponse(f"/admin/users/{user_id}", status_code=302)
 
 @app.post("/admin/subscriptions/{sub_id}/stop")
