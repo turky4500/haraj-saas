@@ -25,6 +25,7 @@ Path("templates").mkdir(exist_ok=True)
 
 app = FastAPI(title="Haraj SaaS")
 app.add_middleware(SessionMiddleware, secret_key=os.environ.get("SECRET_KEY", "haraj-secret-2024"))
+Path("static").mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
