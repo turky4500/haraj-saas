@@ -1,116 +1,185 @@
-{% extends "base_light.html" %}
-{% block title %}لوحة التحكم — حراج مونيتور{% endblock %}
+{% extends "base.html" %}
+{% block title %}لوحة التحكم — {{ site_name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .page-header {
+        margin-bottom: 30px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .page-title {
+        font-size: 24px;
+        font-weight: 800;
+        color: var(--text-main);
+    }
+    .page-desc {
+        color: var(--text-muted);
+        font-size: 15px;
+        margin-top: 5px;
+    }
+    
+    .subs-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 20px;
+    }
+    
+    .sub-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 24px;
+        transition: 0.3s;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02);
+    }
+    .sub-card:hover {
+        border-color: var(--primary);
+        box-shadow: 0 10px 15px -3px rgba(37,99,235,0.1);
+        transform: translateY(-3px);
+    }
+    
+    .sub-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 1px dashed var(--border);
+    }
+    .sub-title {
+        font-size: 18px;
+        font-weight: 800;
+        color: var(--text-main);
+    }
+    .status-badge {
+        font-size: 12px;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 50px;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+    .status-active { background: #dcfce7; color: #166534; }
+    .status-inactive { background: #fee2e2; color: #991b1b; }
+    
+    .sub-info {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+    .info-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 14px;
+    }
+    .info-label { color: var(--text-muted); font-weight: 600; }
+    .info-val { color: var(--text-main); font-weight: 700; }
+    
+    .kw-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 5px;
+    }
+    .kw-tag {
+        background: #f1f5f9;
+        color: #475569;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    
+    .edit-btn {
+        display: block;
+        width: 100%;
+        text-align: center;
+        background: var(--bg);
+        color: var(--primary);
+        padding: 12px;
+        border-radius: 10px;
+        text-decoration: none;
+        font-weight: 700;
+        transition: 0.2s;
+    }
+    .edit-btn:hover {
+        background: var(--primary);
+        color: white;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        background: var(--card-bg);
+        border-radius: 16px;
+        border: 1px solid var(--border);
+    }
+    .empty-icon { font-size: 48px; margin-bottom: 15px; }
+</style>
+{% endblock %}
+
 {% block body %}
-
-<div class="app-layout">
-
-  <!-- SIDEBAR -->
-  <aside class="sidebar">
-    <div class="sidebar-brand">
-      <span class="brand-icon">🔍</span>
-      <span class="brand-text">حراج <span style="color:var(--gold)">مونيتور</span></span>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">اشتراكاتي</h1>
+        <p class="page-desc">راقب إعلاناتك وتحكم في كلمات البحث من هنا.</p>
     </div>
-    <nav class="sidebar-nav">
-      <a href="/dashboard" class="nav-item active">
-        <span class="nav-icon">📊</span> لوحة التحكم
-      </a>
-    </nav>
-    <div class="sidebar-footer">
-      <div class="user-pill">
-        <div class="user-avatar">{{ user.name[0] }}</div>
-        <div class="user-info">
-          <div class="user-name">{{ user.name }}</div>
-          <div class="user-email">{{ user.email }}</div>
-        </div>
-      </div>
-      <a href="/logout" class="logout-btn">خروج ↗</a>
-    </div>
-  </aside>
-
-  <!-- MAIN -->
-  <main class="main">
-
-    <!-- TOP BAR -->
-    <div class="topbar">
-      <div>
-        <div class="topbar-title">مرحباً، {{ user.name }} 👋</div>
-        <div class="topbar-sub">هذه اشتراكاتك النشطة على حراج مونيتور</div>
-      </div>
-    </div>
-
-    <!-- BODY -->
-    <div class="page-body">
-
-      {% if not subs %}
-      <div class="empty-state">
-        <div class="empty-icon">🔍</div>
-        <div class="empty-title">لا يوجد اشتراكات بعد</div>
-        <div class="empty-sub">اشتراكك التجريبي جاهز — فقط أضف كلمات البحث وابدأ.</div>
-      </div>
-      {% endif %}
-
-      {% for sub in subs %}
-      <div class="sub-card {% if sub.expired %}sub-expired{% elif sub.bot_running %}sub-active{% else %}sub-paused{% endif %}">
-
-        <div class="sub-header">
-          <div class="sub-title-row">
-            {% if sub.bot_running and not sub.expired %}
-            <span class="live-indicator"><span class="live-dot"></span> يعمل</span>
-            {% elif sub.expired %}
-            <span class="status-badge expired-badge">منتهي</span>
-            {% else %}
-            <span class="status-badge paused-badge">متوقف</span>
-            {% endif %}
-            <h2 class="sub-name">{{ sub.name }}</h2>
-          </div>
-          <a href="/subscription/{{ sub.id }}/edit" class="edit-btn">⚙️ إعدادات</a>
-        </div>
-
-        <div class="sub-stats">
-          <div class="stat-box">
-            <div class="stat-val {% if sub.expired %}danger{% elif sub.days_left <= 3 %}warn{% else %}ok{% endif %}">{{ sub.days_left }}</div>
-            <div class="stat-lbl">يوم متبقي</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-val accent">{{ sub.sent_total or 0 }}</div>
-            <div class="stat-lbl">إشعار أُرسل</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-val">{{ sub.whatsapp_number or '—' }}</div>
-            <div class="stat-lbl">رقم الواتساب</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-val">{{ sub.expires_at[:10] if sub.expires_at else '—' }}</div>
-            <div class="stat-lbl">تاريخ الانتهاء</div>
-          </div>
-        </div>
-
-        <div class="sub-keywords">
-          <div class="kw-label">كلمات البحث:</div>
-          <div class="kw-tags">
-            {% if sub.keywords and sub.keywords != '[]' %}
-              {% for kw in sub.keywords %}
-                {% if kw %}
-                <span class="kw-tag">{{ kw }}</span>
-                {% endif %}
-              {% endfor %}
-            {% else %}
-              <span class="kw-empty">⚠️ لم تُضف كلمات بعد — <a href="/subscription/{{ sub.id }}/edit">أضف الآن</a></span>
-            {% endif %}
-          </div>
-        </div>
-
-        {% if sub.expired %}
-        <div class="sub-alert alert-danger">⏰ انتهت صلاحية هذا الاشتراك — تواصل مع الدعم للتجديد.</div>
-        {% elif sub.days_left <= 3 %}
-        <div class="sub-alert alert-warn">⚠️ ينتهي اشتراكك خلال {{ sub.days_left }} أيام — تواصل مع الدعم للتجديد.</div>
-        {% endif %}
-
-      </div>
-      {% endfor %}
-
-    </div>
-  </main>
 </div>
+
+{% if subs %}
+<div class="subs-grid">
+    {% for sub in subs %}
+    <div class="sub-card">
+        <div class="sub-header">
+            <div class="sub-title">{{ sub.name }}</div>
+            {% if sub.bot_running and not sub.expired %}
+                <span class="status-badge status-active"><span style="width:6px;height:6px;background:#16a34a;border-radius:50%;display:inline-block;"></span> يعمل الآن</span>
+            {% else %}
+                <span class="status-badge status-inactive">متوقف</span>
+            {% endif %}
+        </div>
+        
+        <div class="sub-info">
+            <div class="info-row">
+                <span class="info-label">الرسائل المرسلة:</span>
+                <span class="info-val" style="color: var(--primary);">{{ sub.sent_total }} إعلان</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">صلاحية الاشتراك:</span>
+                {% if sub.expired %}
+                    <span class="info-val" style="color: var(--danger);">منتهي</span>
+                {% else %}
+                    <span class="info-val">{{ sub.days_left }} أيام متبقية</span>
+                {% endif %}
+            </div>
+            
+            <div style="margin-top: 5px;">
+                <span class="info-label">كلمات البحث:</span>
+                <div class="kw-tags">
+                    {% for kw in sub.keywords %}
+                        <span class="kw-tag">{{ kw }}</span>
+                    {% else %}
+                        <span class="kw-tag" style="background: #fee2e2; color: #991b1b;">لم تضف كلمات بعد</span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        
+        <a href="/subscription/{{ sub.id }}/edit" class="edit-btn">⚙️ تعديل الإعدادات والكلمات</a>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <div class="empty-icon">📭</div>
+    <h3 style="margin-bottom: 10px; color: var(--text-main);">لا توجد اشتراكات نشطة</h3>
+    <p style="color: var(--text-muted); margin-bottom: 20px;">يبدو أنه ليس لديك أي اشتراك حالياً، أو انتهت صلاحية اشتراكك.</p>
+    <a href="https://wa.me/رقم_الدعم_الفني_هنا" target="_blank" class="btn btn-primary">تواصل مع الدعم الفني</a>
+</div>
+{% endif %}
 
 {% endblock %}
