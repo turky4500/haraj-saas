@@ -1,101 +1,64 @@
 {% extends "base.html" %}
-{% block title %}الإعدادات — راصد حراج{% endblock %}
+{% block title %}إعدادات النظام — راصد حراج{% endblock %}
+{% block extra_css %}
+<style>
+    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+    .page-title { font-size: 24px; font-weight: 800; color: var(--text-main); }
+    .form-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; padding: 25px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
+    .card-title { font-size: 18px; font-weight: 800; margin-bottom: 20px; color: var(--primary); border-bottom: 1px dashed var(--border); padding-bottom: 10px; }
+    .form-group { margin-bottom: 20px; }
+    .form-label { display: block; font-weight: 700; margin-bottom: 8px; font-size: 14px; }
+    .form-control { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 10px; font-family: 'Tajawal', sans-serif; font-size: 14px; background: var(--bg); transition: 0.3s; }
+    .form-control:focus { outline: none; border-color: var(--primary); background: #fff; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media(max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
 {% block body %}
-<div class="layout">
-  <aside class="sidebar">
-    <div class="sidebar-logo"><div class="logo-mark">🔍 راصد حراج</div></div>
-    <nav class="sidebar-nav">
-      <a href="/admin" class="nav-item">📊 الرئيسية</a>
-      <a href="/admin/users" class="nav-item">👥 المستخدمون</a>
-      <a href="/admin/logs" class="nav-item">📋 السجلات</a>
-      <a href="/admin/settings" class="nav-item active">⚙️ الإعدادات</a>
-    </nav>
-    <div class="sidebar-footer">
-      <a href="/logout" style="font-size:12px;color:var(--text3)">تسجيل الخروج</a>
-    </div>
-  </aside>
-
-  <main class="main-content">
-    <div class="topbar"><div class="topbar-title">⚙️ إعدادات النظام</div></div>
-    <div class="page-body">
-
-      {% if request.query_params.get('saved') %}
-      <div class="alert alert-success">✅ تم حفظ الإعدادات بنجاح</div>
-      {% endif %}
-
-      <form method="post" action="/admin/settings">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-
-          <!-- إعدادات عامة -->
-          <div class="card">
-            <div class="card-header"><div class="card-title">🔧 إعدادات عامة</div></div>
-
-            <div class="form-group">
-              <label class="form-label">اسم الموقع</label>
-              <input type="text" name="site_name" class="form-control" value="{{ settings.get('site_name','راصد حراج') }}">
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">🔑 توكن واتساب</label>
-              <input type="text" name="whatsapp_token" class="form-control" value="{{ settings.get('whatsapp_token','') }}" placeholder="Bearer token">
-              <div class="form-hint">يُستخدم لإرسال جميع رسائل واتساب</div>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">🎁 أيام التجربة المجانية</label>
-              <input type="number" name="trial_days" class="form-control" value="{{ settings.get('trial_days','2') }}" min="1" max="30">
-            </div>
-
-            <div class="form-group" style="margin-bottom:0">
-              <label class="form-label">⏱️ فترة فحص البوت (دقائق)</label>
-              <input type="number" name="bot_sleep_minutes" class="form-control" value="{{ settings.get('bot_sleep_minutes','15') }}" min="5" max="60">
-              <div class="form-hint">كل كم دقيقة يفحص البوت حراج — يطبق على جميع المستخدمين</div>
-            </div>
-          </div>
-
-          <!-- إعدادات صفحة الهبوط -->
-          <div class="card">
-            <div class="card-header"><div class="card-title">🌐 صفحة الهبوط</div></div>
-
-            <div class="form-group">
-              <label class="form-label">العنوان الرئيسي</label>
-              <input type="text" name="landing_hero_title" class="form-control" value="{{ settings.get('landing_hero_title','لا تفوّت أي صفقة على حراج') }}">
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">النص التوضيحي</label>
-              <textarea name="landing_hero_sub" class="form-control" rows="3">{{ settings.get('landing_hero_sub','') }}</textarea>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">ميزة 1</label>
-              <input type="text" name="landing_feature1" class="form-control" value="{{ settings.get('landing_feature1','إشعار فوري على الواتساب') }}">
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">ميزة 2</label>
-              <input type="text" name="landing_feature2" class="form-control" value="{{ settings.get('landing_feature2','بحث بكلمات متعددة') }}">
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">ميزة 3</label>
-              <input type="text" name="landing_feature3" class="form-control" value="{{ settings.get('landing_feature3','فلترة حسب المدينة') }}">
-            </div>
-
-            <div class="form-group" style="margin-bottom:0">
-              <label class="form-label">💰 سعر الاشتراك الشهري (ريال)</label>
-              <input type="number" name="landing_price" class="form-control" value="{{ settings.get('landing_price','49') }}">
-            </div>
-          </div>
-
-        </div>
-
-        <div style="margin-top:20px">
-          <button type="submit" class="btn btn-primary" style="padding:12px 40px;font-size:15px">💾 حفظ جميع الإعدادات</button>
-        </div>
-      </form>
-
-    </div>
-  </main>
+<div class="page-header">
+    <h1 class="page-title">⚙️ إعدادات النظام</h1>
+    <a href="/admin" class="btn" style="background: var(--card-bg); border: 1px solid var(--border);">← رجوع للوحة الأدمن</a>
 </div>
+
+{% if request.query_params.get("saved") %}
+<div style="background: #dcfce7; color: #166534; padding: 15px; border-radius: 10px; margin-bottom: 20px; font-weight: 700; text-align: center;">
+    ✅ تم حفظ الإعدادات بنجاح!
+</div>
+{% endif %}
+
+<form method="post" action="/admin/settings">
+    
+    <div class="form-card">
+        <div class="card-title">📱 إعدادات الربط والواتساب</div>
+        <div class="form-group">
+            <label class="form-label">توكن الواتساب (من منصة تكوين)</label>
+            <input type="text" name="whatsapp_token" class="form-control" value="{{ settings.get('whatsapp_token', '') }}" placeholder="أدخل التوكن هنا لتعمل الرسائل...">
+        </div>
+        <div class="grid-2">
+            <div class="form-group">
+                <label class="form-label">أيام الفترة التجريبية (للمسجلين الجدد)</label>
+                <input type="number" name="trial_days" class="form-control" value="{{ settings.get('trial_days', '2') }}">
+            </div>
+            <div class="form-group">
+                <label class="form-label">الفترة بين كل فحص للبوت (بالدقائق)</label>
+                <input type="number" name="bot_sleep_minutes" class="form-control" value="{{ settings.get('bot_sleep_minutes', '15') }}">
+            </div>
+        </div>
+    </div>
+
+    <div class="form-card">
+        <div class="card-title">🎨 إعدادات صفحة الهبوط (الرئيسية)</div>
+        <div class="grid-2">
+            <div class="form-group">
+                <label class="form-label">اسم الموقع</label>
+                <input type="text" name="site_name" class="form-control" value="{{ settings.get('site_name', 'راصد حراج') }}">
+            </div>
+            <div class="form-group">
+                <label class="form-label">سعر الباقة الاحترافية (ريال)</label>
+                <input type="text" name="landing_price" class="form-control" value="{{ settings.get('landing_price', '49') }}">
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 15px; font-size: 16px;">💾 حفظ جميع الإعدادات</button>
+    </div>
+</form>
 {% endblock %}
