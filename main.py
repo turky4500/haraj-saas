@@ -1,5 +1,5 @@
 """
-Haraj SaaS - التطبيق الرئيسي
+راصد حراج - التطبيق الرئيسي
 """
 import json, logging, os
 from datetime import datetime, timedelta
@@ -21,7 +21,7 @@ logger = logging.getLogger("haraj_app")
 Path("static").mkdir(exist_ok=True)
 Path("templates").mkdir(exist_ok=True)
 
-app = FastAPI(title="Haraj SaaS")
+app = FastAPI(title="راصد حراج")
 app.add_middleware(SessionMiddleware, secret_key=os.environ.get("SECRET_KEY", "haraj-secret-2024"))
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
@@ -72,17 +72,71 @@ def db_update_total(sub_id: int, total: int):
     conn.commit()
     conn.close()
 
+def send_whatsapp(phone: str, message: str):
+    """إرسال رسالة واتساب"""
+    try:
+        import requests
+        token = db_get_token()
+        if not token:
+            return False
+        urls = [
+            "https://whatsapp.tkwin.com.sa/api/v1/send",
+            "https://whatsapp.tkwin.com.sa/api/v1/send/"
+        ]
+        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        payload = {"phone": phone, "message": message}
+        for url in urls:
+            try:
+                r = requests.post(url, json=payload, headers=headers, timeout=20)
+                if 200 <= r.status_code < 300:
+                    return True
+            except Exception:
+                continue
+        return False
+    except Exception as e:
+        logger.error(f"WhatsApp send error: {e}")
+        return False
+
 bot = BotManager(db_get_all_active_subs, db_get_token, db_mark_sent,
                  db_add_log, db_update_total, db_get_sub)
 
 @app.on_event("startup")
 async def startup():
     init_db()
+    # إضافة إعدادات افتراضية
+    conn = get_db()
+    defaults = [
+        ("site_name", "راصد حراج"),
+        ("trial_days", "2"),
+        ("whatsapp_token", ""),
+        ("landing_hero_title", "لا تفوّت أي صفقة على حراج"),
+        ("landing_hero_sub", "بوت ذكي يراقب حراج ويرسل لك إشعار واتساب فوري بمجرد ظهور إعلان يطابق ما تبحث عنه"),
+        ("landing_feature1", "إشعار فوري على الواتساب"),
+        ("landing_feature2", "بحث بكلمات متعددة"),
+        ("landing_feature3", "فلترة حسب المدينة"),
+        ("landing_price", "49"),
+        ("bot_sleep_minutes", "15"),
+    ]
+    for key, val in defaults:
+        existing = conn.execute("SELECT 1 FROM settings WHERE key=?", (key,)).fetchone()
+        if not existing:
+            conn.execute("INSERT INTO settings (key, value) VALUES (?,?)", (key, val))
+    conn.commit()
+    conn.close()
     bot.start_all_active()
-    logger.info("التطبيق بدأ والبوت يعمل")
+    logger.info("راصد حراج بدأ والبوت يعمل")
 
 def get_current_user(request: Request):
     return request.session.get("user")
+
+def get_setting(key: str, default: str = "") -> str:
+    try:
+        conn = get_db()
+        row = conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+        conn.close()
+        return row["value"] if row else default
+    except Exception:
+        return default
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
@@ -91,7 +145,12 @@ async def index(request: Request):
         if user["role"] == "admin":
             return RedirectResponse("/admin", status_code=302)
         return RedirectResponse("/dashboard", status_code=302)
-    return templates.TemplateResponse("landing.html", {"request": request})
+    # تحميل إعدادات صفحة الهبوط
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM settings").fetchall()
+    conn.close()
+    settings = {r["key"]: r["value"] for r in rows}
+    return templates.TemplateResponse("landing.html", {"request": request, "settings": settings})
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
@@ -130,12 +189,27 @@ async def register_post(request: Request,
     trial_row = conn.execute("SELECT value FROM settings WHERE key='trial_days'").fetchone()
     trial_days = int(trial_row["value"]) if trial_row else 2
     expires = datetime.now() + timedelta(days=trial_days)
-    # البوت لا يبدأ حتى يضيف المستخدم كلمات البحث
     conn.execute("""INSERT INTO subscriptions (user_id, name, whatsapp_number, expires_at, status, keywords)
                     VALUES (?,?,?,?,?,?)""",
                  (user_id, f"اشتراك {name}", phone, expires.isoformat(), "active", "[]"))
     conn.commit()
     conn.close()
+
+    # رسالة التحقق من رقم الواتساب
+    verify_msg = f"""مرحباً {name} 👋
+
+شكراً لتسجيلك في *راصد حراج* 🔍
+
+تم تفعيل اشتراكك التجريبي لمدة {trial_days} أيام.
+
+للبدء، افتح حسابك وأضف كلمات البحث التي تريد مراقبتها على حراج.
+
+🌐 رابط الموقع: https://haraj-saas.onrender.com
+
+نتمنى لك تجربة ممتعة! 🎉"""
+
+    send_whatsapp(phone, verify_msg)
+
     request.session["user"] = {"id": user_id, "name": name, "email": email, "role": "user"}
     return RedirectResponse("/dashboard", status_code=302)
 
@@ -165,8 +239,14 @@ async def dashboard(request: Request):
             d["days_left"] = 0
             d["expired"] = True
         d["bot_running"] = bot.threads.get(d["id"]) and bot.threads[d["id"]].is_alive()
+        kws = d.get("keywords", "[]")
+        try:
+            d["keywords"] = json.loads(kws) if isinstance(kws, str) else kws
+        except Exception:
+            d["keywords"] = []
         subs_data.append(d)
-    return templates.TemplateResponse("dashboard.html", {"request": request, "user": user, "subs": subs_data})
+    site_name = get_setting("site_name", "راصد حراج")
+    return templates.TemplateResponse("dashboard.html", {"request": request, "user": user, "subs": subs_data, "site_name": site_name})
 
 @app.get("/subscription/{sub_id}/edit", response_class=HTMLResponse)
 async def edit_sub_page(request: Request, sub_id: int):
@@ -183,7 +263,8 @@ async def edit_sub_page(request: Request, sub_id: int):
     sub_data["keywords"] = json.loads(sub_data.get("keywords","[]"))
     sub_data["cities"] = json.loads(sub_data.get("cities","[]"))
     sub_data["excluded_words"] = json.loads(sub_data.get("excluded_words","[]"))
-    return templates.TemplateResponse("edit_sub.html", {"request": request, "user": user, "sub": sub_data})
+    site_name = get_setting("site_name", "راصد حراج")
+    return templates.TemplateResponse("edit_sub.html", {"request": request, "user": user, "sub": sub_data, "site_name": site_name})
 
 @app.post("/subscription/{sub_id}/edit")
 async def edit_sub_post(request: Request, sub_id: int):
@@ -194,6 +275,8 @@ async def edit_sub_post(request: Request, sub_id: int):
     keywords = [k.strip() for k in form.get("keywords","").split("\n") if k.strip()]
     cities = [c.strip() for c in form.get("cities","").split("\n") if c.strip()]
     excluded = [e.strip() for e in form.get("excluded_words","").split("\n") if e.strip()]
+    # مدة الفحص من إعدادات الأدمن وليس من المستخدم
+    sleep_minutes = int(get_setting("bot_sleep_minutes", "15"))
     conn = get_db()
     conn.execute("""UPDATE subscriptions SET
         keywords=?, cities=?, excluded_words=?,
@@ -211,12 +294,11 @@ async def edit_sub_post(request: Request, sub_id: int):
          int(form.get("quiet_start_minute", 0)),
          int(form.get("quiet_end_hour", 6)),
          int(form.get("quiet_end_minute", 0)),
-         int(form.get("sleep_minutes", 15)),
+         sleep_minutes,
          form.get("name","").strip() or "اشتراكي",
          sub_id, user["id"]))
     conn.commit()
     conn.close()
-    # تشغيل البوت بعد إضافة الكلمات
     bot.start_sub(sub_id)
     bot.reload_sub(sub_id)
     return RedirectResponse("/dashboard", status_code=302)
@@ -258,7 +340,6 @@ async def admin_users(request: Request):
     conn.close()
     return templates.TemplateResponse("admin_users.html", {"request": request, "user": user, "users": [dict(u) for u in users]})
 
-# إضافة مستخدم جديد من الأدمن
 @app.get("/admin/users/new", response_class=HTMLResponse)
 async def admin_new_user_page(request: Request):
     user = get_current_user(request)
@@ -289,6 +370,20 @@ async def admin_new_user_post(request: Request,
                  (user_id, f"اشتراك {name}", phone, expires.isoformat(), "active", "[]"))
     conn.commit()
     conn.close()
+    # رسالة ترحيب
+    site_name = get_setting("site_name", "راصد حراج")
+    welcome_msg = f"""مرحباً {name} 👋
+
+تم إنشاء حسابك في *{site_name}* 🔍
+
+بيانات الدخول:
+📧 البريد: {email}
+🔑 كلمة المرور: {password}
+
+🌐 رابط الموقع: https://haraj-saas.onrender.com
+
+أضف كلمات البحث وابدأ الاستلام فوراً! 🎉"""
+    send_whatsapp(phone, welcome_msg)
     return RedirectResponse(f"/admin/users/{user_id}", status_code=302)
 
 @app.get("/admin/users/{uid}", response_class=HTMLResponse)
@@ -322,7 +417,6 @@ async def admin_user_detail(request: Request, uid: int):
         "target": dict(target), "subs": subs_data, "saved": saved
     })
 
-# تعديل بيانات المستخدم من الأدمن
 @app.post("/admin/users/{uid}/edit")
 async def admin_edit_user(request: Request, uid: int,
                            name: str = Form(...), email: str = Form(...),
@@ -435,7 +529,13 @@ async def admin_settings_post(request: Request):
         return RedirectResponse("/login", status_code=302)
     form = await request.form()
     conn = get_db()
-    for key in ("whatsapp_token", "trial_days", "site_name"):
+    keys = [
+        "whatsapp_token", "trial_days", "site_name",
+        "landing_hero_title", "landing_hero_sub",
+        "landing_feature1", "landing_feature2", "landing_feature3",
+        "landing_price", "bot_sleep_minutes"
+    ]
+    for key in keys:
         val = form.get(key, "")
         conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?,?)", (key, val))
     conn.commit()
