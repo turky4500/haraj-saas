@@ -1,425 +1,393 @@
 """
-Haraj SaaS - التطبيق الرئيسي
+محرك البوت - مأخوذ من الكود الأصلي وتم تكييفه للعمل مع قاعدة البيانات
+- تحديث روابط API الواتساب
+- إضافة منطق تجاهل الهمزات في البحث
+- تحديث التوكن الافتراضي
 """
-import json, logging, os
-from datetime import datetime, timedelta
+import json, re, time, threading, datetime, random, logging
 from pathlib import Path
-from typing import Optional
+from typing import List, Tuple, Optional, Dict
+from urllib.parse import urljoin, quote
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from fastapi import FastAPI, Request, Form, Depends, HTTPException, status
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-from starlette.middleware.sessions import SessionMiddleware
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+from bs4 import BeautifulSoup
 
-from database import get_db, hash_password, init_db, DB_PATH
+try:
+    import certifi
+    CERT_BUNDLE = certifi.where()
+except Exception:
+    CERT_BUNDLE = True
 
-# ===== إعداد التطبيق =====
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
-logger = logging.getLogger("haraj_app")
+HARAJ_BASE = "https://haraj.com.sa"
+WHATSAPP_API_URLS = [
+    "https://whatsapp.tkwin.com.sa/api/v1/send",
+    "https://whatsapp.tkwin.com.sa/api/v1/send/"
+]
+HARAJ_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Haraj Monitor GUI Multi-Subs by Turki; +https://example.com/contact)",
+    "Accept-Language": "ar-SA,ar;q=0.9"
+}
+CITY_CHECK_WORKERS = 4
+MAX_SEND_PER_CYCLE = 25
+CACHE_MAX_SIZE = 1000
+SSL_WARNED = set()
 
-# إنشاء المجلدات المطلوبة تلقائياً
-Path("static").mkdir(exist_ok=True)
-Path("templates").mkdir(exist_ok=True)
+logger = logging.getLogger("haraj_bot")
 
-app = FastAPI(title="Haraj SaaS")
-app.add_middleware(SessionMiddleware, secret_key=os.environ.get("SECRET_KEY", "haraj-secret-2024"))
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+# ========== أدوات مساعدة ==========
 
-# ===== دوال قاعدة البيانات للبوت =====
+def create_session():
+    s = requests.Session()
+    retry = Retry(total=3, backoff_factor=1.0, status_forcelist=(429,500,502,503,504),
+                  allowed_methods=("GET","POST"), raise_on_status=False)
+    s.mount("https://", HTTPAdapter(max_retries=retry, pool_connections=50, pool_maxsize=50))
+    s.mount("http://",  HTTPAdapter(max_retries=retry))
+    return s
 
-def db_get_all_active_subs():
-    conn = get_db()
-    rows = conn.execute("SELECT * FROM subscriptions WHERE status='active'").fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
-
-def db_get_sub(sub_id: int):
-    conn = get_db()
-    row = conn.execute("SELECT * FROM subscriptions WHERE id=?", (sub_id,)).fetchone()
-    conn.close()
-    return dict(row) if row else None
-
-def db_get_token():
-    conn = get_db()
-    row = conn.execute("SELECT value FROM settings WHERE key='whatsapp_token'").fetchone()
-    conn.close()
-    return row["value"] if row else ""
-
-def db_mark_sent(sub_id: int, ad_id: str, check_only=False, title="", url="") -> bool:
-    conn = get_db()
-    if check_only:
-        r = conn.execute("SELECT 1 FROM sent_ads WHERE subscription_id=? AND ad_id=?", (sub_id, ad_id)).fetchone()
-        conn.close()
-        return r is not None
+def safe_get(session, url, timeout=30):
+    host = url.split("/")[2]
     try:
-        conn.execute("INSERT OR IGNORE INTO sent_ads (subscription_id, ad_id, ad_title, ad_url) VALUES (?,?,?,?)",
-                     (sub_id, ad_id, title, url))
-        conn.commit()
-    except Exception: pass
-    conn.close()
+        r = session.get(url, headers=HARAJ_HEADERS, timeout=timeout, verify=CERT_BUNDLE)
+        r.raise_for_status()
+        return r.content
+    except requests.exceptions.SSLError:
+        if host not in SSL_WARNED:
+            SSL_WARNED.add(host)
+            logger.warning(f"SSL fallback for {host}")
+        r = session.get(url, headers=HARAJ_HEADERS, timeout=timeout, verify=False)
+        r.raise_for_status()
+        return r.content
+
+def send_whatsapp(session, token: str, to: str, text: str, log_cb=None) -> bool:
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json; charset=utf-8",
+        "Accept": "application/json",
+        "User-Agent": "HarajMonitorSaaS/4.0"
+    }
+    payload = {"to": to, "message": text}
+    backoffs = [0, 2, 4]
+
+    for api_url in WHATSAPP_API_URLS:
+        for delay in backoffs:
+            if delay:
+                time.sleep(delay)
+            try:
+                r = session.post(api_url, json=payload, headers=headers, timeout=25, verify=CERT_BUNDLE)
+                if 200 <= r.status_code < 300:
+                    return True
+                if r.status_code in (429, 500, 502, 503, 504):
+                    continue
+                else:
+                    if log_cb:
+                        log_cb(f"[WhatsApp] فشل — Status: {r.status_code} — URL: {api_url}")
+                    break
+            except requests.exceptions.SSLError:
+                try:
+                    r = session.post(api_url, json=payload, headers=headers, timeout=25, verify=False)
+                    if 200 <= r.status_code < 300:
+                        return True
+                except Exception as e:
+                    if log_cb:
+                        log_cb(f"[WhatsApp] SSL Error: {e}")
+            except Exception as e:
+                if log_cb:
+                    log_cb(f"[WhatsApp] خطأ: {e}")
     return False
 
-def db_add_log(sub_id: int, msg: str, level="info"):
-    try:
-        conn = get_db()
-        conn.execute("INSERT INTO logs (subscription_id, message, level) VALUES (?,?,?)", (sub_id, msg, level))
-        conn.commit()
-        conn.close()
-    except Exception: pass
+def extract_ads(html_bytes: bytes, base_url: str) -> List[Tuple[str,str]]:
+    soup = BeautifulSoup(html_bytes, "html.parser")
+    pattern = re.compile(r"https?://(?:www\.)?haraj\.com(?:\.sa)?/\d+/.+")
+    ads, seen = [], set()
+    for a in soup.find_all("a", href=True):
+        abs_url = urljoin(base_url, a["href"].strip())
+        if pattern.match(abs_url) and abs_url not in seen:
+            seen.add(abs_url)
+            ads.append((a.get_text(strip=True) or "إعلان في حراج", abs_url))
+    return ads
 
-def db_update_total(sub_id: int, total: int):
-    conn = get_db()
-    conn.execute("UPDATE subscriptions SET sent_total=? WHERE id=?", (total, sub_id))
-    conn.commit()
-    conn.close()
+def extract_ad_id(url: str) -> str:
+    m = re.search(r"/(\d+)(?:/|$)", url)
+    return m.group(1) if m else url
 
-# ===== تشغيل البوت =====
+# ========== منطق تجاهل الهمزات والتطبيع ==========
+_AR_DIACRITICS_RE = re.compile(r"[\u064B-\u0652\u0670\u0640]")
+_AR_NORM_MAP = str.maketrans({"أ": "ا", "إ": "ا", "آ": "ا", "ؤ": "و", "ئ": "ي", "ى": "ي", "ة": "ه"})
 
-@app.on_event("startup")
-async def startup():
-    init_db()
-    bot.start_all_active()
-    logger.info("✅ التطبيق بدأ والبوت يعمل")
+def normalize(s: str) -> str:
+    """تطبيع النص: تجاهل الهمزات والتشكيل والحروف المتشابهة"""
+    s = (s or "").lower()
+    s = _AR_DIACRITICS_RE.sub("", s)
+    s = s.translate(_AR_NORM_MAP)
+    s = re.sub(r"[^\u0600-\u06FFa-z0-9\s]+", " ", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
 
-# ===== مساعدات الجلسة =====
+def split_tokens(s: str) -> List[str]:
+    return [t for t in normalize(s).split() if t]
 
-def get_current_user(request: Request):
-    return request.session.get("user")
+def matches(text: str, kw: str, excluded: list) -> bool:
+    """تطابق الكلمة مع تجاهل الهمزات والكلمات المستبعدة"""
+    nt = normalize(text)
 
-def require_login(request: Request):
-    user = get_current_user(request)
-    if not user:
-        raise HTTPException(status_code=303, headers={"Location": "/login"})
-    return user
+    # التحقق من الكلمات المستبعدة
+    for neg in excluded:
+        neg_norm = normalize(neg)
+        if not neg_norm:
+            continue
+        pattern = r'(^|\s)' + re.escape(neg_norm) + r'($|\s)'
+        if re.search(pattern, nt):
+            return False
 
-def require_admin(request: Request):
-    user = require_login(request)
-    if user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="ممنوع")
-    return user
+    # التحقق من كلمات البحث
+    kw_tokens = split_tokens(kw)
+    if not kw_tokens:
+        return True
 
-@app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
-    user = get_current_user(request)
-    if user:
-        if user["role"] == "admin":
-            return RedirectResponse("/admin", status_code=302)
-        return RedirectResponse("/dashboard", status_code=302)
-    return RedirectResponse("/login", status_code=302)
+    for token in kw_tokens:
+        pattern = r'(^|\s)' + re.escape(token) + r'($|\s)'
+        if not re.search(pattern, nt):
+            return False
+    return True
 
-@app.get("/login", response_class=HTMLResponse)
-async def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
+def is_quiet(cfg: dict) -> bool:
+    if not cfg.get("quiet_enabled"):
+        return False
+    now = datetime.datetime.now()
+    nm = now.hour*60 + now.minute
+    sm = cfg.get("quiet_start_hour",1)*60 + cfg.get("quiet_start_minute",0)
+    em = cfg.get("quiet_end_hour",6)*60   + cfg.get("quiet_end_minute",0)
+    if sm == em: return True
+    if sm < em:  return sm <= nm < em
+    return nm >= sm or nm < em
 
-@app.post("/login")
-async def login_post(request: Request, email: str = Form(...), password: str = Form(...)):
-    conn = get_db()
-    user = conn.execute("SELECT * FROM users WHERE email=? AND password_hash=? AND is_active=1",
-                        (email, hash_password(password))).fetchone()
-    conn.close()
-    if not user:
-        return templates.TemplateResponse("login.html", {"request": request, "error": "البريد أو كلمة المرور غلط"})
-    request.session["user"] = {"id": user["id"], "name": user["name"],
-                                "email": user["email"], "role": user["role"]}
-    if user["role"] == "admin":
-        return RedirectResponse("/admin", status_code=302)
-    return RedirectResponse("/dashboard", status_code=302)
+# ========== خيط المراقبة لكل اشتراك ==========
 
-@app.get("/register", response_class=HTMLResponse)
-async def register_page(request: Request):
-    return templates.TemplateResponse("register.html", {"request": request})
+class SubMonitor(threading.Thread):
+    def __init__(self, sub_id: int, get_cfg_fn, get_token_fn, mark_sent_fn, add_log_fn, update_sent_total_fn):
+        super().__init__(daemon=True, name=f"sub-{sub_id}")
+        self.sub_id = sub_id
+        self._get_cfg = get_cfg_fn
+        self._get_token = get_token_fn
+        self._mark_sent = mark_sent_fn
+        self._add_log = add_log_fn
+        self._update_total = update_sent_total_fn
+        self.stop_evt = threading.Event()
+        self.reload_evt = threading.Event()
+        self.session = create_session()
+        self.ad_cache: Dict[str,str] = {}
+        self.sent_total = 0
 
-@app.post("/register")
-async def register_post(request: Request,
-                        name: str = Form(...), email: str = Form(...),
-                        phone: str = Form(...), password: str = Form(...)):
-    conn = get_db()
-    existing = conn.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone()
-    if existing:
-        conn.close()
-        return templates.TemplateResponse("register.html", {"request": request, "error": "البريد مسجل مسبقاً"})
+    def log(self, msg: str, level="info"):
+        logger.info(f"[sub-{self.sub_id}] {msg}")
+        self._add_log(self.sub_id, msg, level)
 
-    cursor = conn.execute("INSERT INTO users (name, email, phone, password_hash) VALUES (?,?,?,?)",
-                          (name, email, phone, hash_password(password)))
-    user_id = cursor.lastrowid
+    def run(self):
+        self.log("بدأ المراقبة")
+        while not self.stop_evt.is_set():
+            cfg = self._get_cfg(self.sub_id)
+            if not cfg:
+                self.log("الاشتراك غير موجود، إيقاف.")
+                break
 
-    trial_row = conn.execute("SELECT value FROM settings WHERE key='trial_days'").fetchone()
-    trial_days = int(trial_row["value"]) if trial_row else 2
-    expires = datetime.now() + timedelta(days=trial_days)
-    conn.execute("""INSERT INTO subscriptions (user_id, name, whatsapp_number, expires_at, status)
-                    VALUES (?,?,?,?,?)""",
-                 (user_id, f"اشتراك {name}", phone, expires.isoformat(), "active"))
-    conn.commit()
-    sub_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
-    conn.close()
+            # فحص الانتهاء
+            try:
+                expires = datetime.datetime.fromisoformat(cfg["expires_at"])
+                if datetime.datetime.now() >= expires:
+                    self.log("انتهت مدة الاشتراك.")
+                    break
+            except Exception:
+                pass
 
-    bot.start_sub(sub_id)
+            token = self._get_token()
+            if not token:
+                self.log("لا يوجد توكن واتساب، انتظار...", "warning")
+                self._sleep(60)
+                continue
 
-    request.session["user"] = {"id": user_id, "name": name, "email": email, "role": "user"}
-    return RedirectResponse("/dashboard", status_code=302)
+            quiet = is_quiet(cfg)
+            keywords = json.loads(cfg.get("keywords","[]")) or [""]
+            cities   = json.loads(cfg.get("cities","[]"))
+            excluded = json.loads(cfg.get("excluded_words","[]"))
+            city_filter = bool(cfg.get("city_filter_enabled", 1))
+            recipients = [cfg["whatsapp_number"]]
+            sub_name = cfg["name"]
+            sleep_sec = max(5, int(cfg.get("sleep_minutes",15))) * 60
 
-@app.get("/logout")
-async def logout(request: Request):
-    request.session.clear()
-    return RedirectResponse("/login", status_code=302)
+            sent = self._run_cycle(cfg, token, quiet, keywords, cities, excluded,
+                                   city_filter, recipients, sub_name)
+            self.sent_total += sent
+            self._update_total(self.sub_id, self.sent_total)
 
-@app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard(request: Request):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse("/login", status_code=302)
-    conn = get_db()
-    subs = conn.execute("SELECT * FROM subscriptions WHERE user_id=? ORDER BY created_at DESC",
-                        (user["id"],)).fetchall()
-    conn.close()
-    now = datetime.now()
-    subs_data = []
-    for s in subs:
-        d = dict(s)
-        try:
-            exp = datetime.fromisoformat(d["expires_at"])
-            d["days_left"] = max(0, (exp - now).days)
-            d["expired"] = now >= exp
-        except Exception:
-            d["days_left"] = 0
-            d["expired"] = True
-        d["bot_running"] = bot.threads.get(d["id"]) and bot.threads[d["id"]].is_alive()
-        subs_data.append(d)
-    return templates.TemplateResponse("dashboard.html", {"request": request, "user": user, "subs": subs_data})
+            self._sleep(sleep_sec)
 
-@app.get("/subscription/{sub_id}/edit", response_class=HTMLResponse)
-async def edit_sub_page(request: Request, sub_id: int):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse("/login", status_code=302)
-    conn = get_db()
-    sub = conn.execute("SELECT * FROM subscriptions WHERE id=? AND user_id=?",
-                       (sub_id, user["id"])).fetchone()
-    conn.close()
-    if not sub:
-        raise HTTPException(404)
-    sub_data = dict(sub)
-    sub_data["keywords"] = json.loads(sub_data.get("keywords","[]"))
-    sub_data["cities"] = json.loads(sub_data.get("cities","[]"))
-    sub_data["excluded_words"] = json.loads(sub_data.get("excluded_words","[]"))
-    return templates.TemplateResponse("edit_sub.html", {"request": request, "user": user, "sub": sub_data})
+        self.log("توقف المراقبة.")
 
-@app.post("/subscription/{sub_id}/edit")
-async def edit_sub_post(request: Request, sub_id: int):
-    user = get_current_user(request)
-    if not user:
-        return RedirectResponse("/login", status_code=302)
-    form = await request.form()
-    keywords = [k.strip() for k in form.get("keywords","").split("\n") if k.strip()]
-    cities = [c.strip() for c in form.get("cities","").split("\n") if c.strip()]
-    excluded = [e.strip() for e in form.get("excluded_words","").split("\n") if e.strip()]
+    def _sleep(self, seconds: float):
+        end = time.time() + seconds
+        while time.time() < end:
+            if self.stop_evt.is_set() or self.reload_evt.is_set():
+                self.reload_evt.clear()
+                break
+            time.sleep(min(1.0, end - time.time()))
 
-    conn = get_db()
-    conn.execute("""UPDATE subscriptions SET
-        keywords=?, cities=?, excluded_words=?,
-        city_filter_enabled=?, quiet_enabled=?,
-        quiet_start_hour=?, quiet_start_minute=?,
-        quiet_end_hour=?, quiet_end_minute=?,
-        sleep_minutes=?, name=?
-        WHERE id=? AND user_id=?""",
-        (json.dumps(keywords, ensure_ascii=False),
-         json.dumps(cities, ensure_ascii=False),
-         json.dumps(excluded, ensure_ascii=False),
-         1 if form.get("city_filter_enabled") else 0,
-         1 if form.get("quiet_enabled") else 0,
-         int(form.get("quiet_start_hour", 1)),
-         int(form.get("quiet_start_minute", 0)),
-         int(form.get("quiet_end_hour", 6)),
-         int(form.get("quiet_end_minute", 0)),
-         int(form.get("sleep_minutes", 15)),
-         form.get("name","").strip() or "اشتراكي",
-         sub_id, user["id"]))
-    conn.commit()
-    conn.close()
-    bot.reload_sub(sub_id)
-    return RedirectResponse("/dashboard", status_code=302)
+    def _run_cycle(self, cfg, token, quiet, keywords, cities, excluded,
+                   city_filter, recipients, sub_name) -> int:
+        candidates = []
+        cycle_seen = set()
 
-@app.get("/admin", response_class=HTMLResponse)
-async def admin_dashboard(request: Request):
-    user = get_current_user(request)
-    if not user or user["role"] != "admin":
-        return RedirectResponse("/login", status_code=302)
-    conn = get_db()
-    total_users = conn.execute("SELECT COUNT(*) FROM users WHERE role='user'").fetchone()[0]
-    total_subs  = conn.execute("SELECT COUNT(*) FROM subscriptions").fetchone()[0]
-    active_subs = conn.execute("SELECT COUNT(*) FROM subscriptions WHERE status='active' AND expires_at > datetime('now')").fetchone()[0]
-    total_sent  = conn.execute("SELECT SUM(sent_total) FROM subscriptions").fetchone()[0] or 0
-    recent_logs = conn.execute("SELECT l.*, s.name as sub_name FROM logs l LEFT JOIN subscriptions s ON l.subscription_id=s.id ORDER BY l.created_at DESC LIMIT 30").fetchall()
-    conn.close()
-    bot_status = bot.status()
-    return templates.TemplateResponse("admin.html", {
-        "request": request, "user": user,
-        "stats": {"users": total_users, "subs": total_subs, "active": active_subs, "sent": total_sent},
-        "recent_logs": [dict(l) for l in recent_logs],
-        "bot_status": bot_status
-    })
+        for kw in keywords:
+            kw = kw.strip()
+            url = f"{HARAJ_BASE}/search/{quote(kw,safe='')}/" if kw else f"{HARAJ_BASE}/"
+            for page in range(1,4):
+                purl = f"{url}?page={page}" if page > 1 else url
+                try:
+                    html = safe_get(self.session, purl)
+                except Exception as e:
+                    self.log(f"فشل جلب الصفحة: {e}", "error")
+                    continue
+                for title, ad_url in extract_ads(html, HARAJ_BASE):
+                    ad_id = extract_ad_id(ad_url)
+                    if self._mark_sent(self.sub_id, ad_id, check_only=True):
+                        continue
+                    if ad_id in cycle_seen:
+                        continue
+                    cycle_seen.add(ad_id)
+                    candidates.append((kw, title, ad_url))
+                time.sleep(random.uniform(1, 3))
 
-@app.get("/admin/users", response_class=HTMLResponse)
-async def admin_users(request: Request):
-    user = get_current_user(request)
-    if not user or user["role"] != "admin":
-        return RedirectResponse("/login", status_code=302)
-    conn = get_db()
-    users = conn.execute("""
-        SELECT u.*, COUNT(s.id) as sub_count,
-        SUM(CASE WHEN s.expires_at > datetime('now') AND s.status='active' THEN 1 ELSE 0 END) as active_subs
-        FROM users u LEFT JOIN subscriptions s ON u.id=s.user_id
-        WHERE u.role='user' GROUP BY u.id ORDER BY u.created_at DESC
-    """).fetchall()
-    conn.close()
-    return templates.TemplateResponse("admin_users.html", {"request": request, "user": user, "users": [dict(u) for u in users]})
+        if not candidates:
+            return 0
 
-@app.get("/admin/users/{uid}", response_class=HTMLResponse)
-async def admin_user_detail(request: Request, uid: int):
-    user = get_current_user(request)
-    if not user or user["role"] != "admin":
-        return RedirectResponse("/login", status_code=302)
-    conn = get_db()
-    target = conn.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
-    if not target:
-        conn.close()
-        raise HTTPException(404)
-    subs = conn.execute("SELECT * FROM subscriptions WHERE user_id=? ORDER BY created_at DESC", (uid,)).fetchall()
-    conn.close()
-    now = datetime.now()
-    subs_data = []
-    for s in subs:
-        d = dict(s)
-        try:
-            exp = datetime.fromisoformat(d["expires_at"])
-            d["days_left"] = max(0, (exp - now).days)
-            d["expired"] = now >= exp
-        except Exception:
-            d["days_left"] = 0
-            d["expired"] = True
-        d["bot_running"] = bot.threads.get(d["id"]) and bot.threads[d["id"]].is_alive()
-        subs_data.append(d)
-    return templates.TemplateResponse("admin_user_detail.html", {
-        "request": request, "user": user,
-        "target": dict(target), "subs": subs_data
-    })
+        to_send = []
 
-@app.post("/admin/users/{uid}/toggle")
-async def admin_toggle_user(request: Request, uid: int):
-    user = get_current_user(request)
-    if not user or user["role"] != "admin":
-        return JSONResponse({"error": "ممنوع"}, status_code=403)
-    conn = get_db()
-    current = conn.execute("SELECT is_active FROM users WHERE id=?", (uid,)).fetchone()
-    new_val = 0 if current["is_active"] else 1
-    conn.execute("UPDATE users SET is_active=? WHERE id=?", (new_val, uid))
-    conn.commit()
-    conn.close()
-    return JSONResponse({"active": new_val})
+        def check_one(item):
+            kw, title, ad_url = item
+            ad_id = extract_ad_id(ad_url)
+            full_text = self.ad_cache.get(ad_id)
+            if not full_text:
+                try:
+                    ad_html = safe_get(self.session, ad_url)
+                    soup = BeautifulSoup(ad_html, "html.parser")
+                    full_text = soup.get_text(" ", strip=True)
+                    self.ad_cache[ad_id] = full_text
+                    # تنظيف الكاش إذا كبر كثيراً
+                    if len(self.ad_cache) > CACHE_MAX_SIZE:
+                        oldest = list(self.ad_cache.keys())[:100]
+                        for k in oldest:
+                            del self.ad_cache[k]
+                except Exception:
+                    return None
 
-@app.post("/admin/subscriptions/{sub_id}/extend")
-async def admin_extend_sub(request: Request, sub_id: int, days: int = Form(7)):
-    user = get_current_user(request)
-    if not user or user["role"] != "admin":
-        return JSONResponse({"error": "ممنوع"}, status_code=403)
-    conn = get_db()
-    sub = conn.execute("SELECT * FROM subscriptions WHERE id=?", (sub_id,)).fetchone()
-    if not sub:
-        conn.close()
-        return JSONResponse({"error": "غير موجود"}, status_code=404)
-    try:
-        current_exp = datetime.fromisoformat(sub["expires_at"])
-        if current_exp < datetime.now():
-            current_exp = datetime.now()
-    except Exception:
-        current_exp = datetime.now()
-    new_exp = current_exp + timedelta(days=days)
-    conn.execute("UPDATE subscriptions SET expires_at=?, status='active' WHERE id=?",
-                 (new_exp.isoformat(), sub_id))
-    conn.commit()
-    conn.close()
-    bot.start_sub(sub_id)
-    return JSONResponse({"new_expires": new_exp.strftime("%Y-%m-%d")})
+            # فلترة المدينة
+            if city_filter and cities:
+                ft_lower = full_text.lower()
+                if not any(c.lower() in ft_lower for c in cities):
+                    return None
 
-@app.post("/admin/subscriptions/add")
-async def admin_add_sub(request: Request,
-                        user_id: int = Form(...), name: str = Form(...),
-                        whatsapp: str = Form(...), days: int = Form(30)):
-    user = get_current_user(request)
-    if not user or user["role"] != "admin":
-        return RedirectResponse("/admin/users", status_code=302)
-    expires = datetime.now() + timedelta(days=days)
-    conn = get_db()
-    conn.execute("""INSERT INTO subscriptions (user_id, name, whatsapp_number, expires_at, status)
-                    VALUES (?,?,?,?,?)""", (user_id, name, whatsapp, expires.isoformat(), "active"))
-    conn.commit()
-    sub_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
-    conn.close()
-    bot.start_sub(sub_id)
-    return RedirectResponse(f"/admin/users/{user_id}", status_code=302)
+            # فلترة الكلمات (مع تجاهل الهمزات)
+            if not matches(full_text, kw, excluded):
+                return None
 
-@app.post("/admin/subscriptions/{sub_id}/stop")
-async def admin_stop_sub(request: Request, sub_id: int):
-    user = get_current_user(request)
-    if not user or user["role"] != "admin":
-        return JSONResponse({"error": "ممنوع"}, status_code=403)
-    bot.stop_sub(sub_id)
-    conn = get_db()
-    conn.execute("UPDATE subscriptions SET status='paused' WHERE id=?", (sub_id,))
-    conn.commit()
-    conn.close()
-    return JSONResponse({"status": "stopped"})
+            return item
 
-@app.post("/admin/subscriptions/{sub_id}/start")
-async def admin_start_sub(request: Request, sub_id: int):
-    user = get_current_user(request)
-    if not user or user["role"] != "admin":
-        return JSONResponse({"error": "ممنوع"}, status_code=403)
-    conn = get_db()
-    conn.execute("UPDATE subscriptions SET status='active' WHERE id=?", (sub_id,))
-    conn.commit()
-    conn.close()
-    bot.start_sub(sub_id)
-    return JSONResponse({"status": "started"})
+        with ThreadPoolExecutor(max_workers=CITY_CHECK_WORKERS) as ex:
+            futures = [ex.submit(check_one, c) for c in candidates]
+            for fut in as_completed(futures):
+                if self.stop_evt.is_set(): break
+                r = fut.result()
+                if r: to_send.append(r)
 
-@app.get("/admin/settings", response_class=HTMLResponse)
-async def admin_settings_page(request: Request):
-    user = get_current_user(request)
-    if not user or user["role"] != "admin":
-        return RedirectResponse("/login", status_code=302)
-    conn = get_db()
-    rows = conn.execute("SELECT * FROM settings").fetchall()
-    conn.close()
-    settings = {r["key"]: r["value"] for r in rows}
-    return templates.TemplateResponse("admin_settings.html", {"request": request, "user": user, "settings": settings})
+        sent = 0
+        city_label = "، ".join(cities) if city_filter and cities else "كل المدن"
 
-@app.post("/admin/settings")
-async def admin_settings_post(request: Request):
-    user = get_current_user(request)
-    if not user or user["role"] != "admin":
-        return RedirectResponse("/login", status_code=302)
-    form = await request.form()
-    conn = get_db()
-    for key in ("whatsapp_token", "trial_days", "site_name"):
-        val = form.get(key, "")
-        conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?,?)", (key, val))
-    conn.commit()
-    conn.close()
-    return RedirectResponse("/admin/settings?saved=1", status_code=302)
+        for idx, (kw, title, ad_url) in enumerate(to_send, 1):
+            if self.stop_evt.is_set(): break
+            if idx > MAX_SEND_PER_CYCLE: break
+            ad_id = extract_ad_id(ad_url)
 
-@app.get("/admin/logs", response_class=HTMLResponse)
-async def admin_logs(request: Request):
-    user = get_current_user(request)
-    if not user or user["role"] != "admin":
-        return RedirectResponse("/login", status_code=302)
-    conn = get_db()
-    logs = conn.execute("""SELECT l.*, s.name as sub_name, u.name as user_name
-        FROM logs l
-        LEFT JOIN subscriptions s ON l.subscription_id=s.id
-        LEFT JOIN users u ON s.user_id=u.id
-        ORDER BY l.created_at DESC LIMIT 200""").fetchall()
-    conn.close()
-    return templates.TemplateResponse("admin_logs.html", {"request": request, "user": user,
-                                                           "logs": [dict(l) for l in logs]})
+            if quiet:
+                self.log(f"[هدوء] حفظ: {title}")
+                continue
+
+            msg = f"🔔 إعلان جديد ({sub_name})\n📍 {city_label}\n📌 {title}\n🔗 {ad_url}"
+
+            for to in recipients:
+                # تأخير 30-60 ثانية بين كل إرسال لحماية الرقم
+                delay = random.uniform(30, 60)
+                self.log(f"انتظار {delay:.0f}s قبل الإرسال (لحماية الرقم)...")
+                self._sleep(delay)
+                if self.stop_evt.is_set(): break
+                ok = send_whatsapp(self.session, token, to, msg, log_cb=self.log)
+                if ok:
+                    self._mark_sent(self.sub_id, ad_id, title=title, url=ad_url)
+                    sent += 1
+                    self.log(f"✅ أُرسل: {title}")
+                else:
+                    self.log(f"❌ فشل الإرسال: {title}", "error")
+
+        return sent
+
+    def stop(self):
+        self.stop_evt.set()
+
+    def reload(self):
+        self.reload_evt.set()
+
+
+# ========== مدير كل الاشتراكات ==========
+
+class BotManager:
+    def __init__(self, db_get_fn, db_get_token_fn, db_mark_sent_fn,
+                 db_add_log_fn, db_update_total_fn, db_get_sub_fn):
+        self._db_get = db_get_fn
+        self._get_token = db_get_token_fn
+        self._mark_sent = db_mark_sent_fn
+        self._add_log = db_add_log_fn
+        self._update_total = db_update_total_fn
+        self._get_sub = db_get_sub_fn
+        self.threads: Dict[int, SubMonitor] = {}
+        self._lock = threading.Lock()
+
+    def start_sub(self, sub_id: int):
+        with self._lock:
+            th = self.threads.get(sub_id)
+            if th and th.is_alive():
+                return
+            th = SubMonitor(
+                sub_id, self._get_sub, self._get_token,
+                self._mark_sent, self._add_log, self._update_total
+            )
+            self.threads[sub_id] = th
+            th.start()
+            logger.info(f"Started sub-{sub_id}")
+
+    def stop_sub(self, sub_id: int):
+        with self._lock:
+            th = self.threads.get(sub_id)
+            if th and th.is_alive():
+                th.stop()
+
+    def reload_sub(self, sub_id: int):
+        with self._lock:
+            th = self.threads.get(sub_id)
+            if th and th.is_alive():
+                th.reload()
+
+    def status(self) -> dict:
+        with self._lock:
+            return {sid: th.is_alive() for sid, th in self.threads.items()}
+
+    def start_all_active(self):
+        subs = self._db_get()
+        for sub in subs:
+            if sub["status"] == "active":
+                try:
+                    expires = datetime.datetime.fromisoformat(sub["expires_at"])
+                    if datetime.datetime.now() < expires:
+                        self.start_sub(sub["id"])
+                except Exception:
+                    pass
