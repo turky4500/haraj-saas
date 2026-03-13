@@ -19,6 +19,10 @@ from bot.haraj_bot import BotManager
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger("haraj_app")
 
+# إنشاء المجلدات المطلوبة تلقائياً
+Path("static").mkdir(exist_ok=True)
+Path("templates").mkdir(exist_ok=True)
+
 app = FastAPI(title="Haraj SaaS")
 app.add_middleware(SessionMiddleware, secret_key=os.environ.get("SECRET_KEY", "haraj-secret-2024"))
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -99,10 +103,6 @@ def require_admin(request: Request):
         raise HTTPException(status_code=403, detail="ممنوع")
     return user
 
-# ============================
-# ========= الصفحات ==========
-# ============================
-
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     user = get_current_user(request)
@@ -111,8 +111,6 @@ async def index(request: Request):
             return RedirectResponse("/admin", status_code=302)
         return RedirectResponse("/dashboard", status_code=302)
     return RedirectResponse("/login", status_code=302)
-
-# ===== تسجيل الدخول =====
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
@@ -132,8 +130,6 @@ async def login_post(request: Request, email: str = Form(...), password: str = F
         return RedirectResponse("/admin", status_code=302)
     return RedirectResponse("/dashboard", status_code=302)
 
-# ===== إنشاء حساب جديد =====
-
 @app.get("/register", response_class=HTMLResponse)
 async def register_page(request: Request):
     return templates.TemplateResponse("register.html", {"request": request})
@@ -152,7 +148,6 @@ async def register_post(request: Request,
                           (name, email, phone, hash_password(password)))
     user_id = cursor.lastrowid
 
-    # اشتراك تجريبي مجاني
     trial_row = conn.execute("SELECT value FROM settings WHERE key='trial_days'").fetchone()
     trial_days = int(trial_row["value"]) if trial_row else 2
     expires = datetime.now() + timedelta(days=trial_days)
@@ -163,7 +158,6 @@ async def register_post(request: Request,
     sub_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
     conn.close()
 
-    # تشغيل البوت للاشتراك الجديد
     bot.start_sub(sub_id)
 
     request.session["user"] = {"id": user_id, "name": name, "email": email, "role": "user"}
@@ -173,8 +167,6 @@ async def register_post(request: Request,
 async def logout(request: Request):
     request.session.clear()
     return RedirectResponse("/login", status_code=302)
-
-# ===== لوحة المستخدم =====
 
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request):
@@ -200,8 +192,6 @@ async def dashboard(request: Request):
         subs_data.append(d)
     return templates.TemplateResponse("dashboard.html", {"request": request, "user": user, "subs": subs_data})
 
-# ===== تعديل اشتراك المستخدم =====
-
 @app.get("/subscription/{sub_id}/edit", response_class=HTMLResponse)
 async def edit_sub_page(request: Request, sub_id: int):
     user = get_current_user(request)
@@ -225,12 +215,9 @@ async def edit_sub_post(request: Request, sub_id: int):
     if not user:
         return RedirectResponse("/login", status_code=302)
     form = await request.form()
-    keywords_raw = form.get("keywords","")
-    cities_raw = form.get("cities","")
-    excluded_raw = form.get("excluded_words","")
-    keywords = [k.strip() for k in keywords_raw.split("\n") if k.strip()]
-    cities = [c.strip() for c in cities_raw.split("\n") if c.strip()]
-    excluded = [e.strip() for e in excluded_raw.split("\n") if e.strip()]
+    keywords = [k.strip() for k in form.get("keywords","").split("\n") if k.strip()]
+    cities = [c.strip() for c in form.get("cities","").split("\n") if c.strip()]
+    excluded = [e.strip() for e in form.get("excluded_words","").split("\n") if e.strip()]
 
     conn = get_db()
     conn.execute("""UPDATE subscriptions SET
@@ -256,10 +243,6 @@ async def edit_sub_post(request: Request, sub_id: int):
     conn.close()
     bot.reload_sub(sub_id)
     return RedirectResponse("/dashboard", status_code=302)
-
-# ============================
-# ====== لوحة الأدمن =========
-# ============================
 
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_dashboard(request: Request):
@@ -325,8 +308,6 @@ async def admin_user_detail(request: Request, uid: int):
         "request": request, "user": user,
         "target": dict(target), "subs": subs_data
     })
-
-# ===== API الأدمن =====
 
 @app.post("/admin/users/{uid}/toggle")
 async def admin_toggle_user(request: Request, uid: int):
