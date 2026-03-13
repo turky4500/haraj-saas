@@ -1,144 +1,96 @@
-{% extends "base_light.html" %}
-{% block title %}لوحة الأدمن — راصد حراج{% endblock %}
-{% block head %}
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+{% extends "base.html" %}
+{% block title %}لوحة الإدارة — راصد حراج{% endblock %}
+{% block extra_css %}
 <style>
-  /* إجبار استخدام الثيم الفاتح والخط الجديد */
-  body, .layout, .sidebar, .main-content { font-family: 'Cairo', sans-serif !important; background-color: #f8f9fa; color: #1e293b; }
-  .sidebar { background: #ffffff; border-left: 1px solid #e2e8f0; }
-  .nav-item.active { background: #eff6ff; color: #2563eb; border-right: 3px solid #2563eb; }
-  .nav-item { color: #64748b; font-weight: 600; }
-  .card, .stat-card { background: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0; border-radius: 12px; }
-  .topbar { background: #ffffff; border-bottom: 1px solid #e2e8f0; }
-  .topbar-title { color: #0f172a; font-weight: 800; font-size: 20px; }
-  table th { background: #f8fafc; color: #475569; font-weight: 700; border-bottom: 2px solid #e2e8f0; }
-  table td { border-bottom: 1px solid #e2e8f0; color: #1e293b; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+    .stat-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; padding: 25px; text-align: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
+    .stat-num { font-size: 32px; font-weight: 900; color: var(--primary); margin-bottom: 5px; }
+    .stat-label { font-size: 14px; font-weight: 700; color: var(--text-muted); }
+    
+    .panel-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; padding: 25px; margin-bottom: 20px; }
+    .panel-title { font-size: 18px; font-weight: 800; margin-bottom: 20px; display: flex; justify-content: space-between; }
+    
+    .table { width: 100%; border-collapse: collapse; text-align: right; font-size: 14px; }
+    .table th { padding: 12px; background: var(--bg); color: var(--text-muted); font-weight: 800; border-bottom: 2px solid var(--border); }
+    .table td { padding: 12px; border-bottom: 1px solid var(--border); color: var(--text-main); font-weight: 600; }
+    .badge { padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; }
+    .b-success { background: #dcfce7; color: #166534; }
+    .b-danger { background: #fee2e2; color: #991b1b; }
+    .b-warning { background: #fef9c3; color: #854d0e; }
+    .b-info { background: #e0f2fe; color: #075985; }
 </style>
 {% endblock %}
 {% block body %}
-<div class="layout">
-  <aside class="sidebar">
-    <div class="sidebar-logo">
-      <div class="logo-mark" style="color: #2563eb; font-weight: 800;">🔍 راصد حراج</div>
-      <div class="logo-sub" style="color: #64748b;">لوحة الإدارة</div>
+<div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+    <h1 style="font-weight: 800;">لوحة تحكم الإدارة 👑</h1>
+    <div>
+        <a href="/admin/settings" class="btn btn-primary">⚙️ الإعدادات</a>
     </div>
-    <nav class="sidebar-nav">
-      <div class="nav-section" style="color: #94a3b8;">الإدارة</div>
-      <a href="/admin" class="nav-item active">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="20"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/></svg>
-        الرئيسية
-      </a>
-      <a href="/admin/users" class="nav-item">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="20"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197"/></svg>
-        المستخدمون
-      </a>
-      <a href="/admin/logs" class="nav-item">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="20"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-        السجلات
-      </a>
-      <a href="/admin/settings" class="nav-item">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="20"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065z"/><circle cx="12" cy="12" r="3" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/></svg>
-        الإعدادات وصفحة الهبوط
-      </a>
-    </nav>
-    <div class="sidebar-footer">
-      <div class="user-badge">
-        <div class="user-avatar" style="background:linear-gradient(135deg,#3b82f6,#2563eb)">A</div>
-        <div class="user-info">
-          <div class="user-name" style="color: #0f172a; font-weight: 700;">{{ user.name }}</div>
-          <div class="user-role" style="color: #64748b;">مدير النظام</div>
-        </div>
-      </div>
-      <a href="/logout" style="display:block;margin-top:12px;font-size:13px;font-weight: 600;color:#ef4444;text-decoration:none;">تسجيل الخروج 🚪</a>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-num">{{ stats.users }}</div>
+        <div class="stat-label">👥 إجمالي المستخدمين</div>
     </div>
-  </aside>
-
-  <main class="main-content">
-    <div class="topbar">
-      <div class="topbar-title">لوحة التحكم</div>
-      <div class="topbar-actions">
-        <span class="badge badge-success" style="background: #dcfce7; color: #166534; padding: 6px 12px; border-radius: 50px; font-weight: 700;"><span class="live-dot" style="width:8px;height:8px;background:#16a34a;display:inline-block;border-radius:50%;margin-left:6px;"></span> النظام يعمل</span>
-      </div>
+    <div class="stat-card">
+        <div class="stat-num">{{ stats.subs }}</div>
+        <div class="stat-label">📋 إجمالي الاشتراكات</div>
     </div>
-    <div class="page-body">
+    <div class="stat-card">
+        <div class="stat-num" style="color: #10b981;">{{ stats.active }}</div>
+        <div class="stat-label">✅ اشتراكات نشطة (تعمل)</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-num" style="color: #f59e0b;">{{ stats.sent }}</div>
+        <div class="stat-label">📨 إعلانات أُرسلت للمشتركين</div>
+    </div>
+</div>
 
-      <div class="stats-grid">
-        <div class="stat-card" style="padding: 20px;">
-          <div class="stat-icon" style="background:#eff6ff; font-size: 24px; padding: 10px; border-radius: 10px; display: inline-block;">👥</div>
-          <div class="stat-label" style="color: #64748b; margin-top: 10px; font-weight: 600;">المستخدمون</div>
-          <div class="stat-value" style="color: #0f172a; font-size: 28px; font-weight: 800;">{{ stats.users }}</div>
-        </div>
-        <div class="stat-card" style="padding: 20px;">
-          <div class="stat-icon" style="background:#dcfce7; font-size: 24px; padding: 10px; border-radius: 10px; display: inline-block;">✅</div>
-          <div class="stat-label" style="color: #64748b; margin-top: 10px; font-weight: 600;">اشتراكات نشطة</div>
-          <div class="stat-value" style="color: #16a34a; font-size: 28px; font-weight: 800;">{{ stats.active }}</div>
-        </div>
-        <div class="stat-card" style="padding: 20px;">
-          <div class="stat-icon" style="background:#fef3c7; font-size: 24px; padding: 10px; border-radius: 10px; display: inline-block;">📋</div>
-          <div class="stat-label" style="color: #64748b; margin-top: 10px; font-weight: 600;">إجمالي الاشتراكات</div>
-          <div class="stat-value" style="color: #0f172a; font-size: 28px; font-weight: 800;">{{ stats.subs }}</div>
-        </div>
-        <div class="stat-card" style="padding: 20px;">
-          <div class="stat-icon" style="background:#fce7f3; font-size: 24px; padding: 10px; border-radius: 10px; display: inline-block;">📨</div>
-          <div class="stat-label" style="color: #64748b; margin-top: 10px; font-weight: 600;">إشعارات أُرسلت</div>
-          <div class="stat-value" style="color: #e11d48; font-size: 28px; font-weight: 800;">{{ stats.sent }}</div>
-        </div>
-      </div>
-
-      <div class="card" style="margin-bottom:24px; margin-top: 24px; padding: 20px;">
-        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-          <div class="card-title" style="font-size: 18px; font-weight: 800; color: #0f172a;">🤖 حالة البوت</div>
-          <span style="font-size:13px;color:#64748b; background: #f1f5f9; padding: 4px 10px; border-radius: 8px;">{{ bot_status|length }} خيط نشط</span>
-        </div>
-        {% if bot_status %}
-        <div style="display:flex;flex-wrap:wrap;gap:10px">
-          {% for sid, alive in bot_status.items() %}
-          <span class="badge" style="padding: 8px 12px; border-radius: 8px; font-weight: 600; font-size: 13px; {% if alive %}background: #dcfce7; color: #166534;{% else %}background: #f1f5f9; color: #64748b;{% endif %}">
-            اشتراك #{{ sid }}: {% if alive %}يعمل 🟢{% else %}متوقف ⚪{% endif %}
-          </span>
-          {% endfor %}
-        </div>
+<div class="panel-card">
+    <div class="panel-title">
+        <span>🤖 حالة خيوط البوت (Threads)</span>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+        {% for sid, alive in bot_status.items() %}
+        <span class="badge {% if alive %}b-success{% else %}b-danger{% endif %}" style="font-size: 14px; padding: 8px 12px;">
+            اشتراك #{{ sid }}: {% if alive %}يعمل 🟢{% else %}متوقف 🔴{% endif %}
+        </span>
         {% else %}
-        <p style="font-size:14px;color:#64748b; background: #f8fafc; padding: 16px; border-radius: 8px; text-align: center;">لا يوجد اشتراكات نشطة حالياً</p>
-        {% endif %}
-      </div>
+        <div style="color: var(--text-muted); font-size: 14px;">لا توجد اشتراكات مضافة في البوت حالياً.</div>
+        {% endfor %}
+    </div>
+</div>
 
-      <div class="card" style="padding: 20px;">
-        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-          <div class="card-title" style="font-size: 18px; font-weight: 800; color: #0f172a;">📋 آخر السجلات</div>
-          <a href="/admin/logs" class="btn btn-ghost btn-sm" style="color: #2563eb; font-weight: 700; text-decoration: none;">عرض الكل ←</a>
-        </div>
-        <div class="table-wrap" style="overflow-x: auto;">
-          <table style="width: 100%; border-collapse: collapse; text-align: right;">
+<div class="panel-card">
+    <div class="panel-title">📋 آخر السجلات (Logs)</div>
+    <div style="overflow-x: auto;">
+        <table class="table">
             <thead>
-              <tr>
-                <th style="padding: 12px;">الاشتراك</th>
-                <th style="padding: 12px;">الرسالة</th>
-                <th style="padding: 12px;">المستوى</th>
-                <th style="padding: 12px;">الوقت</th>
-              </tr>
+                <tr>
+                    <th>الاشتراك</th>
+                    <th>الرسالة</th>
+                    <th>المستوى</th>
+                    <th>الوقت</th>
+                </tr>
             </thead>
             <tbody>
-              {% for log in recent_logs %}
-              <tr>
-                <td style="padding: 12px; font-weight: 600;">{{ log.sub_name or '#' ~ log.subscription_id }}</td>
-                <td style="padding: 12px; max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ log.message }}</td>
-                <td style="padding: 12px;">
-                  {% if log.level == 'error' %}<span style="background: #fee2e2; color: #991b1b; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 700;">خطأ</span>
-                  {% elif log.level == 'warning' %}<span style="background: #fef9c3; color: #854d0e; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 700;">تحذير</span>
-                  {% else %}<span style="background: #e0f2fe; color: #075985; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 700;">معلومة</span>{% endif %}
-                </td>
-                <td style="padding: 12px; font-size:13px;color:#64748b;" dir="ltr">{{ log.created_at[:16] }}</td>
-              </tr>
-              {% else %}
-              <tr><td colspan="4" style="text-align:center;color:#64748b;padding:30px; background: #f8fafc; border-radius: 8px;">لا يوجد سجلات حتى الآن</td></tr>
-              {% endfor %}
+                {% for log in recent_logs %}
+                <tr>
+                    <td>{{ log.sub_name or '#' ~ log.subscription_id }}</td>
+                    <td style="max-width:300px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ log.message }}</td>
+                    <td>
+                        {% if log.level == 'error' %}<span class="badge b-danger">خطأ</span>
+                        {% elif log.level == 'warning' %}<span class="badge b-warning">تحذير</span>
+                        {% else %}<span class="badge b-info">معلومة</span>{% endif %}
+                    </td>
+                    <td dir="ltr" style="text-align: right; color: var(--text-muted); font-size: 13px;">{{ log.created_at[:16] }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4" style="text-align: center; padding: 20px; color: var(--text-muted);">لا توجد سجلات بعد</td></tr>
+                {% endfor %}
             </tbody>
-          </table>
-        </div>
-      </div>
-
+        </table>
     </div>
-  </main>
 </div>
 {% endblock %}
