@@ -76,8 +76,6 @@ def db_update_total(sub_id: int, total: int):
     conn.close()
 
 # ===== تشغيل البوت =====
-bot = BotManager(db_get_all_active_subs, db_get_token, db_mark_sent,
-                 db_add_log, db_update_total, db_get_sub)
 
 @app.on_event("startup")
 async def startup():
