@@ -1,64 +1,251 @@
 {% extends "base.html" %}
 {% block title %}إعدادات النظام — راصد حراج{% endblock %}
+
 {% block extra_css %}
 <style>
-    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-    .page-title { font-size: 24px; font-weight: 800; color: var(--text-main); }
-    .form-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; padding: 25px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
-    .card-title { font-size: 18px; font-weight: 800; margin-bottom: 20px; color: var(--primary); border-bottom: 1px dashed var(--border); padding-bottom: 10px; }
-    .form-group { margin-bottom: 20px; }
-    .form-label { display: block; font-weight: 700; margin-bottom: 8px; font-size: 14px; }
-    .form-control { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 10px; font-family: 'Tajawal', sans-serif; font-size: 14px; background: var(--bg); transition: 0.3s; }
-    .form-control:focus { outline: none; border-color: var(--primary); background: #fff; }
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-    @media(max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
+    .settings-wrapper {
+        max-width: 950px;
+        margin: 0 auto;
+        padding-bottom: 40px;
+    }
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        background: var(--card-bg);
+        padding: 20px 30px;
+        border-radius: 16px;
+        border: 1px solid var(--border);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.02);
+    }
+    .page-title {
+        font-size: 24px;
+        font-weight: 900;
+        color: var(--text-main);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .btn-back {
+        background: var(--bg);
+        color: var(--text-muted);
+        padding: 10px 20px;
+        border-radius: 10px;
+        text-decoration: none;
+        font-weight: 700;
+        transition: 0.3s;
+        border: 1px solid var(--border);
+    }
+    .btn-back:hover {
+        background: var(--border);
+        color: var(--text-main);
+    }
+    
+    .setting-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 30px;
+        margin-bottom: 25px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.02);
+        transition: all 0.3s ease;
+    }
+    .setting-card:hover {
+        border-color: var(--primary);
+        box-shadow: 0 8px 25px rgba(37,99,235,0.06);
+    }
+    .card-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 25px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid var(--bg);
+    }
+    .card-icon {
+        width: 45px;
+        height: 45px;
+        background: #eff6ff;
+        color: var(--primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 12px;
+        font-size: 22px;
+    }
+    .card-title {
+        font-size: 20px;
+        font-weight: 800;
+        color: var(--text-main);
+    }
+    
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
+    @media (max-width: 768px) {
+        .form-row { grid-template-columns: 1fr; }
+    }
+    .form-group {
+        margin-bottom: 20px;
+    }
+    .form-label {
+        display: block;
+        font-weight: 800;
+        color: var(--text-main);
+        margin-bottom: 8px;
+        font-size: 14px;
+    }
+    .form-control {
+        width: 100%;
+        padding: 14px 16px;
+        border: 2px solid var(--bg);
+        border-radius: 12px;
+        font-family: 'Tajawal', sans-serif;
+        font-size: 15px;
+        background: var(--bg);
+        transition: all 0.3s;
+        color: var(--text-main);
+    }
+    .form-control:focus {
+        outline: none;
+        border-color: var(--primary);
+        background: #fff;
+        box-shadow: 0 0 0 4px rgba(37,99,235,0.1);
+    }
+    textarea.form-control {
+        resize: vertical;
+        min-height: 80px;
+    }
+    
+    .btn-save {
+        background: linear-gradient(135deg, var(--primary), #1e40af);
+        color: #fff;
+        border: none;
+        padding: 18px 30px;
+        border-radius: 14px;
+        font-size: 18px;
+        font-weight: 900;
+        font-family: 'Tajawal', sans-serif;
+        cursor: pointer;
+        width: 100%;
+        transition: all 0.3s;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 10px;
+        box-shadow: 0 10px 20px rgba(37,99,235,0.2);
+        margin-top: 10px;
+    }
+    .btn-save:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 15px 30px rgba(37,99,235,0.3);
+    }
+    
+    .alert-success {
+        background: #dcfce7;
+        color: #166534;
+        padding: 16px 20px;
+        border-radius: 12px;
+        margin-bottom: 25px;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border: 1px solid #bbf7d0;
+    }
 </style>
 {% endblock %}
+
 {% block body %}
-<div class="page-header">
-    <h1 class="page-title">⚙️ إعدادات النظام</h1>
-    <a href="/admin" class="btn" style="background: var(--card-bg); border: 1px solid var(--border);">← رجوع للوحة الأدمن</a>
-</div>
+<div class="settings-wrapper">
 
-{% if request.query_params.get("saved") %}
-<div style="background: #dcfce7; color: #166534; padding: 15px; border-radius: 10px; margin-bottom: 20px; font-weight: 700; text-align: center;">
-    ✅ تم حفظ الإعدادات بنجاح!
-</div>
-{% endif %}
-
-<form method="post" action="/admin/settings">
-    
-    <div class="form-card">
-        <div class="card-title">📱 إعدادات الربط والواتساب</div>
-        <div class="form-group">
-            <label class="form-label">توكن الواتساب (من منصة تكوين)</label>
-            <input type="text" name="whatsapp_token" class="form-control" value="{{ settings.get('whatsapp_token', '') }}" placeholder="أدخل التوكن هنا لتعمل الرسائل...">
-        </div>
-        <div class="grid-2">
-            <div class="form-group">
-                <label class="form-label">أيام الفترة التجريبية (للمسجلين الجدد)</label>
-                <input type="number" name="trial_days" class="form-control" value="{{ settings.get('trial_days', '2') }}">
-            </div>
-            <div class="form-group">
-                <label class="form-label">الفترة بين كل فحص للبوت (بالدقائق)</label>
-                <input type="number" name="bot_sleep_minutes" class="form-control" value="{{ settings.get('bot_sleep_minutes', '15') }}">
-            </div>
-        </div>
+    <div class="page-header">
+        <h1 class="page-title">⚙️ إعدادات النظام المتقدمة</h1>
+        <a href="/admin" class="btn-back">← العودة للوحة الإدارة</a>
     </div>
 
-    <div class="form-card">
-        <div class="card-title">🎨 إعدادات صفحة الهبوط (الرئيسية)</div>
-        <div class="grid-2">
-            <div class="form-group">
-                <label class="form-label">اسم الموقع</label>
-                <input type="text" name="site_name" class="form-control" value="{{ settings.get('site_name', 'راصد حراج') }}">
+    {% if request.query_params.get("saved") %}
+    <div class="alert-success">
+        <span>✅</span> تم حفظ وتحديث جميع الإعدادات بنجاح!
+    </div>
+    {% endif %}
+
+    <form method="post" action="/admin/settings">
+        
+        <div class="setting-card">
+            <div class="card-header">
+                <div class="card-icon">📱</div>
+                <div class="card-title">إعدادات الربط والتشغيل</div>
             </div>
+            
             <div class="form-group">
-                <label class="form-label">سعر الباقة الاحترافية (ريال)</label>
-                <input type="text" name="landing_price" class="form-control" value="{{ settings.get('landing_price', '49') }}">
+                <label class="form-label">🔑 توكن الواتساب (من منصة تكوين)</label>
+                <input type="text" name="whatsapp_token" class="form-control" value="{{ settings.get('whatsapp_token', '') }}" placeholder="أدخل التوكن هنا لتعمل الرسائل التلقائية...">
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label">🎁 أيام الفترة التجريبية (للمسجلين الجدد)</label>
+                    <input type="number" name="trial_days" class="form-control" value="{{ settings.get('trial_days', '2') }}">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label">⏱️ سرعة البوت (الفترة بين الفحوصات بالدقائق)</label>
+                    <input type="number" name="bot_sleep_minutes" class="form-control" value="{{ settings.get('bot_sleep_minutes', '15') }}">
+                </div>
             </div>
         </div>
-        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 15px; font-size: 16px;">💾 حفظ جميع الإعدادات</button>
-    </div>
-</form>
+
+        <div class="setting-card">
+            <div class="card-header">
+                <div class="card-icon">🎨</div>
+                <div class="card-title">تخصيص واجهة الموقع (صفحة الهبوط)</div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">🏷️ اسم الموقع</label>
+                    <input type="text" name="site_name" class="form-control" value="{{ settings.get('site_name', 'راصد حراج') }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">💰 سعر الباقة الاحترافية (ريال)</label>
+                    <input type="text" name="landing_price" class="form-control" value="{{ settings.get('landing_price', '49') }}">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">📌 العنوان الرئيسي الجذاب</label>
+                <input type="text" name="landing_hero_title" class="form-control" value="{{ settings.get('landing_hero_title', 'صفقة على حراج') }}">
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">📝 النص التوضيحي (وصف الخدمة)</label>
+                <textarea name="landing_hero_sub" class="form-control">{{ settings.get('landing_hero_sub', 'بوت ذكي يراقب حراج ويرسل لك إشعار واتساب فوري بمجرد ظهور إعلان يطابق ما تبحث عنه — قبل أن يراه أحد غيرك.') }}</textarea>
+            </div>
+
+            <div style="background: var(--bg); padding: 20px; border-radius: 12px; margin-top: 10px;">
+                <label style="display:block; font-weight:800; margin-bottom:15px; color:var(--primary);">⭐ مميزات الموقع (تظهر ككروت للزوار)</label>
+                <div class="form-group">
+                    <label class="form-label">الميزة الأولى</label>
+                    <input type="text" name="landing_feature1" class="form-control" style="background:#fff;" value="{{ settings.get('landing_feature1', 'إشعار فوري على الواتساب') }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">الميزة الثانية</label>
+                    <input type="text" name="landing_feature2" class="form-control" style="background:#fff;" value="{{ settings.get('landing_feature2', 'بحث بكلمات متعددة') }}">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label">الميزة الثالثة</label>
+                    <input type="text" name="landing_feature3" class="form-control" style="background:#fff;" value="{{ settings.get('landing_feature3', 'فلترة حسب المدينة') }}">
+                </div>
+            </div>
+        </div>
+
+        <button type="submit" class="btn-save">
+            💾 حفظ وتطبيق الإعدادات
+        </button>
+
+    </form>
+</div>
 {% endblock %}
