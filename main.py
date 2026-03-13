@@ -142,13 +142,14 @@ async def register_post(request: Request,
 @app.get("/logout")
 async def logout(request: Request):
     request.session.clear()
-return templates.TemplateResponse("landing.html", {"request": request})
+    return RedirectResponse("/login", status_code=302)
+
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request):
     user = get_current_user(request)
     if not user:
-return templates.TemplateResponse("landing.html", {"request": request})
-conn = get_db()
+        return RedirectResponse("/login", status_code=302)
+    conn = get_db()
     subs = conn.execute("SELECT * FROM subscriptions WHERE user_id=? ORDER BY created_at DESC",
                         (user["id"],)).fetchall()
     conn.close()
