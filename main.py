@@ -91,7 +91,7 @@ async def index(request: Request):
         if user["role"] == "admin":
             return RedirectResponse("/admin", status_code=302)
         return RedirectResponse("/dashboard", status_code=302)
-    return RedirectResponse("/login", status_code=302)
+    return templates.TemplateResponse("landing.html", {"request": request})
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
