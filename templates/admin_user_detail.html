@@ -19,19 +19,29 @@
     <div class="topbar">
       <div class="topbar-title">{{ target.name }}</div>
       <div class="topbar-actions">
+        <a href="/admin/users/new" class="btn btn-primary btn-sm">➕ مستخدم جديد</a>
         <a href="/admin/users" class="btn btn-ghost btn-sm">← رجوع</a>
       </div>
     </div>
     <div class="page-body">
 
-      <!-- معلومات المستخدم -->
+      {% if saved %}
+      <div style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:8px;padding:12px 16px;margin-bottom:16px;color:#4ade80;font-size:14px">
+        ✅ تم حفظ التغييرات بنجاح
+      </div>
+      {% endif %}
+
+      <!-- معلومات المستخدم مع إمكانية التعديل -->
       <div class="card" style="margin-bottom:16px">
         <div class="card-header">
           <div class="card-title">👤 معلومات المستخدم</div>
-          <button onclick="toggleUser({{ target.id }}, this)"
-                  class="btn btn-sm {% if target.is_active %}btn-warning{% else %}btn-success{% endif %}">
-            {% if target.is_active %}إيقاف الحساب{% else %}تفعيل الحساب{% endif %}
-          </button>
+          <div style="display:flex;gap:8px">
+            <button onclick="toggleEditForm()" class="btn btn-ghost btn-sm">✏️ تعديل البيانات</button>
+            <button onclick="toggleUser({{ target.id }}, this)"
+                    class="btn btn-sm {% if target.is_active %}btn-warning{% else %}btn-success{% endif %}">
+              {% if target.is_active %}إيقاف الحساب{% else %}تفعيل الحساب{% endif %}
+            </button>
+          </div>
         </div>
         <div class="grid-2">
           <div>
@@ -46,6 +56,32 @@
             </div>
             <div><span style="color:var(--text3);font-size:12px">تاريخ التسجيل: </span><span>{{ target.created_at[:10] }}</span></div>
           </div>
+        </div>
+
+        <!-- فورم تعديل البيانات (مخفي بالبداية) -->
+        <div id="editForm" style="display:none;margin-top:20px;border-top:1px solid var(--border);padding-top:20px">
+          <div style="font-weight:600;margin-bottom:16px;color:var(--accent)">✏️ تعديل بيانات المستخدم</div>
+          <form method="post" action="/admin/users/{{ target.id }}/edit">
+            <div class="grid-2">
+              <div class="form-group">
+                <label class="form-label">الاسم</label>
+                <input type="text" name="name" class="form-control" value="{{ target.name }}" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">البريد الإلكتروني</label>
+                <input type="email" name="email" class="form-control" value="{{ target.email }}" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">رقم الجوال</label>
+                <input type="text" name="phone" class="form-control" value="{{ target.phone }}" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">كلمة المرور الجديدة (اتركها فارغة إذا لا تريد تغييرها)</label>
+                <input type="password" name="password" class="form-control" placeholder="اتركها فارغة للإبقاء على الحالية">
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary">💾 حفظ التغييرات</button>
+          </form>
         </div>
       </div>
 
@@ -132,6 +168,10 @@
 {% endblock %}
 {% block scripts %}
 <script>
+function toggleEditForm() {
+  const f = document.getElementById('editForm')
+  f.style.display = f.style.display === 'none' ? 'block' : 'none'
+}
 async function toggleUser(uid, btn) {
   await fetch(`/admin/users/${uid}/toggle`, {method:'POST'})
   location.reload()
