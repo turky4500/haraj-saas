@@ -71,15 +71,23 @@ def extract_ad_id(url: str) -> str:
     return m.group(1) if m else url
 
 def send_whatsapp(session, token: str, to: str, msg: str) -> bool:
-    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    payload = {"phone": to, "message": msg} # تم تعديل to إلى phone ليتوافق مع API الواتساب
+    headers = {"Authorization": f"Bearer {token.strip()}", "Content-Type": "application/json"}
+    
+    # [تم الإصلاح]: المتغير لازم يكون "to" وليس "phone" عشان تقبله منصة تكوين!
+    payload = {"to": to.strip(), "message": msg} 
+    
     for api_url in WHATSAPP_API_URLS:
         for delay in [0, 2]:
             if delay: time.sleep(delay)
             try:
                 r = session.post(api_url, json=payload, headers=headers, timeout=20, verify=False)
-                if 200 <= r.status_code < 300: return True
-            except Exception:
+                if 200 <= r.status_code < 300: 
+                    return True
+                else:
+                    # تسجيل الخطأ في السيرفر عشان نقدر نتتبعه
+                    logger.error(f"WhatsApp API Error {r.status_code}: {r.text}")
+            except Exception as e:
+                logger.error(f"WhatsApp Connection Error: {e}")
                 continue
     return False
 
@@ -143,7 +151,7 @@ class SubMonitor(threading.Thread):
                     try:
                         r = self.session.get(purl, headers=HARAJ_HEADERS, timeout=20, verify=False)
                         ads = extract_ads(r.content)
-                    except Exception as e:
+                    except Exception:
                         continue
 
                     for title, ad_url in ads:
@@ -172,7 +180,7 @@ class SubMonitor(threading.Thread):
                             
                         # تم التطابق!
                         if quiet:
-                            self._mark_sent(self.sub_id, ad_id) # تجاهل وقت الهدوء بس احفظه عشان ما يزعجه بعدين
+                            self._mark_sent(self.sub_id, ad_id)
                             continue
                             
                         msg = f"🔔 إعلان جديد ({cfg['name']})\n📌 {title}\n🔗 {ad_url}"
