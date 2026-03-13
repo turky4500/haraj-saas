@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة الإدارة - راصد حراج</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #ecf0f1; }
+        .navbar { background-color: #27ae60; }
+        .card { border-radius: 12px; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px;}
+        .log-box { background: #1e1e1e; color: #a9b7c6; height: 300px; overflow-y: scroll; padding: 15px; font-family: monospace; border-radius: 8px;}
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="#">لوحة الإدارة | راصد حراج</a>
+            <a href="/" class="btn btn-outline-light btn-sm">خروج</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="row">
+            <div class="col-md-12 mb-4">
+                <div class="card p-4 text-center">
+                    <h4 class="mb-3">التحكم العام بالنظام</h4>
+                    <p>حالة النظام الحالية: 
+                        {% if global_running %}
+                            <span class="badge bg-success fs-6">شغال 🟢</span>
+                        {% else %}
+                            <span class="badge bg-danger fs-6">متوقف ⏸</span>
+                        {% endif %}
+                    </p>
+                    <div>
+                        <a href="/api/toggle_global" class="btn btn-lg {% if global_running %}btn-danger{% else %}btn-success{% endif %} px-5">
+                            {% if global_running %}إيقاف التشغيل العام ⏸{% else %}بدء التشغيل العام ▶{% endif %}
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-12">
+                <div class="card p-4">
+                    <h5>📜 سجل النظام الحقيقي (Logs)</h5>
+                    <div class="log-box">
+                        {% for log in logs %}
+                            <div>{{ log }}</div>
+                        {% else %}
+                            <div>لا توجد أحداث مسجلة بعد.</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
