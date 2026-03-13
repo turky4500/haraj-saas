@@ -13,7 +13,6 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
 from database import get_db, hash_password, init_db, DB_PATH
-from bot.haraj_bot import BotManager
 
 # ===== إعداد التطبيق =====
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
