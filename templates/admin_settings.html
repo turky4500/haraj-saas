@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}الإعدادات — حراج مونيتور{% endblock %}
+{% block body %}
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-logo"><div class="logo-mark">🔍 حراج مونيتور</div></div>
+    <nav class="sidebar-nav">
+      <a href="/admin" class="nav-item">📊 الرئيسية</a>
+      <a href="/admin/users" class="nav-item">👥 المستخدمون</a>
+      <a href="/admin/logs" class="nav-item">📋 السجلات</a>
+      <a href="/admin/settings" class="nav-item active">⚙️ الإعدادات</a>
+    </nav>
+    <div class="sidebar-footer">
+      <a href="/logout" style="font-size:12px;color:var(--text3)">تسجيل الخروج</a>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="topbar"><div class="topbar-title">إعدادات النظام</div></div>
+    <div class="page-body">
+
+      {% if request.query_params.get('saved') %}
+      <div class="alert alert-success">✅ تم حفظ الإعدادات بنجاح</div>
+      {% endif %}
+
+      <div class="card" style="max-width:600px">
+        <form method="post" action="/admin/settings">
+
+          <div class="form-group">
+            <label class="form-label">🔑 توكن واتساب (تكوين API)</label>
+            <input type="text" name="whatsapp_token" class="form-control"
+                   value="{{ settings.whatsapp_token }}"
+                   placeholder="Bearer token من تكوين">
+            <div class="form-hint">هذا التوكن يُستخدم لإرسال جميع رسائل واتساب لكل المستخدمين</div>
+          </div>
+
+          <hr class="divider">
+
+          <div class="form-group">
+            <label class="form-label">🎁 مدة التجربة المجانية (أيام)</label>
+            <input type="number" name="trial_days" class="form-control"
+                   value="{{ settings.trial_days }}" min="1" max="30">
+            <div class="form-hint">عدد الأيام المجانية عند تسجيل مستخدم جديد</div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">🏷️ اسم الموقع</label>
+            <input type="text" name="site_name" class="form-control"
+                   value="{{ settings.site_name }}" placeholder="حراج مونيتور">
+          </div>
+
+          <button type="submit" class="btn btn-primary">💾 حفظ الإعدادات</button>
+        </form>
+      </div>
+
+    </div>
+  </main>
+</div>
+{% endblock %}

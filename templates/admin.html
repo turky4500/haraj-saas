@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}لوحة الأدمن — حراج مونيتور{% endblock %}
+{% block body %}
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">🔍 حراج مونيتور</div>
+      <div class="logo-sub">لوحة الإدارة</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">الإدارة</div>
+      <a href="/admin" class="nav-item active">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/></svg>
+        الرئيسية
+      </a>
+      <a href="/admin/users" class="nav-item">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197"/></svg>
+        المستخدمون
+      </a>
+      <a href="/admin/logs" class="nav-item">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        السجلات
+      </a>
+      <a href="/admin/settings" class="nav-item">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065z"/><circle cx="12" cy="12" r="3" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/></svg>
+        الإعدادات
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-badge">
+        <div class="user-avatar" style="background:linear-gradient(135deg,#f59e0b,#ef4444)">A</div>
+        <div class="user-info">
+          <div class="user-name">{{ user.name }}</div>
+          <div class="user-role">مدير النظام</div>
+        </div>
+      </div>
+      <a href="/logout" style="display:block;margin-top:12px;font-size:12px;color:var(--text3)">تسجيل الخروج</a>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="topbar">
+      <div class="topbar-title">لوحة التحكم</div>
+      <div class="topbar-actions">
+        <span class="badge badge-success"><span class="live-dot" style="width:6px;height:6px"></span> النظام يعمل</span>
+      </div>
+    </div>
+    <div class="page-body">
+
+      <!-- إحصائيات -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:rgba(59,130,246,.15)">👥</div>
+          <div class="stat-label">المستخدمون</div>
+          <div class="stat-value" style="color:var(--accent)">{{ stats.users }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:rgba(16,185,129,.15)">✅</div>
+          <div class="stat-label">اشتراكات نشطة</div>
+          <div class="stat-value" style="color:var(--success)">{{ stats.active }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:rgba(6,182,212,.15)">📋</div>
+          <div class="stat-label">إجمالي الاشتراكات</div>
+          <div class="stat-value">{{ stats.subs }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:rgba(245,158,11,.15)">📨</div>
+          <div class="stat-label">إشعارات أُرسلت</div>
+          <div class="stat-value" style="color:var(--warning)">{{ stats.sent }}</div>
+        </div>
+      </div>
+
+      <!-- حالة البوت -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header">
+          <div class="card-title">🤖 حالة البوت</div>
+          <span style="font-size:12px;color:var(--text3)">{{ bot_status|length }} خيط نشط</span>
+        </div>
+        {% if bot_status %}
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          {% for sid, alive in bot_status.items() %}
+          <span class="badge {% if alive %}badge-success{% else %}badge-gray{% endif %}">
+            اشتراك #{{ sid }}: {% if alive %}يعمل{% else %}متوقف{% endif %}
+          </span>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p style="font-size:13px;color:var(--text3)">لا يوجد اشتراكات نشطة حالياً</p>
+        {% endif %}
+      </div>
+
+      <!-- آخر السجلات -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">📋 آخر السجلات</div>
+          <a href="/admin/logs" class="btn btn-ghost btn-sm">عرض الكل</a>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>الاشتراك</th><th>الرسالة</th><th>المستوى</th><th>الوقت</th></tr>
+            </thead>
+            <tbody>
+              {% for log in recent_logs %}
+              <tr>
+                <td>{{ log.sub_name or '#' ~ log.subscription_id }}</td>
+                <td style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ log.message }}</td>
+                <td>
+                  {% if log.level == 'error' %}<span class="badge badge-danger">خطأ</span>
+                  {% elif log.level == 'warning' %}<span class="badge badge-warning">تحذير</span>
+                  {% else %}<span class="badge badge-info">معلومة</span>{% endif %}
+                </td>
+                <td style="font-size:12px;color:var(--text3)">{{ log.created_at[:16] }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="4" style="text-align:center;color:var(--text3);padding:24px">لا يوجد سجلات</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+{% endblock %}

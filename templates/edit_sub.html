@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}تعديل الاشتراك — حراج مونيتور{% endblock %}
+{% block body %}
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">🔍 حراج مونيتور</div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="/dashboard" class="nav-item">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+        رجوع للوحة التحكم
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-badge">
+        <div class="user-avatar">{{ user.name[0] }}</div>
+        <div class="user-info">
+          <div class="user-name">{{ user.name }}</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="topbar">
+      <div class="topbar-title">تعديل: {{ sub.name }}</div>
+    </div>
+    <div class="page-body">
+      <form method="post" action="/subscription/{{ sub.id }}/edit">
+        <div class="grid-2">
+          <!-- العمود الأول -->
+          <div>
+            <div class="card" style="margin-bottom:16px">
+              <div class="card-header"><div class="card-title">🔤 الاسم والكلمات</div></div>
+
+              <div class="form-group">
+                <label class="form-label">اسم الاشتراك</label>
+                <input type="text" name="name" class="form-control" value="{{ sub.name }}" required>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">كلمات البحث</label>
+                <textarea name="keywords" class="form-control" rows="5" placeholder="كل كلمة في سطر مستقل&#10;مثال:&#10;ايفون&#10;سامسونج">{{ sub.keywords | join('\n') }}</textarea>
+                <div class="form-hint">كل كلمة أو جملة في سطر مستقل</div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">كلمات مستبعدة (اختياري)</label>
+                <textarea name="excluded_words" class="form-control" rows="3" placeholder="كلمات لاستبعادها من النتائج">{{ sub.excluded_words | join('\n') }}</textarea>
+                <div class="form-hint">إعلانات تحتوي هذه الكلمات سيتم تجاهلها</div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header"><div class="card-title">🏙️ فلترة المدن</div></div>
+
+              <div class="form-group">
+                <label class="form-check">
+                  <input type="checkbox" name="city_filter_enabled" {% if sub.city_filter_enabled %}checked{% endif %}>
+                  <span>تفعيل فلترة المدن</span>
+                </label>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">المدن المطلوبة</label>
+                <textarea name="cities" class="form-control" rows="4" placeholder="الرياض&#10;Riyadh&#10;جدة">{{ sub.cities | join('\n') }}</textarea>
+                <div class="form-hint">كل مدينة في سطر مستقل</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- العمود الثاني -->
+          <div>
+            <div class="card" style="margin-bottom:16px">
+              <div class="card-header"><div class="card-title">⏱️ إعدادات الوقت</div></div>
+
+              <div class="form-group">
+                <label class="form-label">مدة النوم بين الدورات (دقائق)</label>
+                <input type="number" name="sleep_minutes" class="form-control" value="{{ sub.sleep_minutes }}" min="5" max="120">
+                <div class="form-hint">كل كم دقيقة يتحقق البوت من الإعلانات الجديدة</div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header"><div class="card-title">🌙 أوقات الهدوء</div></div>
+
+              <div class="form-group">
+                <label class="form-check">
+                  <input type="checkbox" name="quiet_enabled" id="quietChk" {% if sub.quiet_enabled %}checked{% endif %} onchange="toggleQuiet()">
+                  <span>تفعيل أوقات الهدوء (لا يرسل إشعارات)</span>
+                </label>
+              </div>
+
+              <div id="quietSection" style="{% if not sub.quiet_enabled %}display:none{% endif %}">
+                <div class="grid-2">
+                  <div class="form-group">
+                    <label class="form-label">بداية الهدوء (ساعة)</label>
+                    <input type="number" name="quiet_start_hour" class="form-control" value="{{ sub.quiet_start_hour }}" min="0" max="23">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">الدقيقة</label>
+                    <input type="number" name="quiet_start_minute" class="form-control" value="{{ sub.quiet_start_minute }}" min="0" max="59">
+                  </div>
+                </div>
+                <div class="grid-2">
+                  <div class="form-group">
+                    <label class="form-label">نهاية الهدوء (ساعة)</label>
+                    <input type="number" name="quiet_end_hour" class="form-control" value="{{ sub.quiet_end_hour }}" min="0" max="23">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">الدقيقة</label>
+                    <input type="number" name="quiet_end_minute" class="form-control" value="{{ sub.quiet_end_minute }}" min="0" max="59">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style="margin-top:16px;display:flex;gap:10px">
+              <button type="submit" class="btn btn-success" style="flex:1">💾 حفظ التغييرات</button>
+              <a href="/dashboard" class="btn btn-ghost" style="flex:1;justify-content:center">إلغاء</a>
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+  </main>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function toggleQuiet(){
+  document.getElementById('quietSection').style.display =
+    document.getElementById('quietChk').checked ? 'block' : 'none'
+}
+</script>
+{% endblock %}

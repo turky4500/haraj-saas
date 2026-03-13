@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}{{ target.name }} — حراج مونيتور{% endblock %}
+{% block body %}
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-logo"><div class="logo-mark">🔍 حراج مونيتور</div></div>
+    <nav class="sidebar-nav">
+      <a href="/admin" class="nav-item">📊 الرئيسية</a>
+      <a href="/admin/users" class="nav-item active">👥 المستخدمون</a>
+      <a href="/admin/logs" class="nav-item">📋 السجلات</a>
+      <a href="/admin/settings" class="nav-item">⚙️ الإعدادات</a>
+    </nav>
+    <div class="sidebar-footer">
+      <a href="/logout" style="font-size:12px;color:var(--text3)">تسجيل الخروج</a>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="topbar">
+      <div class="topbar-title">{{ target.name }}</div>
+      <div class="topbar-actions">
+        <a href="/admin/users" class="btn btn-ghost btn-sm">← رجوع</a>
+      </div>
+    </div>
+    <div class="page-body">
+
+      <!-- معلومات المستخدم -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header">
+          <div class="card-title">👤 معلومات المستخدم</div>
+          <button onclick="toggleUser({{ target.id }}, this)"
+                  class="btn btn-sm {% if target.is_active %}btn-warning{% else %}btn-success{% endif %}">
+            {% if target.is_active %}إيقاف الحساب{% else %}تفعيل الحساب{% endif %}
+          </button>
+        </div>
+        <div class="grid-2">
+          <div>
+            <div style="margin-bottom:12px"><span style="color:var(--text3);font-size:12px">الاسم: </span><span style="font-weight:600">{{ target.name }}</span></div>
+            <div style="margin-bottom:12px"><span style="color:var(--text3);font-size:12px">البريد: </span><span>{{ target.email }}</span></div>
+            <div><span style="color:var(--text3);font-size:12px">الجوال: </span><span>{{ target.phone }}</span></div>
+          </div>
+          <div>
+            <div style="margin-bottom:12px"><span style="color:var(--text3);font-size:12px">الحالة: </span>
+              {% if target.is_active %}<span class="badge badge-success">مفعّل</span>
+              {% else %}<span class="badge badge-danger">موقوف</span>{% endif %}
+            </div>
+            <div><span style="color:var(--text3);font-size:12px">تاريخ التسجيل: </span><span>{{ target.created_at[:10] }}</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- إضافة اشتراك جديد -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header"><div class="card-title">➕ إضافة اشتراك جديد</div></div>
+        <form method="post" action="/admin/subscriptions/add">
+          <input type="hidden" name="user_id" value="{{ target.id }}">
+          <div class="grid-2">
+            <div class="form-group">
+              <label class="form-label">اسم الاشتراك</label>
+              <input type="text" name="name" class="form-control" placeholder="مثال: بحث سيارات" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">رقم الواتساب</label>
+              <input type="text" name="whatsapp" class="form-control" value="{{ target.phone }}" placeholder="966501234567" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">مدة الاشتراك (أيام)</label>
+              <input type="number" name="days" class="form-control" value="30" min="1" max="365">
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary">إضافة الاشتراك</button>
+        </form>
+      </div>
+
+      <!-- اشتراكات المستخدم -->
+      <div class="card">
+        <div class="card-header"><div class="card-title">📋 اشتراكات المستخدم</div></div>
+        {% if subs %}
+        <div style="display:flex;flex-direction:column;gap:12px">
+          {% for sub in subs %}
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+              <div style="display:flex;align-items:center;gap:8px">
+                {% if sub.bot_running and not sub.expired %}<span class="live-dot"></span>{% endif %}
+                <span style="font-weight:600">{{ sub.name }}</span>
+                {% if sub.expired %}<span class="badge badge-danger">منتهي</span>
+                {% elif sub.status == 'paused' %}<span class="badge badge-warning">متوقف</span>
+                {% else %}<span class="badge badge-success">نشط</span>{% endif %}
+              </div>
+              <div style="display:flex;gap:8px">
+                {% if sub.bot_running %}
+                <button onclick="stopSub({{ sub.id }}, this)" class="btn btn-warning btn-sm">إيقاف</button>
+                {% else %}
+                <button onclick="startSub({{ sub.id }}, this)" class="btn btn-success btn-sm">تشغيل</button>
+                {% endif %}
+                <button onclick="showExtend({{ sub.id }})" class="btn btn-primary btn-sm">تمديد</button>
+              </div>
+            </div>
+            <div style="display:flex;gap:16px;font-size:12px;color:var(--text3)">
+              <span>ينتهي: <strong style="color:var(--text)">{{ sub.expires_at[:10] }}</strong></span>
+              <span>متبقي: <strong style="color:{% if sub.expired %}var(--danger){% else %}var(--success){% endif %}">{{ sub.days_left }} يوم</strong></span>
+              <span>إشعارات أُرسلت: <strong style="color:var(--accent)">{{ sub.sent_total }}</strong></span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p style="color:var(--text3);font-size:13px;text-align:center;padding:24px">لا يوجد اشتراكات</p>
+        {% endif %}
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- Modal تمديد -->
+<div id="extendModal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <div class="modal-title">⏳ تمديد الاشتراك</div>
+    <form method="post" id="extendForm">
+      <div class="form-group">
+        <label class="form-label">عدد الأيام</label>
+        <input type="number" name="days" class="form-control" value="30" min="1" max="365">
+      </div>
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <button type="submit" class="btn btn-primary" style="flex:1">تمديد</button>
+        <button type="button" onclick="hideModal('extendModal')" class="btn btn-ghost" style="flex:1">إلغاء</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function toggleUser(uid, btn) {
+  await fetch(`/admin/users/${uid}/toggle`, {method:'POST'})
+  location.reload()
+}
+function showExtend(subId) {
+  document.getElementById('extendForm').action = `/admin/subscriptions/${subId}/extend`
+  showModal('extendModal')
+}
+async function stopSub(subId, btn) {
+  await fetch(`/admin/subscriptions/${subId}/stop`, {method:'POST'})
+  location.reload()
+}
+async function startSub(subId, btn) {
+  await fetch(`/admin/subscriptions/${subId}/start`, {method:'POST'})
+  location.reload()
+}
+</script>
+{% endblock %}

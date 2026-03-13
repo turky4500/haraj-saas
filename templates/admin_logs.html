@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}السجلات — حراج مونيتور{% endblock %}
+{% block body %}
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-logo"><div class="logo-mark">🔍 حراج مونيتور</div></div>
+    <nav class="sidebar-nav">
+      <a href="/admin" class="nav-item">📊 الرئيسية</a>
+      <a href="/admin/users" class="nav-item">👥 المستخدمون</a>
+      <a href="/admin/logs" class="nav-item active">📋 السجلات</a>
+      <a href="/admin/settings" class="nav-item">⚙️ الإعدادات</a>
+    </nav>
+    <div class="sidebar-footer">
+      <a href="/logout" style="font-size:12px;color:var(--text3)">تسجيل الخروج</a>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="topbar">
+      <div class="topbar-title">سجلات النظام</div>
+      <div class="topbar-actions">
+        <button onclick="location.reload()" class="btn btn-ghost btn-sm">🔄 تحديث</button>
+      </div>
+    </div>
+    <div class="page-body">
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>المستخدم</th><th>الاشتراك</th><th>الرسالة</th><th>المستوى</th><th>الوقت</th></tr>
+            </thead>
+            <tbody>
+              {% for log in logs %}
+              <tr>
+                <td style="font-size:12px">{{ log.user_name or '—' }}</td>
+                <td style="font-size:12px">{{ log.sub_name or '#' ~ log.subscription_id }}</td>
+                <td style="font-size:12px;max-width:500px">{{ log.message }}</td>
+                <td>
+                  {% if log.level == 'error' %}<span class="badge badge-danger">خطأ</span>
+                  {% elif log.level == 'warning' %}<span class="badge badge-warning">تحذير</span>
+                  {% else %}<span class="badge badge-info">معلومة</span>{% endif %}
+                </td>
+                <td style="font-size:11px;color:var(--text3);white-space:nowrap">{{ log.created_at[:16] }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="5" style="text-align:center;color:var(--text3);padding:32px">لا يوجد سجلات</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+{% endblock %}
