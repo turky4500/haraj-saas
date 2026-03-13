@@ -1,142 +1,137 @@
-{% extends "base_light.html" %}
+{% extends "base.html" %}
 {% block title %}إعدادات الاشتراك — راصد حراج{% endblock %}
-{% block head %}
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+{% block extra_css %}
 <style>
-  body, .app-layout { font-family: 'Cairo', sans-serif !important; }
+    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+    .page-title { font-size: 24px; font-weight: 800; }
+    .btn-back { background: var(--card-bg); color: var(--text-main); border: 1px solid var(--border); }
+    .btn-back:hover { background: var(--bg); transform: translateY(0); }
+    
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+    @media(max-width: 768px) { .form-grid { grid-template-columns: 1fr; } }
+    
+    .form-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; padding: 25px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.01); }
+    .card-title { font-size: 18px; font-weight: 800; margin-bottom: 20px; color: var(--primary); display: flex; align-items: center; gap: 8px; }
+    
+    .form-group { margin-bottom: 15px; }
+    .form-label { display: block; font-weight: 700; margin-bottom: 8px; font-size: 14px; }
+    .form-control { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 10px; font-family: 'Tajawal', sans-serif; font-size: 14px; background: var(--bg); transition: 0.3s; resize: vertical; }
+    .form-control:focus { outline: none; border-color: var(--primary); background: #fff; }
+    
+    .toggle-row { display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding: 10px 0; border-bottom: 1px dashed var(--border); margin-bottom: 15px; }
+    .toggle-info strong { display: block; font-size: 15px; font-weight: 800; }
+    .toggle-info span { font-size: 13px; color: var(--text-muted); }
+    
+    /* Custom Checkbox Toggle */
+    .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #cbd5e1; transition: .4s; border-radius: 34px; }
+    .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+    input:checked + .slider { background-color: var(--primary); }
+    input:checked + .slider:before { transform: translateX(20px); }
+
+    .time-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
 </style>
 {% endblock %}
 {% block body %}
-
-<div class="app-layout">
-  <aside class="sidebar">
-    <div class="sidebar-brand">
-      <span class="brand-icon">🔍</span>
-      <span class="brand-text">راصد <span style="color:var(--primary, #2563eb)">حراج</span></span>
-    </div>
-    <nav class="sidebar-nav">
-      <a href="/dashboard" class="nav-item">
-        <span class="nav-icon">📊</span> لوحة التحكم
-      </a>
-    </nav>
-    <div class="sidebar-footer">
-      <div class="user-pill">
-        <div class="user-avatar" style="background: #2563eb; color: #fff;">{{ user.name[0] }}</div>
-        <div class="user-info">
-          <div class="user-name" style="font-weight: 700;">{{ user.name }}</div>
-          <div class="user-email">{{ user.email }}</div>
-        </div>
-      </div>
-      <a href="/logout" class="logout-btn" style="color: #ef4444; font-weight: 600;">خروج 🚪</a>
-    </div>
-  </aside>
-
-  <main class="main">
-    <div class="topbar">
-      <div>
-        <div class="topbar-title">⚙️ إعدادات الاشتراك</div>
-        <div class="topbar-sub">{{ sub.name }}</div>
-      </div>
-      <a href="/dashboard" style="display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:700;color:#475569;text-decoration:none;padding:10px 18px;border-radius:10px;background:#f1f5f9; transition: 0.3s;">← رجوع</a>
-    </div>
-    <div class="page-body">
-      <form method="post" action="/subscription/{{ sub.id }}/edit" class="form-page">
-
-        <div class="form-card">
-          <div class="form-card-title">📌 اسم الاشتراك</div>
-          <div class="form-group" style="margin-bottom:0">
-            <input type="text" name="name" class="form-control" value="{{ sub.name }}" placeholder="مثال: بحث سيارات" required>
-          </div>
-        </div>
-
-        <div class="form-card">
-          <div class="form-card-title">🔍 كلمات البحث <span style="font-size:13px;color:#64748b;font-weight:600">(كلمة واحدة في كل سطر)</span></div>
-          <div class="form-group" style="margin-bottom:0">
-            <textarea name="keywords" class="form-control" rows="5" placeholder="لاندكروزر 2011&#10;كامري&#10;شقة للإيجار">{% for kw in sub.keywords %}{{ kw }}
-{% endfor %}</textarea>
-          </div>
-        </div>
-
-        <div class="form-card">
-          <div class="form-card-title">🚫 كلمات الاستبعاد <span style="font-size:13px;color:#64748b;font-weight:600">(إعلانات لا تريدها)</span></div>
-          <div class="form-group" style="margin-bottom:0">
-            <textarea name="excluded_words" class="form-control" rows="4" placeholder="مصدوم&#10;تالف&#10;تشليح">{% for w in sub.excluded_words %}{{ w }}
-{% endfor %}</textarea>
-          </div>
-        </div>
-
-        <div class="form-card">
-          <div class="form-card-title">🏙️ فلترة المدن</div>
-          <label class="toggle-row" onclick="toggleSwitch('city_toggle', 'city_filter_enabled')">
-            <div>
-              <div class="toggle-label" style="font-weight: 700;">تفعيل فلتر المدن</div>
-              <div class="toggle-desc" style="font-weight: 600;">تلقّى إعلانات من مدن محددة فقط</div>
-            </div>
-            <div class="toggle-switch {% if sub.city_filter_enabled %}on{% endif %}" id="city_toggle"></div>
-            <input type="checkbox" name="city_filter_enabled" id="city_filter_enabled" style="display:none" {% if sub.city_filter_enabled %}checked{% endif %}>
-          </label>
-          <div class="form-group" style="margin-bottom:0; margin-top: 15px;">
-            <label class="form-label" style="font-weight: 700;">المدن المطلوبة <span style="font-weight: 600;">(مدينة في كل سطر)</span></label>
-            <textarea name="cities" class="form-control" rows="4" placeholder="الرياض&#10;جدة&#10;الدمام">{% for c in sub.cities %}{{ c }}
-{% endfor %}</textarea>
-          </div>
-        </div>
-
-        <div class="form-card">
-          <div class="form-card-title">🌙 ساعات الصمت</div>
-          <label class="toggle-row" onclick="toggleSwitch('quiet_toggle', 'quiet_enabled')">
-            <div>
-              <div class="toggle-label" style="font-weight: 700;">تفعيل ساعات الصمت</div>
-              <div class="toggle-desc" style="font-weight: 600;">لن تصلك رسائل خلال هذا الوقت المخصص لراحتك</div>
-            </div>
-            <div class="toggle-switch {% if sub.quiet_enabled %}on{% endif %}" id="quiet_toggle"></div>
-            <input type="checkbox" name="quiet_enabled" id="quiet_enabled" style="display:none" {% if sub.quiet_enabled %}checked{% endif %}>
-          </label>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px; margin-top: 15px;">
-            <div class="form-group" style="margin-bottom:0">
-              <label class="form-label" style="font-weight: 700;">من الساعة</label>
-              <div class="time-row" style="display: flex; gap: 5px; align-items: center;">
-                <select name="quiet_start_hour" class="form-control" style="padding: 8px;">
-                  {% for h in range(24) %}<option value="{{ h }}" {% if h == sub.quiet_start_hour %}selected{% endif %}>{{ '%02d'|format(h) }}</option>{% endfor %}
-                </select>
-                <span class="time-sep" style="font-weight: 900;">:</span>
-                <select name="quiet_start_minute" class="form-control" style="padding: 8px;">
-                  <option value="0" {% if sub.quiet_start_minute == 0 %}selected{% endif %}>00</option>
-                  <option value="30" {% if sub.quiet_start_minute == 30 %}selected{% endif %}>30</option>
-                </select>
-              </div>
-            </div>
-            <div class="form-group" style="margin-bottom:0">
-              <label class="form-label" style="font-weight: 700;">إلى الساعة</label>
-              <div class="time-row" style="display: flex; gap: 5px; align-items: center;">
-                <select name="quiet_end_hour" class="form-control" style="padding: 8px;">
-                  {% for h in range(24) %}<option value="{{ h }}" {% if h == sub.quiet_end_hour %}selected{% endif %}>{{ '%02d'|format(h) }}</option>{% endfor %}
-                </select>
-                <span class="time-sep" style="font-weight: 900;">:</span>
-                <select name="quiet_end_minute" class="form-control" style="padding: 8px;">
-                  <option value="0" {% if sub.quiet_end_minute == 0 %}selected{% endif %}>00</option>
-                  <option value="30" {% if sub.quiet_end_minute == 30 %}selected{% endif %}>30</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <button type="submit" class="btn-save" style="background: #2563eb; color: #fff; border: none; padding: 14px 24px; border-radius: 12px; font-weight: 800; font-size: 16px; width: 100%; cursor: pointer; transition: 0.3s;">💾 حفظ الإعدادات</button>
-
-      </form>
-    </div>
-  </main>
+<div class="page-header">
+    <h1 class="page-title">⚙️ إعدادات البوت</h1>
+    <a href="/dashboard" class="btn btn-back">← رجوع للوحة التحكم</a>
 </div>
 
-{% endblock %}
-{% block scripts %}
-<script>
-function toggleSwitch(toggleId, inputId) {
-  const sw = document.getElementById(toggleId)
-  const inp = document.getElementById(inputId)
-  inp.checked = !inp.checked
-  sw.classList.toggle('on', inp.checked)
-}
-</script>
+<form method="post" action="/subscription/{{ sub.id }}/edit">
+    <div class="form-grid">
+        <div>
+            <div class="form-card">
+                <div class="card-title">📌 معلومات أساسية</div>
+                <div class="form-group">
+                    <label class="form-label">اسم الاشتراك (لتمييزه)</label>
+                    <input type="text" name="name" class="form-control" value="{{ sub.name }}" required>
+                </div>
+            </div>
+
+            <div class="form-card">
+                <div class="card-title">🔍 كلمات البحث</div>
+                <p style="font-size:13px; color:var(--text-muted); margin-bottom:10px;">أدخل كل كلمة في سطر مستقل. البوت سيتجاهل الهمزات والتشكيل تلقائياً.</p>
+                <textarea name="keywords" class="form-control" rows="6" placeholder="مثال:&#10;ايفون 15&#10;كامري 2024">{% for kw in sub.keywords %}{{ kw }}&#10;{% endfor %}</textarea>
+            </div>
+            
+            <div class="form-card">
+                <div class="card-title">🚫 الكلمات المستبعدة</div>
+                <label class="toggle-row">
+                    <div class="toggle-info">
+                        <strong>تفعيل الاستبعاد</strong>
+                        <span>تجاهل الإعلانات التي تحتوي على هذه الكلمات</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" name="exclude_enabled" {% if sub.exclude_enabled %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                </label>
+                <textarea name="excluded_words" class="form-control" rows="4" placeholder="مثال:&#10;مصدوم&#10;تالف">{% for w in sub.excluded_words %}{{ w }}&#10;{% endfor %}</textarea>
+            </div>
+        </div>
+
+        <div>
+            <div class="form-card">
+                <div class="card-title">🏙️ فلترة المدن</div>
+                <label class="toggle-row">
+                    <div class="toggle-info">
+                        <strong>تفعيل فلتر المدن</strong>
+                        <span>جلب الإعلانات من مدن محددة فقط</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" name="city_filter_enabled" {% if sub.city_filter_enabled %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                </label>
+                <textarea name="cities" class="form-control" rows="4" placeholder="مثال:&#10;الرياض&#10;جدة">{% for c in sub.cities %}{{ c }}&#10;{% endfor %}</textarea>
+            </div>
+
+            <div class="form-card">
+                <div class="card-title">🌙 أوقات الهدوء</div>
+                <label class="toggle-row">
+                    <div class="toggle-info">
+                        <strong>تفعيل وقت الهدوء</strong>
+                        <span>لن يقوم البوت بإرسال الإشعارات وقت نومك، سيحفظها ويرسلها لاحقاً.</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" name="quiet_enabled" {% if sub.quiet_enabled %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                </label>
+                <div class="time-inputs">
+                    <div class="form-group">
+                        <label class="form-label">من الساعة</label>
+                        <div style="display:flex; gap:5px; align-items:center;">
+                            <select name="quiet_start_hour" class="form-control" style="padding:8px;">
+                                {% for h in range(24) %}<option value="{{ h }}" {% if h == sub.quiet_start_hour %}selected{% endif %}>{{ '%02d'|format(h) }}</option>{% endfor %}
+                            </select>
+                            <b>:</b>
+                            <select name="quiet_start_minute" class="form-control" style="padding:8px;">
+                                <option value="0" {% if sub.quiet_start_minute == 0 %}selected{% endif %}>00</option>
+                                <option value="30" {% if sub.quiet_start_minute == 30 %}selected{% endif %}>30</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">إلى الساعة</label>
+                        <div style="display:flex; gap:5px; align-items:center;">
+                            <select name="quiet_end_hour" class="form-control" style="padding:8px;">
+                                {% for h in range(24) %}<option value="{{ h }}" {% if h == sub.quiet_end_hour %}selected{% endif %}>{{ '%02d'|format(h) }}</option>{% endfor %}
+                            </select>
+                            <b>:</b>
+                            <select name="quiet_end_minute" class="form-control" style="padding:8px;">
+                                <option value="0" {% if sub.quiet_end_minute == 0 %}selected{% endif %}>00</option>
+                                <option value="30" {% if sub.quiet_end_minute == 30 %}selected{% endif %}>30</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%; padding: 16px; font-size: 18px; box-shadow: 0 10px 15px rgba(37,99,235,0.2);">💾 حفظ الإعدادات وتحديث البوت</button>
+        </div>
+    </div>
+</form>
 {% endblock %}
