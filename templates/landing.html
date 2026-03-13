@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>حراج مونيتور — تابع أفضل الصفقات لحظة بلحظة</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --gold: #C9A84C;
+    --gold-light: #E8C97A;
+    --gold-pale: #FFF8E7;
+    --ink: #1A1410;
+    --ink2: #3D2E1E;
+    --ink3: #7A6555;
+    --cream: #FDFAF5;
+    --cream2: #F5EFE3;
+    --white: #FFFFFF;
+    --green: #2D7A4F;
+    --green-light: #E8F5EE;
+    --red: #C0392B;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Cairo', sans-serif;
+    background: var(--cream);
+    color: var(--ink);
+    overflow-x: hidden;
+  }
+
+  /* ===== NAVBAR ===== */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    background: rgba(253,250,245,0.92);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(201,168,76,0.2);
+    padding: 0 48px;
+    height: 68px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .nav-brand {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 20px; font-weight: 900; color: var(--ink);
+    text-decoration: none;
+  }
+  .nav-brand .dot { color: var(--gold); }
+  .nav-links { display: flex; align-items: center; gap: 8px; }
+  .nav-links a {
+    text-decoration: none; font-size: 14px; font-weight: 600;
+    padding: 8px 20px; border-radius: 50px;
+    transition: all .2s;
+  }
+  .nav-links .link-ghost { color: var(--ink2); }
+  .nav-links .link-ghost:hover { background: var(--cream2); }
+  .nav-links .link-cta {
+    background: var(--gold); color: var(--white);
+    box-shadow: 0 4px 16px rgba(201,168,76,0.4);
+  }
+  .nav-links .link-cta:hover {
+    background: var(--gold-light);
+    box-shadow: 0 6px 24px rgba(201,168,76,0.5);
+    transform: translateY(-1px);
+  }
+
+  /* ===== HERO ===== */
+  .hero {
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 120px 24px 80px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero-bg {
+    position: absolute; inset: 0; z-index: 0;
+    background:
+      radial-gradient(ellipse 70% 60% at 50% 0%, rgba(201,168,76,0.12) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 40% at 10% 80%, rgba(45,122,79,0.07) 0%, transparent 50%),
+      radial-gradient(ellipse 50% 50% at 90% 70%, rgba(201,168,76,0.06) 0%, transparent 50%);
+  }
+
+  /* floating orbs */
+  .orb {
+    position: absolute; border-radius: 50%; filter: blur(60px); animation: float 8s ease-in-out infinite;
+  }
+  .orb-1 { width: 400px; height: 400px; background: rgba(201,168,76,0.08); top: -100px; right: -100px; animation-delay: 0s; }
+  .orb-2 { width: 300px; height: 300px; background: rgba(45,122,79,0.06); bottom: 0; left: -80px; animation-delay: 3s; }
+  @keyframes float {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-30px) scale(1.05); }
+  }
+
+  /* grid pattern */
+  .hero-grid {
+    position: absolute; inset: 0;
+    background-image: linear-gradient(rgba(201,168,76,0.05) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(201,168,76,0.05) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  .hero-content { position: relative; z-index: 1; text-align: center; max-width: 780px; }
+
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--white); border: 1px solid rgba(201,168,76,0.4);
+    border-radius: 50px; padding: 8px 20px;
+    font-size: 13px; font-weight: 700; color: var(--gold);
+    margin-bottom: 32px;
+    box-shadow: 0 4px 24px rgba(201,168,76,0.12);
+    animation: fadeDown .6s ease both;
+  }
+  .badge-dot {
+    width: 8px; height: 8px; background: var(--gold); border-radius: 50%;
+    animation: pulse 2s ease infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.6;transform:scale(1.3)} }
+
+  .hero-title {
+    font-size: clamp(40px, 7vw, 80px); font-weight: 900; line-height: 1.1;
+    color: var(--ink); margin-bottom: 24px;
+    animation: fadeDown .6s .1s ease both;
+  }
+  .hero-title .accent { color: var(--gold); position: relative; }
+  .hero-title .accent::after {
+    content: ''; position: absolute; bottom: 4px; left: 0; right: 0;
+    height: 4px; background: var(--gold-light); border-radius: 2px; opacity: .5;
+  }
+
+  .hero-sub {
+    font-size: clamp(15px, 2vw, 19px); color: var(--ink3); line-height: 1.8;
+    margin-bottom: 48px; font-weight: 400;
+    animation: fadeDown .6s .2s ease both;
+  }
+
+  .hero-actions {
+    display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;
+    animation: fadeDown .6s .3s ease both;
+  }
+  .btn-hero-primary {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: var(--gold); color: var(--white);
+    padding: 16px 36px; border-radius: 50px;
+    font-size: 16px; font-weight: 700;
+    text-decoration: none; transition: all .25s;
+    box-shadow: 0 8px 32px rgba(201,168,76,0.4), 0 2px 8px rgba(201,168,76,0.3);
+  }
+  .btn-hero-primary:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 16px 48px rgba(201,168,76,0.5);
+    background: var(--gold-light);
+  }
+  .btn-hero-ghost {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: transparent; color: var(--ink2);
+    border: 1.5px solid rgba(26,20,16,0.2);
+    padding: 16px 36px; border-radius: 50px;
+    font-size: 16px; font-weight: 600;
+    text-decoration: none; transition: all .25s;
+  }
+  .btn-hero-ghost:hover { background: var(--cream2); border-color: var(--gold); color: var(--gold); }
+
+  /* Stats bar */
+  .hero-stats {
+    display: flex; gap: 48px; justify-content: center; flex-wrap: wrap;
+    margin-top: 64px; padding-top: 48px;
+    border-top: 1px solid rgba(201,168,76,0.2);
+    animation: fadeDown .6s .4s ease both;
+  }
+  .stat-item { text-align: center; }
+  .stat-num { font-size: 32px; font-weight: 900; color: var(--ink); }
+  .stat-num span { color: var(--gold); }
+  .stat-label { font-size: 13px; color: var(--ink3); font-weight: 500; margin-top: 4px; }
+
+  /* preview */
+  .hero-preview {
+    position: relative; z-index: 1;
+    margin-top: 80px;
+    animation: fadeUp .8s .5s ease both;
+  }
+  .preview-phone {
+    width: 280px; margin: 0 auto;
+    background: var(--ink); border-radius: 32px;
+    padding: 16px; box-shadow: 0 40px 100px rgba(26,20,16,0.25), 0 0 0 1px rgba(255,255,255,.05);
+  }
+  .preview-screen {
+    background: #111; border-radius: 20px; overflow: hidden;
+    padding: 16px; min-height: 200px;
+  }
+  .preview-msg {
+    background: #25D366;
+    border-radius: 12px 12px 12px 0;
+    padding: 12px 14px; margin-bottom: 8px;
+    font-size: 12px; color: #fff; line-height: 1.6;
+    animation: msgIn 1s ease both;
+  }
+  .preview-msg:nth-child(2) { animation-delay: 1.5s; opacity: 0; }
+  .preview-msg:nth-child(3) { animation-delay: 3s; opacity: 0; }
+  @keyframes msgIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
+  .preview-time { font-size: 10px; color: rgba(255,255,255,.6); margin-top: 4px; }
+
+  /* ===== FEATURES ===== */
+  .section {
+    padding: 100px 24px;
+  }
+  .section-inner { max-width: 1100px; margin: 0 auto; }
+  .section-tag {
+    display: inline-block; background: var(--gold-pale);
+    color: var(--gold); font-size: 12px; font-weight: 700;
+    padding: 6px 16px; border-radius: 50px; margin-bottom: 16px;
+    letter-spacing: .05em;
+  }
+  .section-title {
+    font-size: clamp(28px, 4vw, 44px); font-weight: 900;
+    color: var(--ink); margin-bottom: 16px; line-height: 1.2;
+  }
+  .section-sub {
+    font-size: 17px; color: var(--ink3); max-width: 560px; line-height: 1.8;
+  }
+
+  .features-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 24px; margin-top: 56px;
+  }
+  .feature-card {
+    background: var(--white);
+    border: 1px solid rgba(201,168,76,0.15);
+    border-radius: 20px; padding: 32px;
+    transition: all .3s;
+    position: relative; overflow: hidden;
+  }
+  .feature-card::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(201,168,76,0.04), transparent);
+    opacity: 0; transition: opacity .3s;
+  }
+  .feature-card:hover { transform: translateY(-6px); box-shadow: 0 24px 64px rgba(201,168,76,0.12); border-color: rgba(201,168,76,0.4); }
+  .feature-card:hover::before { opacity: 1; }
+  .feature-icon {
+    width: 52px; height: 52px;
+    background: var(--gold-pale); border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; margin-bottom: 20px;
+  }
+  .feature-title { font-size: 18px; font-weight: 700; color: var(--ink); margin-bottom: 10px; }
+  .feature-desc { font-size: 14px; color: var(--ink3); line-height: 1.8; }
+
+  /* ===== HOW IT WORKS ===== */
+  .steps-bg { background: var(--ink); }
+  .steps-bg .section-tag { background: rgba(201,168,76,.15); }
+  .steps-bg .section-title { color: var(--white); }
+  .steps-bg .section-sub { color: rgba(255,255,255,.5); }
+
+  .steps-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0; margin-top: 56px; position: relative;
+  }
+  .step {
+    padding: 32px; position: relative; text-align: center;
+  }
+  .step:not(:last-child)::after {
+    content: '←'; position: absolute; left: -1px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--gold); font-size: 20px;
+  }
+  .step-num {
+    width: 48px; height: 48px; border-radius: 50%;
+    background: rgba(201,168,76,.15); border: 1.5px solid rgba(201,168,76,.4);
+    color: var(--gold); font-weight: 900; font-size: 18px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 20px;
+  }
+  .step-title { font-size: 16px; font-weight: 700; color: var(--white); margin-bottom: 10px; }
+  .step-desc { font-size: 13px; color: rgba(255,255,255,.45); line-height: 1.7; }
+
+  /* ===== PRICING ===== */
+  .pricing-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px; margin-top: 56px; max-width: 800px;
+  }
+  .plan-card {
+    border-radius: 24px; padding: 36px;
+    border: 1.5px solid rgba(201,168,76,0.2);
+    background: var(--white); transition: all .3s;
+    position: relative;
+  }
+  .plan-card.featured {
+    background: var(--ink); border-color: var(--gold);
+    box-shadow: 0 24px 64px rgba(26,20,16,.2);
+  }
+  .plan-badge {
+    position: absolute; top: -14px; right: 32px;
+    background: var(--gold); color: var(--white);
+    font-size: 12px; font-weight: 700;
+    padding: 4px 16px; border-radius: 50px;
+  }
+  .plan-name { font-size: 14px; font-weight: 700; color: var(--ink3); margin-bottom: 12px; }
+  .plan-card.featured .plan-name { color: rgba(255,255,255,.5); }
+  .plan-price {
+    font-size: 48px; font-weight: 900; color: var(--ink); line-height: 1;
+    margin-bottom: 8px;
+  }
+  .plan-card.featured .plan-price { color: var(--white); }
+  .plan-period { font-size: 13px; color: var(--ink3); margin-bottom: 28px; }
+  .plan-card.featured .plan-period { color: rgba(255,255,255,.4); }
+  .plan-features { list-style: none; margin-bottom: 32px; display: flex; flex-direction: column; gap: 12px; }
+  .plan-features li { font-size: 14px; color: var(--ink2); display: flex; align-items: center; gap: 10px; }
+  .plan-card.featured .plan-features li { color: rgba(255,255,255,.8); }
+  .plan-features li::before { content: '✓'; color: var(--gold); font-weight: 700; }
+  .plan-btn {
+    display: block; width: 100%; padding: 14px;
+    border-radius: 50px; font-size: 15px; font-weight: 700;
+    text-align: center; text-decoration: none; transition: all .25s;
+  }
+  .plan-btn-ghost {
+    border: 1.5px solid rgba(201,168,76,0.4); color: var(--gold);
+  }
+  .plan-btn-ghost:hover { background: var(--gold-pale); }
+  .plan-btn-primary {
+    background: var(--gold); color: var(--white);
+    box-shadow: 0 8px 32px rgba(201,168,76,0.4);
+  }
+  .plan-btn-primary:hover { background: var(--gold-light); }
+
+  /* ===== CTA ===== */
+  .cta-section {
+    background: linear-gradient(135deg, var(--gold) 0%, #A87830 100%);
+    padding: 100px 24px; text-align: center;
+  }
+  .cta-title {
+    font-size: clamp(28px, 4vw, 50px); font-weight: 900;
+    color: var(--white); margin-bottom: 16px;
+  }
+  .cta-sub { font-size: 18px; color: rgba(255,255,255,.75); margin-bottom: 40px; }
+  .btn-cta-white {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: var(--white); color: var(--gold);
+    padding: 18px 48px; border-radius: 50px;
+    font-size: 17px; font-weight: 800;
+    text-decoration: none; transition: all .25s;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+  }
+  .btn-cta-white:hover { transform: translateY(-3px); box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+
+  /* ===== FOOTER ===== */
+  footer {
+    background: var(--ink); padding: 48px 24px;
+    text-align: center;
+  }
+  .footer-brand { font-size: 22px; font-weight: 900; color: var(--white); margin-bottom: 12px; }
+  .footer-brand span { color: var(--gold); }
+  .footer-links { display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; margin-bottom: 24px; }
+  .footer-links a { font-size: 13px; color: rgba(255,255,255,.4); text-decoration: none; transition: color .2s; }
+  .footer-links a:hover { color: var(--gold); }
+  .footer-copy { font-size: 12px; color: rgba(255,255,255,.25); }
+
+  @keyframes fadeDown { from{opacity:0;transform:translateY(-20px)} to{opacity:1;transform:none} }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(30px)} to{opacity:1;transform:none} }
+
+  @media(max-width:600px) {
+    nav { padding: 0 20px; }
+    .hero-stats { gap: 24px; }
+    .steps-grid { grid-template-columns: 1fr; }
+    .step:not(:last-child)::after { content: '↓'; left: 50%; bottom: -10px; top: auto; transform: translateX(-50%); }
+    .plan-card.featured { order: -1; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav>
+  <a href="/" class="nav-brand">حراج <span class="dot">●</span> مونيتور</a>
+  <div class="nav-links">
+    <a href="/login" class="link-ghost">تسجيل الدخول</a>
+    <a href="/register" class="link-cta">ابدأ مجاناً ←</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg">
+    <div class="hero-grid"></div>
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+  </div>
+  <div class="hero-content">
+    <div class="hero-badge">
+      <div class="badge-dot"></div>
+      يعمل الآن على مدار الساعة
+    </div>
+    <h1 class="hero-title">
+      لا تفوّت أي<br>
+      <span class="accent">صفقة على حراج</span>
+    </h1>
+    <p class="hero-sub">
+      بوت ذكي يراقب حراج على مدار الساعة ويرسل لك إشعار واتساب فوري<br>
+      بمجرد ظهور إعلان يطابق ما تبحث عنه — قبل أن يراه أحد غيرك.
+    </p>
+    <div class="hero-actions">
+      <a href="/register" class="btn-hero-primary">🚀 ابدأ تجربة مجانية</a>
+      <a href="/login" class="btn-hero-ghost">تسجيل الدخول</a>
+    </div>
+    <div class="hero-stats">
+      <div class="stat-item">
+        <div class="stat-num">٢٤<span>/٧</span></div>
+        <div class="stat-label">مراقبة متواصلة</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num"><span>+</span>٣٠</div>
+        <div class="stat-label">ثانية وصول للإعلان</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num"><span>٠</span></div>
+        <div class="stat-label">إعلان يفوتك</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Phone mockup -->
+  <div class="hero-preview">
+    <div class="preview-phone">
+      <div class="preview-screen">
+        <div class="preview-msg">
+          🔔 <strong>إعلان جديد على حراج</strong><br>
+          آيفون 15 برو ماكس — 3,500 ريال<br>
+          الرياض، حالة ممتازة<br>
+          <div class="preview-time">الآن ✓✓</div>
+        </div>
+        <div class="preview-msg">
+          🔔 <strong>إعلان جديد على حراج</strong><br>
+          بلايستيشن 5 — 1,800 ريال<br>
+          جدة، مع الكرتون<br>
+          <div class="preview-time">منذ دقيقة ✓✓</div>
+        </div>
+        <div class="preview-msg">
+          🔔 <strong>إعلان جديد على حراج</strong><br>
+          لابتوب ماك بوك M3 — 4,200 ريال<br>
+          الدمام، بكل ملحقاته<br>
+          <div class="preview-time">منذ ٣ دقائق ✓✓</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="section">
+  <div class="section-inner">
+    <div class="section-tag">المميزات</div>
+    <h2 class="section-title">كل ما تحتاجه في بوت واحد</h2>
+    <p class="section-sub">صُمّم ليكون أسرع وأذكى طريقة لمراقبة حراج والحصول على أفضل الصفقات.</p>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <div class="feature-title">إشعار فوري على الواتساب</div>
+        <div class="feature-desc">بمجرد نشر الإعلان يصلك الإشعار مباشرة على واتساب — قبل أن يراه أحد غيرك.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔍</div>
+        <div class="feature-title">بحث بكلمات متعددة</div>
+        <div class="feature-desc">ضع عدة كلمات بحث مختلفة في اشتراك واحد وتابع كل ما يهمك من مكان واحد.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🏙️</div>
+        <div class="feature-title">فلترة حسب المدينة</div>
+        <div class="feature-desc">حدّد المدن التي تهمك فقط — الرياض، جدة، الدمام أو أي منطقة أخرى.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🚫</div>
+        <div class="feature-title">استبعاد كلمات معينة</div>
+        <div class="feature-desc">تجنّب الإعلانات غير المناسبة بتحديد الكلمات التي لا تريد رؤيتها في النتائج.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🌙</div>
+        <div class="feature-title">ساعات صمت</div>
+        <div class="feature-desc">حدّد أوقات الراحة ولن تصلك رسائل خلالها — نومك أهم من أي صفقة.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <div class="feature-title">إحصائيات تفصيلية</div>
+        <div class="feature-desc">تابع عدد الإعلانات المرسلة وأداء اشتراكاتك من لوحة تحكم واضحة وسهلة.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="section steps-bg">
+  <div class="section-inner">
+    <div class="section-tag">كيف يعمل</div>
+    <h2 class="section-title">جاهز في ٣ خطوات بسيطة</h2>
+    <p class="section-sub">لا تحتاج أي خبرة تقنية — فقط سجّل وهيّئ وانتظر الصفقات.</p>
+    <div class="steps-grid">
+      <div class="step">
+        <div class="step-num">١</div>
+        <div class="step-title">أنشئ حسابك</div>
+        <div class="step-desc">سجّل مجاناً في ثوانٍ باستخدام بريدك الإلكتروني ورقم جوالك.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">٢</div>
+        <div class="step-title">أضف كلمات البحث</div>
+        <div class="step-desc">حدّد ما تبحث عنه — منتج، علامة تجارية، أو أي شيء تريده من حراج.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">٣</div>
+        <div class="step-title">استلم الإشعارات</div>
+        <div class="step-desc">البوت يراقب حراج ويرسل لك واتساب فوري بكل إعلان جديد يطابق بحثك.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section class="section">
+  <div class="section-inner">
+    <div class="section-tag">الأسعار</div>
+    <h2 class="section-title">ابدأ مجاناً — وطوّر متى تريد</h2>
+    <p class="section-sub">فترة تجريبية مجانية بدون بطاقة ائتمان، لتجرب قبل ما تقرر.</p>
+    <div class="pricing-grid">
+      <div class="plan-card">
+        <div class="plan-name">التجريبي</div>
+        <div class="plan-price">٠</div>
+        <div class="plan-period">ريال — لفترة محدودة</div>
+        <ul class="plan-features">
+          <li>اشتراك واحد</li>
+          <li>كلمات بحث متعددة</li>
+          <li>إشعارات واتساب</li>
+          <li>يومان مجاناً</li>
+        </ul>
+        <a href="/register" class="plan-btn plan-btn-ghost">ابدأ مجاناً</a>
+      </div>
+      <div class="plan-card featured">
+        <div class="plan-badge">الأكثر طلباً</div>
+        <div class="plan-name">الاحترافي</div>
+        <div class="plan-price" style="color:var(--gold)">٤٩</div>
+        <div class="plan-period">ريال / شهرياً</div>
+        <ul class="plan-features">
+          <li>اشتراكات متعددة</li>
+          <li>فلترة حسب المدينة</li>
+          <li>ساعات صمت</li>
+          <li>استبعاد كلمات</li>
+          <li>دعم على مدار الساعة</li>
+        </ul>
+        <a href="/register" class="plan-btn plan-btn-primary">اشترك الآن</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <div class="cta-title">الصفقة القادمة — لك أنت 🎯</div>
+  <p class="cta-sub">آلاف الإعلانات تُنشر يومياً على حراج. لا تتركها تفوتك.</p>
+  <a href="/register" class="btn-cta-white">ابدأ مجاناً الآن ←</a>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-brand">حراج <span>●</span> مونيتور</div>
+  <div class="footer-links">
+    <a href="/login">تسجيل الدخول</a>
+    <a href="/register">إنشاء حساب</a>
+  </div>
+  <div class="footer-copy">جميع الحقوق محفوظة © ٢٠٢٥</div>
+</footer>
+
+</body>
+</html>
