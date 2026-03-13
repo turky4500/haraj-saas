@@ -1,240 +1,83 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{{ settings.get('site_name','راصد حراج') }} — تابع أفضل الصفقات لحظة بلحظة</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-<style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --primary: #2563eb;
-    --primary-dark: #1e40af;
-    --primary-light: #eff6ff;
-    --dark: #0f172a;
-    --gray-dark: #334155;
-    --gray: #64748b;
-    --gray-light: #f8fafc;
-    --white: #ffffff;
-    --success: #16a34a;
-    --success-bg: #dcfce7;
-  }
-  html { scroll-behavior: smooth; }
-  body { font-family: 'Cairo', sans-serif; background: var(--gray-light); color: var(--dark); overflow-x: hidden; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ settings.get('site_name', 'راصد حراج') }} — صفقات حراج بين يديك</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary: #2563eb; --dark: #0f172a; --gray: #64748b; --light: #f8fafc; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Tajawal', sans-serif; }
+        body { background-color: var(--light); color: var(--dark); overflow-x: hidden; }
+        
+        /* Navbar */
+        nav { display: flex; justify-content: space-between; padding: 20px 5%; background: #fff; border-bottom: 1px solid #e2e8f0; }
+        .logo { font-size: 24px; font-weight: 900; color: var(--dark); text-decoration: none; }
+        .logo span { color: var(--primary); }
+        .nav-links a { text-decoration: none; font-weight: 700; color: var(--dark); margin-right: 20px; padding: 10px 24px; border-radius: 8px; transition: 0.3s; }
+        .nav-links a.btn-primary { background: var(--primary); color: #fff; }
+        .nav-links a.btn-primary:hover { background: #1d4ed8; }
 
-  /* NAV */
-  nav {
-    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-    background: rgba(255,255,255,0.95); backdrop-filter: blur(10px);
-    border-bottom: 1px solid #e2e8f0;
-    height: 70px; display: flex; align-items: center;
-    padding: 0 5%;
-    justify-content: space-between;
-  }
-  .nav-brand { font-size: 24px; font-weight: 900; color: var(--dark); text-decoration: none; }
-  .nav-brand em { color: var(--primary); font-style: normal; }
-  .nav-links { display: flex; align-items: center; gap: 12px; }
-  .nav-links a { text-decoration: none; font-size: 15px; font-weight: 700; padding: 10px 24px; border-radius: 50px; transition: all .2s; }
-  .n-ghost { color: var(--gray-dark); }
-  .n-ghost:hover { background: #e2e8f0; }
-  .n-cta { background: var(--primary); color: var(--white); box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2); }
-  .n-cta:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        /* Hero Section */
+        .hero { text-align: center; padding: 100px 20px; background: linear-gradient(180deg, #fff 0%, #f8fafc 100%); }
+        .hero h1 { font-size: clamp(32px, 5vw, 56px); font-weight: 900; margin-bottom: 20px; line-height: 1.3; }
+        .hero h1 span { color: var(--primary); }
+        .hero p { font-size: 18px; color: var(--gray); max-width: 600px; margin: 0 auto 40px; line-height: 1.8; }
+        .hero-btns a { display: inline-block; padding: 16px 40px; font-size: 18px; font-weight: 800; border-radius: 50px; text-decoration: none; transition: 0.3s; }
+        .btn-start { background: var(--primary); color: #fff; box-shadow: 0 10px 20px rgba(37,99,235,0.2); }
+        .btn-start:hover { transform: translateY(-3px); box-shadow: 0 15px 25px rgba(37,99,235,0.3); }
+        
+        /* Features */
+        .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; padding: 60px 5%; max-width: 1200px; margin: 0 auto; }
+        .feature-card { background: #fff; padding: 40px 30px; border-radius: 20px; border: 1px solid #e2e8f0; text-align: center; transition: 0.3s; }
+        .feature-card:hover { transform: translateY(-5px); border-color: var(--primary); box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+        .feature-icon { font-size: 40px; margin-bottom: 20px; }
+        .feature-card h3 { font-size: 20px; font-weight: 800; margin-bottom: 10px; }
+        .feature-card p { color: var(--gray); font-size: 15px; line-height: 1.7; }
 
-  /* HERO */
-  .hero {
-    min-height: 100vh; display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    padding: 130px 5% 80px; text-align: center;
-    position: relative; overflow: hidden;
-    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-  }
-  .hero-badge {
-    display: inline-flex; align-items: center; gap: 8px;
-    background: var(--white); border: 1px solid #e2e8f0;
-    border-radius: 50px; padding: 8px 24px; margin-bottom: 30px;
-    font-size: 14px; font-weight: 700; color: var(--primary);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-    position: relative; z-index: 1;
-    animation: fadeDown .5s ease both;
-  }
-  .bdot { width: 10px; height: 10px; border-radius: 50%; background: var(--success); animation: bpulse 2s infinite; }
-  @keyframes bpulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.3)} }
-
-  .hero-title {
-    font-size: clamp(32px, 5vw, 64px); font-weight: 900;
-    line-height: 1.3; color: var(--dark); margin-bottom: 24px;
-    position: relative; z-index: 1;
-    animation: fadeDown .5s .1s ease both;
-  }
-  .hero-title .hl {
-    color: var(--primary); position: relative; display: inline-block;
-  }
-  .hero-sub {
-    font-size: clamp(16px, 1.8vw, 20px); color: var(--gray); line-height: 1.8;
-    max-width: 700px; margin: 0 auto 40px; font-weight: 600;
-    position: relative; z-index: 1;
-    animation: fadeDown .5s .2s ease both;
-  }
-  .hero-btns {
-    display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;
-    position: relative; z-index: 1;
-    animation: fadeDown .5s .3s ease both;
-  }
-  .btn-main {
-    display: inline-flex; align-items: center; gap: 10px;
-    background: var(--primary); color: var(--white);
-    padding: 16px 40px; border-radius: 50px; font-size: 18px; font-weight: 800;
-    text-decoration: none; transition: all .3s;
-    box-shadow: 0 10px 25px rgba(37, 99, 235, 0.3);
-  }
-  .btn-main:hover { transform: translateY(-3px); box-shadow: 0 15px 35px rgba(37, 99, 235, 0.4); background: var(--primary-dark); }
-  
-  .btn-sec {
-    display: inline-flex; align-items: center; gap: 10px;
-    background: var(--white); color: var(--gray-dark); border: 2px solid #e2e8f0;
-    padding: 16px 40px; border-radius: 50px; font-size: 18px; font-weight: 800;
-    text-decoration: none; transition: all .3s;
-  }
-  .btn-sec:hover { background: var(--primary-light); border-color: var(--primary); color: var(--primary); }
-
-  /* STATS */
-  .hero-stats {
-    display: flex; gap: 60px; justify-content: center; flex-wrap: wrap;
-    margin-top: 60px; padding-top: 40px;
-    position: relative; z-index: 1;
-    animation: fadeDown .5s .4s ease both;
-  }
-  .stat { text-align: center; }
-  .stat-n { font-size: 40px; font-weight: 900; color: var(--dark); }
-  .stat-n span { color: var(--primary); }
-  .stat-l { font-size: 15px; color: var(--gray); margin-top: 5px; font-weight: 700; }
-
-  /* PHONE PREVIEW */
-  .phone-wrap { margin-top: 80px; position: relative; z-index: 1; animation: fadeUp .8s .5s ease both; }
-  .phone {
-    width: 300px; margin: 0 auto;
-    background: #0f172a; border-radius: 40px; padding: 12px;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-    border: 4px solid #cbd5e1;
-  }
-  .phone-screen { background: #ffffff; border-radius: 30px; padding: 20px; min-height: 400px; text-align: right; }
-  .phone-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #f1f5f9; }
-  .wa-icon { width: 40px; height: 40px; background: #25D366; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; }
-  .wa-name { font-size: 15px; font-weight: 800; color: #0f172a; }
-  .wa-sub { font-size: 12px; font-weight: 600; color: #25D366; }
-  .msg {
-    background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 16px 16px 2px 16px;
-    padding: 12px 16px; margin-bottom: 12px; font-size: 13px; color: #166534; line-height: 1.6;
-    opacity: 0; animation: msgSlide 0.5s ease forwards;
-  }
-  .msg:nth-child(1) { animation-delay: 1.2s; }
-  .msg:nth-child(2) { animation-delay: 2.5s; }
-  .msg-time { font-size: 11px; color: #86efac; margin-top: 6px; text-align: left; }
-  @keyframes msgSlide { from{opacity:0;transform:translateY(15px)} to{opacity:1;transform:none} }
-
-  /* FEATURES */
-  .sec { padding: 100px 5%; background: var(--white); }
-  .sec-inner { max-width: 1200px; margin: 0 auto; text-align: center; }
-  .sec-tag {
-    display: inline-block; background: var(--primary-light); color: var(--primary);
-    font-size: 14px; font-weight: 800; padding: 8px 20px; border-radius: 50px;
-    margin-bottom: 20px;
-  }
-  .sec-title { font-size: clamp(28px, 4vw, 42px); font-weight: 900; color: var(--dark); margin-bottom: 20px; }
-  .sec-sub { font-size: 18px; color: var(--gray); max-width: 600px; margin: 0 auto; line-height: 1.8; }
-
-  .feat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 30px; margin-top: 60px; text-align: right; }
-  .feat {
-    background: var(--gray-light); border: 1px solid #e2e8f0;
-    border-radius: 24px; padding: 35px; transition: all .3s;
-  }
-  .feat:hover { transform: translateY(-5px); box-shadow: 0 20px 40px rgba(0,0,0,0.05); background: var(--white); border-color: var(--primary); }
-  .feat-icon { width: 60px; height: 60px; background: var(--primary-light); border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 28px; margin-bottom: 20px; }
-  .feat-title { font-size: 20px; font-weight: 800; color: var(--dark); margin-bottom: 12px; }
-  .feat-desc { font-size: 15px; color: var(--gray); line-height: 1.8; font-weight: 600; }
-
-  /* CTA BOTTOM */
-  .cta { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); padding: 100px 5%; text-align: center; border-radius: 40px; max-width: 1200px; margin: 80px auto; color: var(--white); box-shadow: 0 20px 40px rgba(37,99,235,0.2); }
-  .cta-title { font-size: clamp(28px, 4vw, 46px); font-weight: 900; margin-bottom: 20px; }
-  .cta-sub { font-size: 18px; color: #bfdbfe; margin-bottom: 40px; font-weight: 600; }
-  .btn-cta { display: inline-flex; background: var(--white); color: var(--primary); padding: 18px 48px; border-radius: 50px; font-size: 20px; font-weight: 900; text-decoration: none; transition: all .3s; }
-  .btn-cta:hover { transform: translateY(-3px); box-shadow: 0 15px 30px rgba(0,0,0,0.2); }
-
-  /* FOOTER */
-  footer { background: var(--dark); padding: 50px 5%; text-align: center; color: var(--gray); }
-  .f-brand { font-size: 24px; font-weight: 900; color: var(--white); margin-bottom: 20px; }
-  .f-brand em { color: var(--primary); font-style: normal; }
-  .f-copy { font-size: 14px; margin-top: 20px; font-weight: 600; }
-
-  @keyframes fadeDown { from{opacity:0;transform:translateY(-20px)} to{opacity:1;transform:none} }
-  @keyframes fadeUp { from{opacity:0;transform:translateY(30px)} to{opacity:1;transform:none} }
-</style>
+        footer { text-align: center; padding: 40px; background: var(--dark); color: var(--gray); margin-top: 50px; }
+    </style>
 </head>
 <body>
 
-<nav>
-  <a href="/" class="nav-brand">راصد <em>حراج</em></a>
-  <div class="nav-links">
-    <a href="/login" class="n-ghost">دخول</a>
-    <a href="/register" class="n-cta">ابدأ مجاناً ←</a>
-  </div>
-</nav>
-
-<section class="hero">
-  <div class="hero-badge"><div class="bdot"></div> يعمل الآن ٢٤/٧ بكفاءة عالية</div>
-  <h1 class="hero-title">
-    لا تفوّت أي<br>
-    <span class="hl">{{ settings.get('landing_hero_title','صفقة على حراج') }}</span>
-  </h1>
-  <p class="hero-sub">{{ settings.get('landing_hero_sub','بوت ذكي يراقب حراج ويرسل لك إشعار واتساب فوري بمجرد ظهور إعلان يطابق ما تبحث عنه — قبل أن يراه أحد غيرك.') }}</p>
-  <div class="hero-btns">
-    <a href="/register" class="btn-main">🚀 اشترك وابدأ تجربتك</a>
-    <a href="/login" class="btn-sec">تسجيل الدخول</a>
-  </div>
-  
-  <div class="hero-stats">
-    <div class="stat"><div class="stat-n">٢٤<span>/٧</span></div><div class="stat-l">مراقبة متواصلة</div></div>
-    <div class="stat"><div class="stat-n"><span>+</span>٣٠</div><div class="stat-l">ثانية وصول للإعلان</div></div>
-  </div>
-
-  <div class="phone-wrap">
-    <div class="phone">
-      <div class="phone-screen">
-        <div class="phone-header">
-          <div class="wa-icon">💬</div>
-          <div><div class="wa-name">راصد حراج 🔍</div><div class="wa-sub">● متصل</div></div>
+    <nav>
+        <a href="/" class="logo">🔍 راصد <span>حراج</span></a>
+        <div class="nav-links">
+            <a href="/login">تسجيل الدخول</a>
+            <a href="/register" class="btn-primary">ابدأ مجاناً ←</a>
         </div>
-        <div class="msg">🔔 <strong>إعلان جديد!</strong><br>لاندكروزر 2011 نظيف جداً<br>الرياض · للبيع المستعجل<div class="msg-time">الآن ✓✓</div></div>
-        <div class="msg">🔔 <strong>إعلان جديد!</strong><br>آيفون 15 برو ماكس — 3,200 ريال<br>جدة · حالة ممتازة<div class="msg-time">قبل دقيقة ✓✓</div></div>
-      </div>
+    </nav>
+
+    <div class="hero">
+        <h1>لا تفوّت أي <span>صفقة مميزة</span><br>على منصة حراج بعد اليوم</h1>
+        <p>بوت ذكي يعمل 24/7 لمراقبة الإعلانات التي تهمك، ويرسل لك إشعاراً فورياً على الواتساب بمجرد نشرها. كن أنت أول من يتصل بالبائع!</p>
+        <div class="hero-btns">
+            <a href="/register" class="btn-start">🚀 اشترك الآن وجرب مجاناً</a>
+        </div>
     </div>
-  </div>
-</section>
 
-<section class="sec">
-  <div class="sec-inner">
-    <div class="sec-tag">المميزات</div>
-    <h2 class="sec-title">كل ما تحتاجه في بوت واحد</h2>
-    <p class="sec-sub">صُمّم ليكون أسرع وأذكى طريقة لمراقبة حراج والحصول على أفضل الصفقات.</p>
-    <div class="feat-grid">
-      <div class="feat"><div class="feat-icon">⚡</div><div class="feat-title">{{ settings.get('landing_feature1','إشعار فوري على الواتساب') }}</div><div class="feat-desc">بمجرد نشر الإعلان يصلك الإشعار مباشرة — كن أول من يتواصل مع البائع.</div></div>
-      <div class="feat"><div class="feat-icon">🔍</div><div class="feat-title">{{ settings.get('landing_feature2','بحث بكلمات متعددة') }}</div><div class="feat-desc">ضع عدة كلمات بحث (مثل: لاندكروزر، ايفون) وتابعها كلها من مكان واحد.</div></div>
-      <div class="feat"><div class="feat-icon">🏙️</div><div class="feat-title">{{ settings.get('landing_feature3','فلترة حسب المدينة') }}</div><div class="feat-desc">حدّد المدن التي تهمك فقط — الرياض، جدة، أو أي منطقة أخرى.</div></div>
+    <div class="features">
+        <div class="feature-card">
+            <div class="feature-icon">⚡</div>
+            <h3>إشعارات فورية</h3>
+            <p>يصلك إشعار واتساب بمجرد نشر الإعلان، لتسبق الجميع وتقتنص أفضل الصفقات.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">🎯</div>
+            <h3>فلترة ذكية</h3>
+            <p>حدد المدن والكلمات التي تبحث عنها، واستبعد الكلمات التي لا تريدها بكل سهولة.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon">🌙</div>
+            <h3>أوقات الهدوء</h3>
+            <p>خصص أوقاتاً لنومك وراحتك، وسيقوم البوت بحفظ الإعلانات وإرسالها لك لاحقاً.</p>
+        </div>
     </div>
-  </div>
-</section>
 
-<section class="cta">
-  <div class="cta-title">الصفقة القادمة — لك أنت 🎯</div>
-  <p class="cta-sub">آلاف الإعلانات تُنشر يومياً على حراج. لا تتركها تفوتك.</p>
-  <a href="/register" class="btn-cta">ابدأ تسجيلك الآن ←</a>
-</section>
-
-<footer>
-  <div class="f-brand">راصد <em>حراج</em></div>
-  <div class="f-copy">جميع الحقوق محفوظة © ٢٠٢٦</div>
-</footer>
+    <footer>
+        <p>جميع الحقوق محفوظة © {{ settings.get('site_name', 'راصد حراج') }} 2026</p>
+    </footer>
 
 </body>
 </html>
