@@ -12,7 +12,7 @@ from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
-app.secret_key = "haraj_super_secret_key_v8"
+app.secret_key = "haraj_super_secret_key_v9"
 
 app.jinja_env.globals.update(now=datetime.datetime.now)
 
@@ -179,7 +179,6 @@ class MonitorThread(threading.Thread):
                 settings = SystemSettings.query.first()
                 current_token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
 
-                # التحقق الصارم من حالة الحساب والاشتراك
                 if not user or not user.is_active_account or not sub or sub.status != 'active' or (user.account_expiration and user.account_expiration < datetime.datetime.now()):
                     if sub: 
                         sub.status = 'paused'
@@ -306,12 +305,11 @@ def verify():
             db.session.add(new_user)
             db.session.commit()
             
-            # دخول تلقائي وتحويل للوحة المستخدم
             login_user(new_user)
             session.pop('temp_user', None)
             session.pop('otp', None)
             
-            flash('تم التسجيل بنجاح! تم تفعيل اشتراكك المجاني 🚀', 'success')
+            flash('تم التسجيل والدخول بنجاح! مرحباً بك 🚀', 'success')
             return redirect(url_for('user_dashboard'))
             
         flash('كود التحقق غير صحيح!', 'danger')
@@ -356,6 +354,21 @@ def reset_password():
 def logout():
     logout_user()
     return redirect(url_for('index'))
+
+@app.route('/user_profile', methods=['GET', 'POST'])
+@login_required
+def user_profile():
+    if request.method == 'POST':
+        old_password = request.form.get('old_password')
+        new_password = request.form.get('new_password')
+        if check_password_hash(current_user.password, old_password):
+            current_user.password = generate_password_hash(new_password, method='pbkdf2:sha256')
+            db.session.commit()
+            flash('تم تغيير كلمة المرور بنجاح! 🔒', 'success')
+            return redirect(url_for('user_profile'))
+        else:
+            flash('كلمة المرور الحالية غير صحيحة.', 'danger')
+    return render_template('user_profile.html')
 
 @app.route('/user_dashboard', methods=['GET', 'POST'])
 @login_required
@@ -457,10 +470,38 @@ def delete_sub(sub_id):
 @login_required
 def admin_dashboard():
     if current_user.role != 'admin': return redirect(url_for('user_dashboard'))
+    
     users = User.query.all()
     subs = Subscription.query.all()
     global_logs = AdLog.query.order_by(AdLog.timestamp.desc()).limit(200).all()
-    return render_template('admin.html', users=users, subs=subs, logs=global_logs, active_threads=ACTIVE_THREADS)
+
+    # حساب الإحصائيات للإدمن
+    total_users = User.query.count()
+    active_users = User.query.filter_by(is_active_account=True).count()
+    inactive_users = total_users - active_users
+
+    # إعلانات آخر 7 أيام
+    seven_days_ago = datetime.datetime.utcnow() - datetime.timedelta(days=7)
+    recent_logs = AdLog.query.filter(AdLog.timestamp >= seven_days_ago).all()
+    
+    daily_ads = {}
+    for i in range(6, -1, -1):
+        day = (datetime.datetime.utcnow() - datetime.timedelta(days=i)).strftime('%m-%d')
+        daily_ads[day] = 0
+
+    for log in recent_logs:
+        day = log.timestamp.strftime('%m-%d')
+        if day in daily_ads:
+            daily_ads[day] += 1
+
+    chart_labels = list(daily_ads.keys())
+    chart_data = list(daily_ads.values())
+
+    return render_template('admin.html', 
+                           users=users, subs=subs, logs=global_logs, 
+                           active_threads=ACTIVE_THREADS,
+                           total_users=total_users, active_users=active_users, inactive_users=inactive_users,
+                           chart_labels=chart_labels, chart_data=chart_data)
 
 @app.route('/admin_settings', methods=['GET', 'POST'])
 @login_required
@@ -513,7 +554,6 @@ def toggle_user(user_id):
         user = User.query.get_or_404(user_id)
         if user.id != current_user.id:
             user.is_active_account = not user.is_active_account
-            # إيقاف الخيط فوراً عند إيقاف الحساب
             if not user.is_active_account and user.subscription:
                 sub_id = user.subscription.id
                 if sub_id in ACTIVE_THREADS:
@@ -566,7 +606,6 @@ def revert_impersonate():
 
 with app.app_context():
     db.create_all()
-    # التأكد من وجود إعدادات النظام عند أول تشغيل
     if not SystemSettings.query.first():
         db.session.add(SystemSettings())
         db.session.commit()
