@@ -12,7 +12,7 @@ from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
-app.secret_key = "haraj_super_secret_key_v9"
+app.secret_key = "haraj_super_secret_key_v10"
 
 app.jinja_env.globals.update(now=datetime.datetime.now)
 
@@ -188,36 +188,48 @@ class MonitorThread(threading.Thread):
             if not is_quiet_now(self.cfg['quiet_enabled'], self.cfg['q_sh'], self.cfg['q_sm'], self.cfg['q_eh'], self.cfg['q_em']):
                 for kw in self.cfg['keywords']:
                     if self.stop_evt.is_set(): break
-                    url = f"{HARAJ_BASE}/search/{quote(kw, safe='')}/" if kw else f"{HARAJ_BASE}/"
-                    try:
-                        html = self.req_session.get(url, headers=HARAJ_HEADERS, timeout=15, verify=False).content
-                        for title, ad_url in extract_ads(html, HARAJ_BASE):
-                            ad_id = re.search(r"/(\d+)(?:/|$)", ad_url).group(1)
-                            if ad_id not in self.seen_ids:
-                                ad_html = self.req_session.get(ad_url, headers=HARAJ_HEADERS, timeout=15, verify=False).content
-                                soup = BeautifulSoup(ad_html, "html.parser")
-                                full_text = soup.get_text(" ", strip=True)
-                                
-                                if is_target_city(full_text, self.cfg['cities'], self.cfg['city_filter_enabled']) and \
-                                   matches_keyword_precise(full_text, kw, self.cfg['excluded_words'], self.cfg['exclude_enabled']):
+                    
+                    # فحص أول 3 صفحات كما هو بالمنطق الأساسي
+                    for page in range(1, 4):
+                        if self.stop_evt.is_set(): break
+                        
+                        if kw:
+                            url = f"{HARAJ_BASE}/search/{quote(kw, safe='')}/page/{page}" if page > 1 else f"{HARAJ_BASE}/search/{quote(kw, safe='')}/"
+                        else:
+                            url = f"{HARAJ_BASE}/page/{page}" if page > 1 else f"{HARAJ_BASE}/"
+                            
+                        try:
+                            html = self.req_session.get(url, headers=HARAJ_HEADERS, timeout=15, verify=False).content
+                            for title, ad_url in extract_ads(html, HARAJ_BASE):
+                                ad_id = re.search(r"/(\d+)(?:/|$)", ad_url).group(1)
+                                if ad_id not in self.seen_ids:
+                                    ad_html = self.req_session.get(ad_url, headers=HARAJ_HEADERS, timeout=15, verify=False).content
+                                    soup = BeautifulSoup(ad_html, "html.parser")
+                                    full_text = soup.get_text(" ", strip=True)
                                     
-                                    delay = random.uniform(30, 60)
-                                    time.sleep(delay)
-                                    
-                                    msg = f"إعلان جديد ({kw}):\n{title}\n{ad_url}"
-                                    if send_whatsapp(self.req_session, current_token, self.cfg['recipients'], msg):
-                                        self.seen_ids.add(ad_id)
-                                        with open(self.seen_file, 'w') as f: json.dump(list(self.seen_ids), f)
+                                    if is_target_city(full_text, self.cfg['cities'], self.cfg['city_filter_enabled']) and \
+                                       matches_keyword_precise(full_text, kw, self.cfg['excluded_words'], self.cfg['exclude_enabled']):
                                         
-                                        with app.app_context():
-                                            log_sub = Subscription.query.get(self.cfg['id'])
-                                            if log_sub:
-                                                log_sub.sent_count += 1
-                                                new_log = AdLog(user_id=self.cfg['user_id'], title=title, url=ad_url, keyword_matched=kw)
-                                                db.session.add(new_log)
-                                                db.session.commit()
-                    except:
-                        pass
+                                        delay = random.uniform(30, 60)
+                                        time.sleep(delay)
+                                        
+                                        msg = f"إعلان جديد ({kw}):\n{title}\n{ad_url}"
+                                        if send_whatsapp(self.req_session, current_token, self.cfg['recipients'], msg):
+                                            self.seen_ids.add(ad_id)
+                                            with open(self.seen_file, 'w') as f: json.dump(list(self.seen_ids), f)
+                                            
+                                            with app.app_context():
+                                                log_sub = Subscription.query.get(self.cfg['id'])
+                                                if log_sub:
+                                                    log_sub.sent_count += 1
+                                                    new_log = AdLog(user_id=self.cfg['user_id'], title=title, url=ad_url, keyword_matched=kw)
+                                                    db.session.add(new_log)
+                                                    db.session.commit()
+                        except:
+                            pass
+                        
+                        # تأخير بسيط بين صفحات حراج عشان ما ننحظر
+                        time.sleep(random.uniform(3, 7))
             
             sleep_seconds = self.cfg['sleep_minutes'] * 60
             for _ in range(sleep_seconds):
@@ -418,201 +430,4 @@ def user_dashboard():
             new_sub = Subscription(
                 user_id=current_user.id, name=name, keywords=keywords, recipients=current_user.phone,
                 cities=cities, city_filter_enabled=city_filter_enabled,
-                excluded_words=excluded_words, exclude_enabled=exclude_enabled,
-                quiet_enabled=quiet_enabled, quiet_start_hour=q_sh, quiet_start_minute=q_sm,
-                quiet_end_hour=q_eh, quiet_end_minute=q_em, sleep_minutes=15, end_ts=end_time
-            )
-            db.session.add(new_sub)
-            db.session.commit()
-            start_thread_for_sub(new_sub)
-            flash('تم حفظ الاشتراك وبدأ الرصد!', 'success')
-        return redirect(url_for('user_dashboard'))
-        
-    return render_template('user.html', sub=sub, logs=logs, is_expired=is_expired)
-
-@app.route('/toggle_sub/<int:sub_id>')
-@login_required
-def toggle_sub(sub_id):
-    sub = Subscription.query.get_or_404(sub_id)
-    if sub.user_id == current_user.id or current_user.role == 'admin':
-        if sub.status == 'active':
-            sub.status = 'paused'
-            if sub.id in ACTIVE_THREADS:
-                ACTIVE_THREADS[sub.id].stop()
-                del ACTIVE_THREADS[sub.id]
-            flash('تم إيقاف الاشتراك مؤقتاً ⏸', 'warning')
-        else:
-            user_owner = User.query.get(sub.user_id)
-            if user_owner.account_expiration and datetime.datetime.now() > user_owner.account_expiration:
-                flash('لا يمكن الاستئناف، حساب العميل منتهي.', 'danger')
-            else:
-                sub.status = 'active'
-                start_thread_for_sub(sub)
-                flash('تم استئناف الاشتراك بنجاح ▶️', 'success')
-        db.session.commit()
-    return redirect(request.referrer)
-
-@app.route('/delete_sub/<int:sub_id>')
-@login_required
-def delete_sub(sub_id):
-    sub = Subscription.query.get_or_404(sub_id)
-    if sub.user_id == current_user.id or current_user.role == 'admin':
-        if sub.id in ACTIVE_THREADS:
-            ACTIVE_THREADS[sub.id].stop()
-            del ACTIVE_THREADS[sub.id]
-        db.session.delete(sub)
-        db.session.commit()
-        flash('تم حذف الاشتراك نهائياً 🗑️', 'info')
-    return redirect(request.referrer)
-
-# ================= مسارات الإدارة (Admin) =================
-@app.route('/admin_dashboard')
-@login_required
-def admin_dashboard():
-    if current_user.role != 'admin': return redirect(url_for('user_dashboard'))
-    
-    users = User.query.all()
-    subs = Subscription.query.all()
-    global_logs = AdLog.query.order_by(AdLog.timestamp.desc()).limit(200).all()
-
-    # حساب الإحصائيات للإدمن
-    total_users = User.query.count()
-    active_users = User.query.filter_by(is_active_account=True).count()
-    inactive_users = total_users - active_users
-
-    # إعلانات آخر 7 أيام
-    seven_days_ago = datetime.datetime.utcnow() - datetime.timedelta(days=7)
-    recent_logs = AdLog.query.filter(AdLog.timestamp >= seven_days_ago).all()
-    
-    daily_ads = {}
-    for i in range(6, -1, -1):
-        day = (datetime.datetime.utcnow() - datetime.timedelta(days=i)).strftime('%m-%d')
-        daily_ads[day] = 0
-
-    for log in recent_logs:
-        day = log.timestamp.strftime('%m-%d')
-        if day in daily_ads:
-            daily_ads[day] += 1
-
-    chart_labels = list(daily_ads.keys())
-    chart_data = list(daily_ads.values())
-
-    return render_template('admin.html', 
-                           users=users, subs=subs, logs=global_logs, 
-                           active_threads=ACTIVE_THREADS,
-                           total_users=total_users, active_users=active_users, inactive_users=inactive_users,
-                           chart_labels=chart_labels, chart_data=chart_data)
-
-@app.route('/admin_settings', methods=['GET', 'POST'])
-@login_required
-def admin_settings():
-    if current_user.role != 'admin': return redirect(url_for('user_dashboard'))
-    settings = SystemSettings.query.first()
-    
-    if request.method == 'POST':
-        settings.whatsapp_token = request.form.get('whatsapp_token')
-        settings.trial_days = int(request.form.get('trial_days', 2))
-        db.session.commit()
-        flash('تم حفظ إعدادات النظام بنجاح ⚙️', 'success')
-        return redirect(url_for('admin_settings'))
-        
-    return render_template('admin_settings.html', settings=settings)
-
-@app.route('/admin_edit_user/<int:user_id>', methods=['GET', 'POST'])
-@login_required
-def admin_edit_user(user_id):
-    if current_user.role != 'admin': return redirect(url_for('user_dashboard'))
-    user = User.query.get_or_404(user_id)
-    
-    if request.method == 'POST':
-        user.username = request.form.get('username')
-        user.phone = request.form.get('phone')
-        new_pass = request.form.get('password')
-        exp_date_str = request.form.get('account_expiration')
-        
-        if new_pass:
-            user.password = generate_password_hash(new_pass, method='pbkdf2:sha256')
-            
-        if exp_date_str:
-            user.account_expiration = datetime.datetime.strptime(exp_date_str, '%Y-%m-%d')
-        else:
-            user.account_expiration = None 
-        
-        if user.subscription:
-            user.subscription.recipients = user.phone
-            user.subscription.end_ts = user.account_expiration.isoformat() if user.account_expiration else ""
-            
-        db.session.commit()
-        flash(f'تم تعديل بيانات العميل {user.username} بنجاح.', 'success')
-        return redirect(url_for('admin_dashboard'))
-    return render_template('admin_edit_user.html', user=user)
-
-@app.route('/toggle_user/<int:user_id>')
-@login_required
-def toggle_user(user_id):
-    if current_user.role == 'admin':
-        user = User.query.get_or_404(user_id)
-        if user.id != current_user.id:
-            user.is_active_account = not user.is_active_account
-            if not user.is_active_account and user.subscription:
-                sub_id = user.subscription.id
-                if sub_id in ACTIVE_THREADS:
-                    ACTIVE_THREADS[sub_id].stop()
-                    del ACTIVE_THREADS[sub_id]
-            db.session.commit()
-    return redirect(url_for('admin_dashboard'))
-
-@app.route('/admin_toggle_sub/<int:sub_id>')
-@login_required
-def admin_toggle_sub(sub_id):
-    if current_user.role != 'admin': return redirect(url_for('index'))
-    sub = Subscription.query.get_or_404(sub_id)
-    if sub.status == 'active':
-        sub.status = 'paused'
-        if sub.id in ACTIVE_THREADS:
-            ACTIVE_THREADS[sub.id].stop()
-            del ACTIVE_THREADS[sub.id]
-        flash('تم إيقاف اشتراك العميل بنجاح.', 'warning')
-    else:
-        user_owner = User.query.get(sub.user_id)
-        if user_owner.account_expiration and datetime.datetime.now() > user_owner.account_expiration:
-            flash('لا يمكن استئناف اشتراك العميل لأن حسابه منتهي الصلاحية!', 'danger')
-        else:
-            sub.status = 'active'
-            start_thread_for_sub(sub)
-            flash('تم استئناف اشتراك العميل بنجاح.', 'success')
-    db.session.commit()
-    return redirect(url_for('admin_dashboard'))
-
-@app.route('/impersonate/<int:user_id>')
-@login_required
-def impersonate(user_id):
-    if current_user.role != 'admin': return redirect(url_for('index'))
-    user = User.query.get_or_404(user_id)
-    session['admin_impersonating'] = current_user.id
-    login_user(user)
-    flash(f'أنت الآن تتصفح وتتحكم بحساب العميل: {user.username}', 'warning')
-    return redirect(url_for('user_dashboard'))
-
-@app.route('/revert_impersonate')
-@login_required
-def revert_impersonate():
-    if 'admin_impersonating' in session:
-        admin_user = User.query.get(session['admin_impersonating'])
-        login_user(admin_user)
-        session.pop('admin_impersonating', None)
-        flash('تمت العودة لحساب الإدارة بنجاح.', 'success')
-    return redirect(url_for('admin_dashboard'))
-
-with app.app_context():
-    db.create_all()
-    if not SystemSettings.query.first():
-        db.session.add(SystemSettings())
-        db.session.commit()
-
-if __name__ == '__main__':
-    with app.app_context():
-        for sub in Subscription.query.filter_by(status='active').all():
-            if sub.owner.is_active_account and (not sub.owner.account_expiration or sub.owner.account_expiration > datetime.datetime.now()):
-                start_thread_for_sub(sub)
-    app.run(host='0.0.0.0', port=5000)
+                excluded_words=excluded_words, exclude_enabled=exclud
