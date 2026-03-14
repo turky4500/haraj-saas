@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <title>إعدادات النظام - الإدارة</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+</head>
+<body style="background-color: #ecf0f1; display: flex; align-items: center; justify-content: center; height: 100vh;">
+    <div class="card p-4 shadow-lg" style="width: 100%; max-width: 600px; border-radius: 15px; border-top: 5px solid #27ae60;">
+        <h4 class="mb-4 text-center text-success">⚙️ إعدادات النظام العامة</h4>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST">
+            <div class="mb-4">
+                <label class="form-label fw-bold">مدة الاشتراك المجاني (بالأيام)</label>
+                <input type="number" name="trial_days" class="form-control" value="{{ settings.trial_days if settings else 2 }}" min="0" required>
+                <div class="form-text text-muted">أي عميل يسجل جديد سيحصل على هذا العدد من الأيام كفترة تجربة. (ضع 0 لإلغاء التجربة المجانية).</div>
+            </div>
+            
+            <div class="mb-4">
+                <label class="form-label fw-bold">مفتاح الربط (Token) الخاص بالواتساب</label>
+                <input type="text" name="whatsapp_token" class="form-control text-start" dir="ltr" value="{{ settings.whatsapp_token if settings else '' }}" required>
+                <div class="form-text text-muted">مفتاح الربط من مزود الخدمة (tkwin). تأكد من صحته حتى تصل الرسائل.</div>
+            </div>
+            
+            <button type="submit" class="btn btn-success w-100 mb-2 py-2 fw-bold">💾 حفظ إعدادات النظام</button>
+            <a href="/admin_dashboard" class="btn btn-secondary w-100">العودة للوحة الإدارة</a>
+        </form>
+    </div>
+</body>
+</html>
