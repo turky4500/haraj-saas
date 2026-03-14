@@ -6,23 +6,28 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
 </head>
 <body style="background-color: #ecf0f1; display: flex; align-items: center; justify-content: center; height: 100vh;">
-    <div class="card p-4" style="width: 100%; max-width: 500px; border-radius: 15px;">
-        <h4 class="mb-4 text-center">✏️ تعديل بيانات العميل</h4>
+    <div class="card p-4 shadow-sm" style="width: 100%; max-width: 500px; border-radius: 15px;">
+        <h4 class="mb-4 text-center text-primary">✏️ تحكم ببيانات العميل</h4>
         <form method="POST">
             <div class="mb-3">
-                <label>اسم المستخدم</label>
+                <label class="form-label text-muted small">اسم المستخدم</label>
                 <input type="text" name="username" class="form-control" value="{{ user.username }}" required>
             </div>
             <div class="mb-3">
-                <label>رقم الجوال للواتساب</label>
+                <label class="form-label text-muted small">رقم الجوال للواتساب</label>
                 <input type="text" name="phone" class="form-control" value="{{ user.phone }}" required>
             </div>
-            <div class="mb-4">
-                <label>رقم سري جديد (اتركه فارغاً إذا لا تريد تغييره)</label>
-                <input type="text" name="password" class="form-control" placeholder="اكتب الرمز السري الجديد هنا">
+            <div class="mb-3">
+                <label class="form-label text-danger small fw-bold">تاريخ انتهاء الاشتراك (للتمديد أو التقليص)</label>
+                <input type="date" name="account_expiration" class="form-control border-danger" value="{{ user.account_expiration.strftime('%Y-%m-%d') if user.account_expiration else '' }}">
+                <div class="form-text">لتجديد اشتراك العميل، اختر تاريخاً مستقبلياً من هنا.</div>
             </div>
-            <button type="submit" class="btn btn-primary w-100 mb-2">حفظ التعديلات</button>
-            <a href="/admin_dashboard" class="btn btn-secondary w-100">إلغاء والعودة</a>
+            <div class="mb-4">
+                <label class="form-label text-muted small">رقم سري جديد (اتركه فارغاً إذا لا تريد تغييره)</label>
+                <input type="password" name="password" class="form-control" placeholder="اكتب الرمز السري الجديد هنا">
+            </div>
+            <button type="submit" class="btn btn-primary w-100 mb-2 py-2 fw-bold">💾 حفظ التعديلات</button>
+            <a href="/admin_dashboard" class="btn btn-light w-100">إلغاء والعودة</a>
         </form>
     </div>
 </body>
