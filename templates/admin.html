@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>لوحة الإدارة - راصد حراج</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { background-color: #ecf0f1; font-family: 'Segoe UI', Tahoma, sans-serif;}
@@ -17,10 +18,10 @@
 <body>
     <nav class="navbar navbar-dark mb-4">
         <div class="container">
-            <a class="navbar-brand" href="#">لوحة الإدارة الكبرى | راصد حراج</a>
+            <a class="navbar-brand" href="#"><i class="fas fa-tools"></i> لوحة الإدارة الكبرى | راصد حراج</a>
             <span class="text-light ms-auto me-3">
-                <a href="/admin_settings" class="btn btn-light btn-sm fw-bold me-2">⚙️ إعدادات النظام</a>
-                <a href="/logout" class="btn btn-outline-light btn-sm">تسجيل خروج</a>
+                <a href="/admin_settings" class="btn btn-light btn-sm fw-bold me-2"><i class="fas fa-cog"></i> إعدادات النظام</a>
+                <a href="/logout" class="btn btn-outline-light btn-sm"><i class="fas fa-sign-out-alt"></i> تسجيل خروج</a>
             </span>
         </div>
     </nav>
@@ -37,13 +38,13 @@
         <div class="row mb-4">
             <div class="col-md-4">
                 <div class="card p-3 shadow-sm text-center">
-                    <h5 class="text-muted">العملاء (نشط / موقوف)</h5>
+                    <h5 class="text-muted"><i class="fas fa-users"></i> العملاء (نشط / موقوف)</h5>
                     <canvas id="usersChart" style="max-height: 200px;"></canvas>
                 </div>
             </div>
             <div class="col-md-8">
                 <div class="card p-3 shadow-sm text-center">
-                    <h5 class="text-muted">عدد الإعلانات المرسلة (آخر 7 أيام)</h5>
+                    <h5 class="text-muted"><i class="fas fa-chart-line"></i> عدد الإعلانات المرسلة (آخر 7 أيام)</h5>
                     <canvas id="adsChart" style="max-height: 200px;"></canvas>
                 </div>
             </div>
@@ -52,9 +53,12 @@
         <div class="row">
             <div class="col-md-12 mb-4">
                 <div class="card p-4">
-                    <h5 class="mb-4">👥 إدارة العملاء والاشتراكات</h5>
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h5 class="mb-0 fw-bold"><i class="fas fa-users-cog text-primary"></i> إدارة العملاء والاشتراكات</h5>
+                        <a href="/admin_add_user" class="btn btn-success fw-bold shadow-sm"><i class="fas fa-user-plus"></i> إضافة عميل جديد</a>
+                    </div>
                     <div class="table-responsive">
-                        <table class="table table-bordered align-middle text-center">
+                        <table class="table table-bordered align-middle text-center table-hover">
                             <thead class="table-dark">
                                 <tr>
                                     <th>العميل</th>
@@ -80,7 +84,7 @@
                                         {% if user.subscription %}
                                             <span class="badge bg-info text-dark d-block mb-1">رسائل: {{ user.subscription.sent_count }}</span>
                                             <a href="/admin_toggle_sub/{{ user.subscription.id }}" class="btn btn-sm {% if user.subscription.status == 'active' %}btn-outline-warning{% else %}btn-outline-success{% endif %} w-100">
-                                                {% if user.subscription.status == 'active' %}إيقاف الاشتراك ⏸{% else %}تشغيل الاشتراك ▶{% endif %}
+                                                {% if user.subscription.status == 'active' %}<i class="fas fa-pause"></i> إيقاف الاشتراك{% else %}<i class="fas fa-play"></i> تشغيل الاشتراك{% endif %}
                                             </a>
                                         {% else %}
                                             <span class="text-muted small">لا يوجد اشتراك</span>
@@ -88,18 +92,18 @@
                                     </td>
                                     <td>
                                         {% if user.is_active_account %}
-                                            <span class="badge bg-success">حساب فعال</span>
+                                            <span class="badge bg-success">فعال</span>
                                         {% else %}
-                                            <span class="badge bg-danger">حساب موقوف</span>
+                                            <span class="badge bg-danger">موقوف</span>
                                         {% endif %}
                                     </td>
                                     <td>
                                         {% if user.id != current_user.id %}
                                             <div class="d-flex flex-column gap-1">
-                                                <a href="/admin_edit_user/{{ user.id }}" class="btn btn-sm btn-primary">تعديل/تمديد</a>
-                                                <a href="/impersonate/{{ user.id }}" class="btn btn-sm btn-dark">دخول بحسابه</a>
+                                                <a href="/admin_edit_user/{{ user.id }}" class="btn btn-sm btn-primary"><i class="fas fa-edit"></i> تعديل/تمديد</a>
+                                                <a href="/impersonate/{{ user.id }}" class="btn btn-sm btn-dark"><i class="fas fa-sign-in-alt"></i> دخول بحسابه</a>
                                                 <a href="/toggle_user/{{ user.id }}" class="btn btn-sm {% if user.is_active_account %}btn-danger{% else %}btn-success{% endif %}">
-                                                    {% if user.is_active_account %}إيقاف الحساب كلياً 🚫{% else %}تفعيل الحساب ✅{% endif %}
+                                                    {% if user.is_active_account %}<i class="fas fa-ban"></i> إيقاف الحساب كلياً{% else %}<i class="fas fa-check"></i> تفعيل الحساب{% endif %}
                                                 </a>
                                             </div>
                                         {% else %}
@@ -116,7 +120,7 @@
 
             <div class="col-md-12">
                 <div class="card p-4 log-table">
-                    <h5 class="mb-4 text-secondary">🗂️ الأرشيف الشامل (تقارير الرصد لجميع العملاء)</h5>
+                    <h5 class="mb-4 text-secondary"><i class="fas fa-archive"></i> الأرشيف الشامل (تقارير الرصد لجميع العملاء)</h5>
                     <div class="table-responsive">
                         <table class="table table-sm table-striped align-middle">
                             <thead class="table-secondary">
@@ -133,7 +137,7 @@
                                     <td class="text-muted small" dir="ltr">{{ log.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
                                     <td><strong>{{ log.owner.username }}</strong></td>
                                     <td><span class="badge bg-info text-dark">{{ log.keyword_matched }}</span></td>
-                                    <td><a href="{{ log.url }}" target="_blank" class="text-decoration-none">{{ log.title }}</a></td>
+                                    <td><a href="{{ log.url }}" target="_blank" class="text-decoration-none text-dark">{{ log.title }}</a></td>
                                 </tr>
                                 {% else %}
                                 <tr>
@@ -149,7 +153,6 @@
     </div>
 
     <script>
-        // رسم العملاء (دائري)
         const ctxUsers = document.getElementById('usersChart').getContext('2d');
         new Chart(ctxUsers, {
             type: 'doughnut',
@@ -164,7 +167,6 @@
             options: { plugins: { legend: { position: 'bottom' } } }
         });
 
-        // رسم الإعلانات (خطي)
         const ctxAds = document.getElementById('adsChart').getContext('2d');
         new Chart(ctxAds, {
             type: 'line',
