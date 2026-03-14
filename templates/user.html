@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لوحة المستخدم - راصد حراج</title>
+    <title>لوحة التحكم - راصد حراج</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
     <style>
         body { background-color: #f0f2f5; }
@@ -15,30 +15,37 @@
     <nav class="navbar navbar-dark mb-4">
         <div class="container">
             <a class="navbar-brand" href="#">لوحة المستخدم | راصد حراج</a>
-            <a href="/" class="btn btn-outline-light btn-sm">خروج</a>
+            <span class="text-light ms-auto me-3">مرحباً، {{ current_user.username }}</span>
+            <a href="/logout" class="btn btn-outline-danger btn-sm">تسجيل خروج</a>
         </div>
     </nav>
 
     <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
         <div class="row">
             <div class="col-md-4">
                 <div class="card p-4">
                     <h5 class="mb-4">➕ إضافة اشتراك جديد</h5>
-                    <form action="/api/add_sub" method="POST">
+                    <form action="/user_dashboard" method="POST">
                         <div class="mb-3">
                             <label class="form-label">اسم الاشتراك</label>
-                            <input type="text" name="name" class="form-control" required placeholder="مثال: سيارات لاندكروزر">
+                            <input type="text" name="name" class="form-control" required placeholder="مثال: سيارات">
                         </div>
                         <div class="mb-3">
                             <label class="form-label">كلمات البحث (مفصول بفاصلة)</label>
-                            <input type="text" name="keywords" class="form-control" required placeholder="لاندكروزر 2011, لاندكروزر">
+                            <input type="text" name="keywords" class="form-control" required placeholder="لاندكروزر, شاص">
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">المدن (مفصول بفاصلة)</label>
-                            <input type="text" name="cities" class="form-control" placeholder="الرياض, جدة">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">رقم الجوال للواتساب</label>
+                            <label class="form-label">رقم الجوال</label>
                             <input type="text" name="recipients" class="form-control" required placeholder="9665xxxxxxxx">
                         </div>
                         <button type="submit" class="btn btn-primary w-100">حفظ وبدء الرصد</button>
@@ -48,33 +55,29 @@
 
             <div class="col-md-8">
                 <div class="card p-4">
-                    <h5 class="mb-4">📋 اشتراكاتي النشطة</h5>
+                    <h5 class="mb-4">📋 اشتراكاتي</h5>
                     <div class="table-responsive">
                         <table class="table table-hover align-middle">
                             <thead class="table-light">
                                 <tr>
                                     <th>الاسم</th>
                                     <th>الكلمات</th>
+                                    <th>عدد الإرساليات</th>
                                     <th>الحالة</th>
-                                    <th>الإرساليات</th>
                                     <th>إجراءات</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for sub_id, info in subs.items() %}
+                                {% for sub in subs %}
                                 <tr>
-                                    <td>{{ info.cfg.name }}</td>
-                                    <td>{{ info.cfg.keywords | join('، ') }}</td>
+                                    <td>{{ sub.name }}</td>
+                                    <td>{{ sub.keywords }}</td>
+                                    <td><span class="badge bg-info text-dark">{{ sub.sent_count }}</span></td>
                                     <td>
-                                        {% if info.thread and info.thread.is_alive() %}
-                                            <span class="badge bg-success">يعمل 🟢</span>
-                                        {% else %}
-                                            <span class="badge bg-danger">متوقف 🔴</span>
-                                        {% endif %}
+                                        <span class="badge bg-success">نشط 🟢</span>
                                     </td>
-                                    <td>{{ info.thread.sent_total if info.thread else 0 }}</td>
                                     <td>
-                                        <a href="/api/delete_sub/{{ sub_id }}" class="btn btn-sm btn-danger">حذف</a>
+                                        <a href="/delete_sub/{{ sub.id }}" class="btn btn-sm btn-danger" onclick="return confirm('هل أنت متأكد من الحذف؟')">حذف</a>
                                     </td>
                                 </tr>
                                 {% else %}
