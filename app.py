@@ -228,7 +228,6 @@ class MonitorThread(threading.Thread):
                         except:
                             pass
                         
-                        # تأخير بسيط بين صفحات حراج عشان ما ننحظر
                         time.sleep(random.uniform(3, 7))
             
             sleep_seconds = self.cfg['sleep_minutes'] * 60
@@ -430,4 +429,5 @@ def user_dashboard():
             new_sub = Subscription(
                 user_id=current_user.id, name=name, keywords=keywords, recipients=current_user.phone,
                 cities=cities, city_filter_enabled=city_filter_enabled,
-                excluded_words=excluded_words, exclude_enabled=exclud
+                excluded_words=excluded_words, exclude_enabled=exclude_enabled,
+                quiet_enabled=quiet_enabled, quiet_star
