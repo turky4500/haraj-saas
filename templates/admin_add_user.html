@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>إضافة عميل جديد - الإدارة</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background-color: #ecf0f1; font-family: 'Segoe UI', Tahoma, sans-serif; padding-top: 30px; padding-bottom: 30px;}
+        .card { border-radius: 15px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .section-title { font-size: 1.1rem; font-weight: bold; color: #27ae60; margin-bottom: 15px; border-bottom: 2px solid #ecf0f1; padding-bottom: 8px;}
+        .tag-chip { display: inline-flex; align-items: center; background-color: #e1f0fa; color: #0d6efd; padding: 5px 15px; border-radius: 20px; font-size: 0.9rem; margin: 5px 5px 5px 0; font-weight: 500; border: 1px solid #cde4f7; }
+        .tag-chip i { margin-right: 8px; cursor: pointer; color: #dc3545; transition: 0.2s; }
+        .tag-chip i:hover { color: #a71d2a; transform: scale(1.1); }
+        .btn-add { border-radius: 10px; background-color: #e9ecef; color: #495057; font-weight: bold; border: none; }
+        .btn-add:hover { background-color: #dde0e3; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card p-4">
+                    <h4 class="mb-4 text-center fw-bold text-success"><i class="fas fa-user-plus"></i> إضافة عميل وإعداد راداره</h4>
+                    
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ category }}">{{ message }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+
+                    <form action="/admin_add_user" method="POST" id="adminAddForm">
+                        
+                        <div class="section-title"><i class="fas fa-id-card"></i> بيانات الحساب</div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small">اسم المستخدم</label>
+                                <input type="text" name="username" class="form-control" required placeholder="مثال: abu_ali">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small">رقم جوال الواتساب</label>
+                                <input type="text" name="phone" class="form-control" required placeholder="مثال: 9665xxxxxxxx" dir="ltr">
+                            </div>
+                        </div>
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small">كلمة المرور (للدخول)</label>
+                                <input type="text" name="password" class="form-control" required placeholder="اكتب كلمة مرور">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small">تاريخ انتهاء الاشتراك</label>
+                                <input type="date" name="account_expiration" class="form-control border-success">
+                                <small class="text-muted">اتركه فارغاً إذا أردته مفتوحاً.</small>
+                            </div>
+                        </div>
+
+                        <div class="section-title mt-4"><i class="fas fa-radar"></i> إعدادات رادار العميل (تلقائي)</div>
+                        <div class="mb-3">
+                            <label class="form-label text-muted small">اسم الاشتراك</label>
+                            <input type="text" name="name" class="form-control" placeholder="مثال: بحث سيارات العميل">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label text-danger fw-bold small">الكلمات المستهدفة (أضف كلمة ليتم التفعيل)</label>
+                            <div class="input-group mb-2">
+                                <input type="text" id="kwInput" class="form-control" placeholder="لاندكروزر...">
+                                <button type="button" class="btn btn-add px-4" onclick="addTag('kwInput', 'kwTags', 'keywordsHidden')">إضافة</button>
+                            </div>
+                            <div id="kwTags" class="mb-2"></div>
+                            <input type="hidden" name="keywords" id="keywordsHidden">
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check form-switch mb-1">
+                                <input class="form-check-input" type="checkbox" name="city_filter_enabled" id="citySwitch">
+                                <label class="form-check-label text-muted small" for="citySwitch">تفعيل فلترة المدن</label>
+                            </div>
+                            <div class="input-group mb-2">
+                                <input type="text" id="cityInput" class="form-control" placeholder="الرياض...">
+                                <button type="button" class="btn btn-add px-4" onclick="addTag('cityInput', 'cityTags', 'cityHidden')">إضافة</button>
+                            </div>
+                            <div id="cityTags" class="mb-2"></div>
+                            <input type="hidden" name="cities" id="cityHidden">
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="form-check form-switch mb-1">
+                                <input class="form-check-input" type="checkbox" name="exclude_enabled" id="excSwitch">
+                                <label class="form-check-label text-muted small" for="excSwitch">تفعيل الكلمات المحظورة</label>
+                            </div>
+                            <div class="input-group mb-2">
+                                <input type="text" id="excInput" class="form-control" placeholder="مصدوم...">
+                                <button type="button" class="btn btn-add px-4" onclick="addTag('excInput', 'excTags', 'excHidden')">إضافة</button>
+                            </div>
+                            <div id="excTags" class="mb-2"></div>
+                            <input type="hidden" name="excluded_words" id="excHidden">
+                        </div>
+                        
+                        <div class="mb-4 bg-white border p-3 rounded">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" name="quiet_enabled" id="quietSwitch">
+                                <label class="form-check-label text-danger small fw-bold" for="quietSwitch">تفعيل وضع النوم للعميل</label>
+                            </div>
+                            <div class="row">
+                                <div class="col-6">
+                                    <label class="text-muted small">من الساعة:</label>
+                                    <input type="number" name="q_sh" class="form-control" value="1" min="0" max="23">
+                                </div>
+                                <div class="col-6">
+                                    <label class="text-muted small">إلى الساعة:</label>
+                                    <input type="number" name="q_eh" class="form-control" value="6" min="0" max="23">
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="button" onclick="submitAdminForm()" class="btn btn-success w-100 py-3 fw-bold fs-5 shadow-sm">
+                            <i class="fas fa-check-circle"></i> حفظ العميل وتفعيل الرادار
+                        </button>
+                        <a href="/admin_dashboard" class="btn btn-light w-100 mt-2 fw-bold text-muted">إلغاء والعودة</a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let keywordsArray = [];
+        let excludedArray = [];
+        let citiesArray = [];
+
+        function addTag(inputId, containerId, hiddenId) {
+            let input = document.getElementById(inputId);
+            let val = input.value.trim();
+            if(val === "") return;
+
+            let targetArray;
+            if(containerId === 'kwTags') targetArray = keywordsArray;
+            else if(containerId === 'excTags') targetArray = excludedArray;
+            else if(containerId === 'cityTags') targetArray = citiesArray;
+
+            if(!targetArray.includes(val)) {
+                targetArray.push(val);
+                renderTags(containerId, targetArray, hiddenId);
+            }
+            input.value = "";
+        }
+
+        function renderTags(containerId, arr, hiddenId) {
+            let container = document.getElementById(containerId);
+            let hidden = document.getElementById(hiddenId);
+            container.innerHTML = "";
+            arr.forEach((item, index) => {
+                let span = document.createElement("span");
+                span.className = "tag-chip";
+                span.innerHTML = `${item} <i class="fas fa-times-circle" onclick="removeTag('${containerId}', ${index}, '${hiddenId}')"></i>`;
+                container.appendChild(span);
+            });
+            hidden.value = arr.join(",");
+        }
+
+        function removeTag(containerId, index, hiddenId) {
+            if(containerId === 'kwTags') { keywordsArray.splice(index, 1); renderTags(containerId, keywordsArray, hiddenId); }
+            else if(containerId === 'excTags') { excludedArray.splice(index, 1); renderTags(containerId, excludedArray, hiddenId); }
+            else if(containerId === 'cityTags') { citiesArray.splice(index, 1); renderTags(containerId, citiesArray, hiddenId); }
+        }
+
+        document.getElementById('kwInput').addEventListener('keypress', function(e) { if(e.key === 'Enter') { e.preventDefault(); addTag('kwInput', 'kwTags', 'keywordsHidden'); } });
+        document.getElementById('excInput').addEventListener('keypress', function(e) { if(e.key === 'Enter') { e.preventDefault(); addTag('excInput', 'excTags', 'excHidden'); } });
+        document.getElementById('cityInput').addEventListener('keypress', function(e) { if(e.key === 'Enter') { e.preventDefault(); addTag('cityInput', 'cityTags', 'cityHidden'); } });
+
+        function submitAdminForm() {
+            // يمكن للمدير إضافة عميل بدون كلمات، لكن يستحسن تنبيهه
+            document.getElementById('adminAddForm').submit();
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
