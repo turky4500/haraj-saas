@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>الملف الشخصي</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+</head>
+<body style="background-color: #f0f2f5; display: flex; align-items: center; justify-content: center; height: 100vh;">
+    <div class="card p-4 shadow-sm" style="width: 100%; max-width: 450px; border-radius: 15px;">
+        <h4 class="mb-4 text-center" style="color: #2c3e50;">👤 إعدادات الملف الشخصي</h4>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST">
+            <div class="mb-3">
+                <label class="form-label text-muted small">اسم المستخدم</label>
+                <input type="text" class="form-control" value="{{ current_user.username }}" disabled>
+            </div>
+            <div class="mb-4">
+                <label class="form-label text-muted small">رقم الجوال (للتغيير تواصل مع الإدارة)</label>
+                <input type="text" class="form-control" value="{{ current_user.phone }}" disabled dir="ltr">
+            </div>
+
+            <hr class="mb-4">
+            <h6 class="mb-3 fw-bold text-danger">تغيير كلمة المرور</h6>
+
+            <div class="mb-3">
+                <label class="form-label text-muted small">كلمة المرور الحالية</label>
+                <input type="password" name="old_password" class="form-control" required placeholder="ادخل الرمز الحالي">
+            </div>
+            <div class="mb-4">
+                <label class="form-label text-muted small">كلمة المرور الجديدة</label>
+                <input type="password" name="new_password" class="form-control" required placeholder="ادخل الرمز الجديد">
+            </div>
+            <button type="submit" class="btn btn-primary w-100 mb-2 py-2 fw-bold">حفظ كلمة المرور</button>
+            <a href="/user_dashboard" class="btn btn-light w-100">العودة للوحة التحكم</a>
+        </form>
+    </div>
+</body>
+</html>
