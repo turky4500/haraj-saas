@@ -57,7 +57,7 @@
                                     </td>
                                     <td dir="ltr">{{ user.phone }}</td>
                                     <td dir="ltr" class="text-danger fw-bold">
-                                        {{ user.account_expiration.strftime('%Y-%m-%d') if user.account_expiration else 'غير محدد' }}
+                                        {{ user.account_expiration.strftime('%Y-%m-%d') if user.account_expiration else 'مفتوح' }}
                                     </td>
                                     <td><span class="badge bg-info text-dark">{{ user.subscription.sent_count if user.subscription else 0 }}</span></td>
                                     <td>
