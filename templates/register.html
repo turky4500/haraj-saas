@@ -2,50 +2,75 @@
 <html dir="rtl" lang="ar">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>إنشاء حساب - راصد حراج</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { background-color: #f8f9fa; display: flex; align-items: center; justify-content: center; height: 100vh; }
-        .auth-card { background: white; padding: 2.5rem; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); width: 100%; max-width: 400px; }
+        body { font-family: 'Cairo', sans-serif; background: linear-gradient(180deg, #e6f7f4 0%, #f8f9fa 100%); display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+        .auth-card { background: white; padding: 2.5rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); width: 100%; max-width: 450px; position: relative; overflow: hidden; }
+        .form-control { border-radius: 12px; padding: 12px; background-color: #f8f9fa; border: 1px solid #e9ecef; }
+        .form-control:focus { border-color: #1abc9c; box-shadow: 0 0 0 0.25rem rgba(26, 188, 156, 0.25); }
+        .btn-success { background-color: #1abc9c; border: none; border-radius: 12px; padding: 12px; font-weight: 700; font-size: 1.1rem; }
+        .btn-success:hover { background-color: #16a085; }
+        
+        /* شاشة التحميل (تظهر عند الضغط) */
+        #loader-overlay {
+            display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.9); z-index: 10;
+            flex-direction: column; align-items: center; justify-content: center; text-align: center;
+        }
+        .spinner { border: 4px solid rgba(26, 188, 156, 0.2); border-top: 4px solid #1abc9c; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
     <div class="auth-card">
+        <div id="loader-overlay">
+            <div class="spinner mb-3"></div>
+            <h5 class="fw-bold" style="color: #1abc9c;">جاري إرسال كود الواتساب...</h5>
+            <p class="text-muted small">لحظات بسيطة، لا تقفل الصفحة</p>
+        </div>
+
         <div class="text-center mb-4">
-            <h3 style="color: #2c3e50;">✨ إنشاء حساب جديد</h3>
+            <i class="fas fa-user-plus fa-3x mb-3" style="color: #1abc9c;"></i>
+            <h3 class="fw-bold" style="color: #2c3e50;">إنشاء حساب جديد</h3>
             <p class="text-muted">انضم إلينا وابدأ رصد إعلاناتك</p>
         </div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                        {{ message }}
-                    </div>
+                    <div class="alert alert-{{ category }} rounded-3 small fw-bold">{{ message }}</div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
 
-        <form method="POST" action="/register">
+        <form method="POST" action="/register" id="regForm">
             <div class="mb-3">
-                <label class="form-label">اسم المستخدم</label>
+                <label class="form-label fw-bold small text-muted">اسم المستخدم</label>
                 <input type="text" name="username" class="form-control" required placeholder="اختر اسم مستخدم">
             </div>
             <div class="mb-3">
-                <label class="form-label">رقم الواتساب (للتفعيل)</label>
-                <input type="text" name="phone" class="form-control" required placeholder="مثال: 9665xxxxxxxx">
+                <label class="form-label fw-bold small text-muted">رقم الواتساب (للتفعيل)</label>
+                <input type="text" name="phone" class="form-control" required placeholder="مثال: 9665xxxxxxxx" dir="ltr" style="text-align: right;">
             </div>
             <div class="mb-4">
-                <label class="form-label">كلمة المرور</label>
+                <label class="form-label fw-bold small text-muted">كلمة المرور</label>
                 <input type="password" name="password" class="form-control" required placeholder="اختر كلمة مرور قوية">
             </div>
-            <button type="submit" class="btn btn-success w-100 mb-3">إرسال كود التحقق</button>
+            <button type="submit" class="btn btn-success w-100 mb-3 shadow-sm">إرسال كود التحقق</button>
         </form>
-        <div class="text-center">
+        <div class="text-center mt-3">
             <span class="text-muted">لديك حساب بالفعل؟</span>
-            <a href="/login" class="text-decoration-none">سجل دخولك</a>
+            <a href="/login" class="text-decoration-none fw-bold" style="color: #1abc9c;">سجل دخولك</a>
         </div>
     </div>
+
+    <script>
+        document.getElementById('regForm').addEventListener('submit', function() {
+            document.getElementById('loader-overlay').style.display = 'flex';
+        });
+    </script>
 </body>
 </html>
