@@ -1,52 +1,4 @@
-<!DOCTYPE html>
-<html dir="rtl" lang="ar">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لوحة الإدارة - راصد حراج</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
-    <style>
-        body { background-color: #ecf0f1; font-family: 'Segoe UI', Tahoma, sans-serif;}
-        .navbar { background-color: #27ae60; }
-        .card { border-radius: 12px; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px;}
-        .log-table { max-height: 400px; overflow-y: auto; }
-    </style>
-</head>
-<body>
-    <nav class="navbar navbar-dark mb-4">
-        <div class="container">
-            <a class="navbar-brand" href="#">لوحة الإدارة الكبرى | راصد حراج</a>
-            <span class="text-light ms-auto me-3">مرحباً أيها المدير</span>
-            <a href="/logout" class="btn btn-outline-light btn-sm">تسجيل خروج</a>
-        </div>
-    </nav>
-
-    <div class="container">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-
-        <div class="row">
-            <div class="col-md-12 mb-4">
-                <div class="card p-4">
-                    <h5 class="mb-4">👥 إدارة العملاء والتحكم الكامل</h5>
-                    <div class="table-responsive">
-                        <table class="table table-bordered align-middle text-center">
-                            <thead class="table-dark">
-                                <tr>
-                                    <th>رقم العميل</th>
-                                    <th>اسم المستخدم</th>
-                                    <th>رقم الجوال</th>
-                                    <th>عدد الإرساليات</th>
-                                    <th>حالة الحساب</th>
-                                    <th>إجراءات الدعم الفني</th>
-                                </tr>
-                            </thead>
-                            <tbody>
+<tbody>
                                 {% for user in users %}
                                 <tr>
                                     <td>{{ user.id }}</td>
@@ -55,6 +7,9 @@
                                         {% if user.role == 'admin' %}<span class="badge bg-warning text-dark d-block">مدير</span>{% endif %}
                                     </td>
                                     <td dir="ltr">{{ user.phone }}</td>
+                                    <td dir="ltr" class="text-danger fw-bold">
+                                        {{ user.account_expiration.strftime('%Y-%m-%d') if user.account_expiration else 'غير محدد' }}
+                                    </td>
                                     <td><span class="badge bg-info text-dark">{{ user.subscription.sent_count if user.subscription else 0 }}</span></td>
                                     <td>
                                         {% if user.is_active_account %}
@@ -65,8 +20,8 @@
                                     </td>
                                     <td>
                                         {% if user.id != current_user.id %}
-                                            <a href="/admin_edit_user/{{ user.id }}" class="btn btn-sm btn-primary">تعديل بياناته</a>
-                                            <a href="/impersonate/{{ user.id }}" class="btn btn-sm btn-dark">الدخول بحسابه</a>
+                                            <a href="/admin_edit_user/{{ user.id }}" class="btn btn-sm btn-primary">تعديل/تمديد</a>
+                                            <a href="/impersonate/{{ user.id }}" class="btn btn-sm btn-dark">دخول بحسابه</a>
                                             <a href="/toggle_user/{{ user.id }}" class="btn btn-sm {% if user.is_active_account %}btn-danger{% else %}btn-success{% endif %}">
                                                 {% if user.is_active_account %}إيقاف ⏸{% else %}تفعيل ▶{% endif %}
                                             </a>
@@ -77,43 +32,3 @@
                                 </tr>
                                 {% endfor %}
                             </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-12">
-                <div class="card p-4 log-table">
-                    <h5 class="mb-4 text-secondary">🗂️ الأرشيف الشامل (تقارير الرصد لجميع العملاء)</h5>
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped align-middle">
-                            <thead class="table-secondary">
-                                <tr>
-                                    <th>الوقت</th>
-                                    <th>العميل</th>
-                                    <th>الكلمة المرصودة</th>
-                                    <th>عنوان الإعلان ورابطه</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for log in logs %}
-                                <tr>
-                                    <td class="text-muted small" dir="ltr">{{ log.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
-                                    <td><strong>{{ log.owner.username }}</strong></td>
-                                    <td><span class="badge bg-info text-dark">{{ log.keyword_matched }}</span></td>
-                                    <td><a href="{{ log.url }}" target="_blank" class="text-decoration-none">{{ log.title }}</a></td>
-                                </tr>
-                                {% else %}
-                                <tr>
-                                    <td colspan="4" class="text-center text-muted py-3">لا توجد عمليات رصد حتى الآن.</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</body>
-</html>
