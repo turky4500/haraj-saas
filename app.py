@@ -12,7 +12,7 @@ from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
-app.secret_key = "haraj_super_secret_key_v7"
+app.secret_key = "haraj_super_secret_key_v8"
 
 app.jinja_env.globals.update(now=datetime.datetime.now)
 
@@ -29,27 +29,26 @@ APP_BASE_DIR = Path(__file__).resolve().parent
 SUBS_BASE_DIR = APP_BASE_DIR / "subs"
 SUBS_BASE_DIR.mkdir(exist_ok=True)
 
-DEFAULT_TOKEN = "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
 HARAJ_BASE = "https://haraj.com.sa"
 HARAJ_HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Accept-Language": "ar-SA"}
 ACTIVE_THREADS = {} 
 
-# ================= باتش منع السكون (Keep-Alive) =================
+# ================= باتش منع السكون =================
 def keep_alive_patch():
-    """خيط برمجي يزور الموقع كل 10 دقائق لمنع السيرفر من النوم"""
     while True:
         try:
-            # يرجى التأكد من أن هذا هو رابط موقعك النهائي
             requests.get("https://haraj-saas.onrender.com/", timeout=10)
-            print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] تم تنشيط السيرفر بنجاح بواسطة الباتش.")
-        except Exception as e:
-            print(f"خطأ في تنشيط السيرفر: {e}")
-        time.sleep(600) # انتظار 10 دقائق (600 ثانية)
+        except: pass
+        time.sleep(600) 
 
-# تشغيل الباتش في الخلفية
 threading.Thread(target=keep_alive_patch, daemon=True).start()
 
 # ================= النماذج (قاعدة البيانات) =================
+class SystemSettings(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    whatsapp_token = db.Column(db.String(255), default="7a203d6ba6f4325ed3261ea87f6b2e751250ad97")
+    trial_days = db.Column(db.Integer, default=2)
+
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False)
@@ -57,7 +56,7 @@ class User(UserMixin, db.Model):
     password = db.Column(db.String(200), nullable=False)
     role = db.Column(db.String(20), default='user')
     is_active_account = db.Column(db.Boolean, default=True)
-    account_expiration = db.Column(db.DateTime, nullable=True) # إذا كان None يعني لا ينتهي
+    account_expiration = db.Column(db.DateTime, nullable=True)
     subscription = db.relationship('Subscription', backref='owner', uselist=False, lazy=True)
     logs = db.relationship('AdLog', backref='owner', lazy=True)
 
@@ -176,9 +175,12 @@ class MonitorThread(threading.Thread):
         while not self.stop_evt.is_set():
             with app.app_context():
                 user = User.query.get(self.cfg['user_id'])
-                # إذا كان الإدمن أو اشتراكه غير منتهي، يكمل. غير كذا يوقف.
-                if not user or not user.is_active_account or (user.account_expiration and user.account_expiration < datetime.datetime.now()):
-                    sub = Subscription.query.get(self.cfg['id'])
+                sub = Subscription.query.get(self.cfg['id'])
+                settings = SystemSettings.query.first()
+                current_token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
+
+                # التحقق الصارم من حالة الحساب والاشتراك
+                if not user or not user.is_active_account or not sub or sub.status != 'active' or (user.account_expiration and user.account_expiration < datetime.datetime.now()):
                     if sub: 
                         sub.status = 'paused'
                         db.session.commit()
@@ -204,14 +206,14 @@ class MonitorThread(threading.Thread):
                                     time.sleep(delay)
                                     
                                     msg = f"إعلان جديد ({kw}):\n{title}\n{ad_url}"
-                                    if send_whatsapp(self.req_session, DEFAULT_TOKEN, self.cfg['recipients'], msg):
+                                    if send_whatsapp(self.req_session, current_token, self.cfg['recipients'], msg):
                                         self.seen_ids.add(ad_id)
                                         with open(self.seen_file, 'w') as f: json.dump(list(self.seen_ids), f)
                                         
                                         with app.app_context():
-                                            sub = Subscription.query.get(self.cfg['id'])
-                                            if sub:
-                                                sub.sent_count += 1
+                                            log_sub = Subscription.query.get(self.cfg['id'])
+                                            if log_sub:
+                                                log_sub.sent_count += 1
                                                 new_log = AdLog(user_id=self.cfg['user_id'], title=title, url=ad_url, keyword_matched=kw)
                                                 db.session.add(new_log)
                                                 db.session.commit()
@@ -276,7 +278,11 @@ def register():
             'password': generate_password_hash(request.form.get('password'), method='pbkdf2:sha256')
         }
         session['otp'] = otp
-        send_whatsapp(create_session(), DEFAULT_TOKEN, phone, f"كود التحقق الخاص بك هو: {otp}")
+        
+        settings = SystemSettings.query.first()
+        current_token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
+        
+        send_whatsapp(create_session(), current_token, phone, f"كود التحقق الخاص بك هو: {otp}")
         print(f"\n[ OTP CODE for {phone} ]: {otp} \n")
         return redirect(url_for('verify'))
     return render_template('register.html')
@@ -288,23 +294,25 @@ def verify():
             temp = session['temp_user']
             new_user = User(username=temp['username'], phone=temp['phone'], password=temp['password'])
             
-            # أول مستخدم هو الإدمن، واشتراكه لا ينتهي (None)
+            settings = SystemSettings.query.first()
+            trial_days = settings.trial_days if settings else 2
+
             if User.query.count() == 0: 
                 new_user.role = 'admin'
                 new_user.account_expiration = None 
             else:
-                new_user.account_expiration = datetime.datetime.now() + datetime.timedelta(days=2)
+                new_user.account_expiration = datetime.datetime.now() + datetime.timedelta(days=trial_days)
 
             db.session.add(new_user)
             db.session.commit()
             
-            # الدخول التلقائي بعد التحقق بنجاح
+            # دخول تلقائي وتحويل للوحة المستخدم
             login_user(new_user)
             session.pop('temp_user', None)
             session.pop('otp', None)
             
-            flash('تم التسجيل والدخول بنجاح! مرحباً بك 🚀', 'success')
-            return redirect(url_for('index'))
+            flash('تم التسجيل بنجاح! تم تفعيل اشتراكك المجاني 🚀', 'success')
+            return redirect(url_for('user_dashboard'))
             
         flash('كود التحقق غير صحيح!', 'danger')
     return render_template('verify.html')
@@ -318,7 +326,11 @@ def forgot_password():
             otp = str(random.randint(1000, 9999))
             session['reset_phone'] = phone
             session['reset_otp'] = otp
-            send_whatsapp(create_session(), DEFAULT_TOKEN, phone, f"كود استعادة كلمة المرور: {otp}")
+            
+            settings = SystemSettings.query.first()
+            current_token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
+            send_whatsapp(create_session(), current_token, phone, f"كود استعادة كلمة المرور: {otp}")
+            
             print(f"\n[ RESET OTP for {phone} ]: {otp} \n")
             return redirect(url_for('reset_password'))
         flash('رقم الجوال غير مسجل بالنظام!', 'danger')
@@ -417,8 +429,9 @@ def toggle_sub(sub_id):
                 del ACTIVE_THREADS[sub.id]
             flash('تم إيقاف الاشتراك مؤقتاً ⏸', 'warning')
         else:
-            if current_user.account_expiration and datetime.datetime.now() > current_user.account_expiration:
-                flash('لا يمكن الاستئناف، حسابك منتهي.', 'danger')
+            user_owner = User.query.get(sub.user_id)
+            if user_owner.account_expiration and datetime.datetime.now() > user_owner.account_expiration:
+                flash('لا يمكن الاستئناف، حساب العميل منتهي.', 'danger')
             else:
                 sub.status = 'active'
                 start_thread_for_sub(sub)
@@ -449,6 +462,21 @@ def admin_dashboard():
     global_logs = AdLog.query.order_by(AdLog.timestamp.desc()).limit(200).all()
     return render_template('admin.html', users=users, subs=subs, logs=global_logs, active_threads=ACTIVE_THREADS)
 
+@app.route('/admin_settings', methods=['GET', 'POST'])
+@login_required
+def admin_settings():
+    if current_user.role != 'admin': return redirect(url_for('user_dashboard'))
+    settings = SystemSettings.query.first()
+    
+    if request.method == 'POST':
+        settings.whatsapp_token = request.form.get('whatsapp_token')
+        settings.trial_days = int(request.form.get('trial_days', 2))
+        db.session.commit()
+        flash('تم حفظ إعدادات النظام بنجاح ⚙️', 'success')
+        return redirect(url_for('admin_settings'))
+        
+    return render_template('admin_settings.html', settings=settings)
+
 @app.route('/admin_edit_user/<int:user_id>', methods=['GET', 'POST'])
 @login_required
 def admin_edit_user(user_id):
@@ -467,7 +495,7 @@ def admin_edit_user(user_id):
         if exp_date_str:
             user.account_expiration = datetime.datetime.strptime(exp_date_str, '%Y-%m-%d')
         else:
-            user.account_expiration = None # إذا تركها فارغة، يصير الاشتراك مفتوح
+            user.account_expiration = None 
         
         if user.subscription:
             user.subscription.recipients = user.phone
@@ -485,11 +513,35 @@ def toggle_user(user_id):
         user = User.query.get_or_404(user_id)
         if user.id != current_user.id:
             user.is_active_account = not user.is_active_account
+            # إيقاف الخيط فوراً عند إيقاف الحساب
             if not user.is_active_account and user.subscription:
-                if user.subscription.id in ACTIVE_THREADS:
-                    ACTIVE_THREADS[user.subscription.id].stop()
-                    del ACTIVE_THREADS[user.subscription.id]
+                sub_id = user.subscription.id
+                if sub_id in ACTIVE_THREADS:
+                    ACTIVE_THREADS[sub_id].stop()
+                    del ACTIVE_THREADS[sub_id]
             db.session.commit()
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin_toggle_sub/<int:sub_id>')
+@login_required
+def admin_toggle_sub(sub_id):
+    if current_user.role != 'admin': return redirect(url_for('index'))
+    sub = Subscription.query.get_or_404(sub_id)
+    if sub.status == 'active':
+        sub.status = 'paused'
+        if sub.id in ACTIVE_THREADS:
+            ACTIVE_THREADS[sub.id].stop()
+            del ACTIVE_THREADS[sub.id]
+        flash('تم إيقاف اشتراك العميل بنجاح.', 'warning')
+    else:
+        user_owner = User.query.get(sub.user_id)
+        if user_owner.account_expiration and datetime.datetime.now() > user_owner.account_expiration:
+            flash('لا يمكن استئناف اشتراك العميل لأن حسابه منتهي الصلاحية!', 'danger')
+        else:
+            sub.status = 'active'
+            start_thread_for_sub(sub)
+            flash('تم استئناف اشتراك العميل بنجاح.', 'success')
+    db.session.commit()
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/impersonate/<int:user_id>')
@@ -514,6 +566,10 @@ def revert_impersonate():
 
 with app.app_context():
     db.create_all()
+    # التأكد من وجود إعدادات النظام عند أول تشغيل
+    if not SystemSettings.query.first():
+        db.session.add(SystemSettings())
+        db.session.commit()
 
 if __name__ == '__main__':
     with app.app_context():
