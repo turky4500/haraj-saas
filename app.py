@@ -12,9 +12,8 @@ from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
-app.secret_key = "haraj_super_secret_key_v6"
+app.secret_key = "haraj_super_secret_key_v7"
 
-# تمرير دالة الوقت للواجهات عشان نقارن التواريخ
 app.jinja_env.globals.update(now=datetime.datetime.now)
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -35,6 +34,21 @@ HARAJ_BASE = "https://haraj.com.sa"
 HARAJ_HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Accept-Language": "ar-SA"}
 ACTIVE_THREADS = {} 
 
+# ================= باتش منع السكون (Keep-Alive) =================
+def keep_alive_patch():
+    """خيط برمجي يزور الموقع كل 10 دقائق لمنع السيرفر من النوم"""
+    while True:
+        try:
+            # يرجى التأكد من أن هذا هو رابط موقعك النهائي
+            requests.get("https://haraj-saas.onrender.com/", timeout=10)
+            print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] تم تنشيط السيرفر بنجاح بواسطة الباتش.")
+        except Exception as e:
+            print(f"خطأ في تنشيط السيرفر: {e}")
+        time.sleep(600) # انتظار 10 دقائق (600 ثانية)
+
+# تشغيل الباتش في الخلفية
+threading.Thread(target=keep_alive_patch, daemon=True).start()
+
 # ================= النماذج (قاعدة البيانات) =================
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -43,7 +57,7 @@ class User(UserMixin, db.Model):
     password = db.Column(db.String(200), nullable=False)
     role = db.Column(db.String(20), default='user')
     is_active_account = db.Column(db.Boolean, default=True)
-    account_expiration = db.Column(db.DateTime, nullable=True) # تاريخ انتهاء اشتراك العميل
+    account_expiration = db.Column(db.DateTime, nullable=True) # إذا كان None يعني لا ينتهي
     subscription = db.relationship('Subscription', backref='owner', uselist=False, lazy=True)
     logs = db.relationship('AdLog', backref='owner', lazy=True)
 
@@ -66,7 +80,7 @@ class Subscription(db.Model):
     quiet_end_hour = db.Column(db.Integer, default=6)
     quiet_end_minute = db.Column(db.Integer, default=0)
     sleep_minutes = db.Column(db.Integer, default=15) 
-    end_ts = db.Column(db.String(50)) # غير مستخدم فعلياً الآن لأننا نعتمد على حساب العميل
+    end_ts = db.Column(db.String(50))
 
 class AdLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -160,15 +174,15 @@ class MonitorThread(threading.Thread):
 
     def run(self):
         while not self.stop_evt.is_set():
-            # التأكد من صلاحية اشتراك العميل قبل الفحص
             with app.app_context():
                 user = User.query.get(self.cfg['user_id'])
+                # إذا كان الإدمن أو اشتراكه غير منتهي، يكمل. غير كذا يوقف.
                 if not user or not user.is_active_account or (user.account_expiration and user.account_expiration < datetime.datetime.now()):
                     sub = Subscription.query.get(self.cfg['id'])
                     if sub: 
                         sub.status = 'paused'
                         db.session.commit()
-                    break # توقيف الثريد لأن الاشتراك انتهى أو توقف
+                    break 
                 
             if not is_quiet_now(self.cfg['quiet_enabled'], self.cfg['q_sh'], self.cfg['q_sm'], self.cfg['q_eh'], self.cfg['q_em']):
                 for kw in self.cfg['keywords']:
@@ -234,7 +248,6 @@ def start_thread_for_sub(sub):
 
 @app.route('/')
 def index():
-    # هذي صفحة الهبوط الفخمة
     return render_template('index.html')
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -275,18 +288,24 @@ def verify():
             temp = session['temp_user']
             new_user = User(username=temp['username'], phone=temp['phone'], password=temp['password'])
             
-            # أول مستخدم هو الإدمن ومفتوح اشتراكه، غيره ياخذ يومين مجاناً
+            # أول مستخدم هو الإدمن، واشتراكه لا ينتهي (None)
             if User.query.count() == 0: 
                 new_user.role = 'admin'
-                new_user.account_expiration = datetime.datetime.now() + datetime.timedelta(days=3650) # 10 سنوات
+                new_user.account_expiration = None 
             else:
-                new_user.account_expiration = datetime.datetime.now() + datetime.timedelta(days=2) # يومين مجاناً
+                new_user.account_expiration = datetime.datetime.now() + datetime.timedelta(days=2)
 
             db.session.add(new_user)
             db.session.commit()
-            session.clear()
-            flash('تم التسجيل بنجاح! تم منحك تجربة مجانية لمدة يومين 🎁', 'success')
-            return redirect(url_for('login'))
+            
+            # الدخول التلقائي بعد التحقق بنجاح
+            login_user(new_user)
+            session.pop('temp_user', None)
+            session.pop('otp', None)
+            
+            flash('تم التسجيل والدخول بنجاح! مرحباً بك 🚀', 'success')
+            return redirect(url_for('index'))
+            
         flash('كود التحقق غير صحيح!', 'danger')
     return render_template('verify.html')
 
@@ -335,14 +354,13 @@ def user_dashboard():
     sub = Subscription.query.filter_by(user_id=current_user.id).first()
     logs = AdLog.query.filter_by(user_id=current_user.id).order_by(AdLog.timestamp.desc()).limit(100).all()
 
-    # التأكد من صلاحية الاشتراك
     is_expired = False
     if current_user.account_expiration and datetime.datetime.now() > current_user.account_expiration:
         is_expired = True
 
     if request.method == 'POST':
         if is_expired:
-            flash('عذراً، اشتراكك منتهي! لا يمكنك إضافة أو تعديل الرصد. تواصل مع الإدارة.', 'danger')
+            flash('عذراً، اشتراكك منتهي! لا يمكنك التعديل.', 'danger')
             return redirect(url_for('user_dashboard'))
 
         name = request.form.get('name')
@@ -448,6 +466,8 @@ def admin_edit_user(user_id):
             
         if exp_date_str:
             user.account_expiration = datetime.datetime.strptime(exp_date_str, '%Y-%m-%d')
+        else:
+            user.account_expiration = None # إذا تركها فارغة، يصير الاشتراك مفتوح
         
         if user.subscription:
             user.subscription.recipients = user.phone
