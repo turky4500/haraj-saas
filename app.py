@@ -12,7 +12,7 @@ from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
-app.secret_key = "haraj_super_secret_key_v4"
+app.secret_key = "haraj_super_secret_key_v5"
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(BASE_DIR, 'haraj.db')
@@ -41,15 +41,15 @@ class User(UserMixin, db.Model):
     role = db.Column(db.String(20), default='user')
     is_active_account = db.Column(db.Boolean, default=True)
     subscription = db.relationship('Subscription', backref='owner', uselist=False, lazy=True)
-    logs = db.relationship('AdLog', backref='owner', lazy=True) # أرشيف الإعلانات
+    logs = db.relationship('AdLog', backref='owner', lazy=True)
 
 class Subscription(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     name = db.Column(db.String(100), nullable=False)
     keywords = db.Column(db.String(500), nullable=False)
-    recipients = db.Column(db.String(100), nullable=False) # بناخذه تلقائي من العميل
-    status = db.Column(db.String(20), default='active') # active, paused
+    recipients = db.Column(db.String(100), nullable=False) 
+    status = db.Column(db.String(20), default='active') 
     sent_count = db.Column(db.Integer, default=0)
     
     cities = db.Column(db.String(500), default="")
@@ -61,7 +61,7 @@ class Subscription(db.Model):
     quiet_start_minute = db.Column(db.Integer, default=0)
     quiet_end_hour = db.Column(db.Integer, default=6)
     quiet_end_minute = db.Column(db.Integer, default=0)
-    sleep_minutes = db.Column(db.Integer, default=15) # ثابت في الخلفية
+    sleep_minutes = db.Column(db.Integer, default=15) 
     end_ts = db.Column(db.String(50))
 
 class AdLog(db.Model):
@@ -76,7 +76,7 @@ class AdLog(db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# ================= دوال المساعدة للرصد والفلترة =================
+# ================= دوال المساعدة =================
 _AR_DIACRITICS_RE = re.compile(r"[\u064B-\u0652\u0670\u0640]")
 _AR_NORM_MAP = str.maketrans({"أ": "ا", "إ": "ا", "آ": "ا", "ؤ": "و", "ئ": "ي", "ى": "ي", "ة": "ه"})
 
@@ -85,15 +85,13 @@ def normalize_text(s):
     s = _AR_DIACRITICS_RE.sub("", s)
     s = s.translate(_AR_NORM_MAP)
     s = re.sub(r"[^\u0600-\u06FFa-z0-9\s]+", " ", s)
-    s = re.sub(r"\s+", " ", s).strip()
-    return s
+    return re.sub(r"\s+", " ", s).strip()
 
 def matches_keyword_precise(text, kw, excluded_list, exclude_enabled):
     nt = normalize_text(text)
     if exclude_enabled and excluded_list:
         for neg in excluded_list:
-            neg_norm = normalize_text(neg)
-            if neg_norm and re.search(r'(^|\s)' + re.escape(neg_norm) + r'($|\s)', nt): 
+            if normalize_text(neg) and re.search(r'(^|\s)' + re.escape(normalize_text(neg)) + r'($|\s)', nt): 
                 return False
     kw_tokens = [t for t in normalize_text(kw).split() if t]
     if not kw_tokens: return True
@@ -151,7 +149,6 @@ class MonitorThread(threading.Thread):
         self.stop_evt = threading.Event()
         self.req_session = create_session()
         self.seen_file = SUBS_BASE_DIR / f"seen_{self.cfg['id']}.json"
-        
         if self.seen_file.exists():
             with open(self.seen_file, 'r') as f: self.seen_ids = set(json.load(f))
         else:
@@ -160,8 +157,7 @@ class MonitorThread(threading.Thread):
     def run(self):
         end_time = datetime.datetime.fromisoformat(self.cfg['end_ts'])
         while not self.stop_evt.is_set():
-            if datetime.datetime.now() > end_time:
-                break
+            if datetime.datetime.now() > end_time: break
                 
             if not is_quiet_now(self.cfg['quiet_enabled'], self.cfg['q_sh'], self.cfg['q_sm'], self.cfg['q_eh'], self.cfg['q_em']):
                 for kw in self.cfg['keywords']:
@@ -179,6 +175,10 @@ class MonitorThread(threading.Thread):
                                 if is_target_city(full_text, self.cfg['cities'], self.cfg['city_filter_enabled']) and \
                                    matches_keyword_precise(full_text, kw, self.cfg['excluded_words'], self.cfg['exclude_enabled']):
                                     
+                                    # حماية الرقم: تأخير عشوائي قبل الإرسال كما في الكود الأصلي
+                                    delay = random.uniform(30, 60)
+                                    time.sleep(delay)
+                                    
                                     msg = f"إعلان جديد ({kw}):\n{title}\n{ad_url}"
                                     if send_whatsapp(self.req_session, DEFAULT_TOKEN, self.cfg['recipients'], msg):
                                         self.seen_ids.add(ad_id)
@@ -188,15 +188,13 @@ class MonitorThread(threading.Thread):
                                             sub = Subscription.query.get(self.cfg['id'])
                                             if sub:
                                                 sub.sent_count += 1
-                                                # حفظ الإعلان في الأرشيف
                                                 new_log = AdLog(user_id=self.cfg['user_id'], title=title, url=ad_url, keyword_matched=kw)
                                                 db.session.add(new_log)
                                                 db.session.commit()
-                                    time.sleep(random.uniform(5, 10))
                     except:
                         pass
             
-            # النوم (15 دقيقة ثابتة)
+            # النوم (ثابت حسب إعداداتك)
             sleep_seconds = self.cfg['sleep_minutes'] * 60
             for _ in range(sleep_seconds):
                 if self.stop_evt.is_set(): break
@@ -207,8 +205,7 @@ class MonitorThread(threading.Thread):
 
 def start_thread_for_sub(sub):
     cfg = {
-        'id': sub.id,
-        'user_id': sub.user_id,
+        'id': sub.id, 'user_id': sub.user_id,
         'keywords': [k.strip() for k in sub.keywords.split(',') if k.strip()],
         'recipients': sub.recipients.split(',')[0].strip(),
         'cities': [c.strip() for c in sub.cities.split(',') if c.strip()],
@@ -218,8 +215,7 @@ def start_thread_for_sub(sub):
         'quiet_enabled': sub.quiet_enabled,
         'q_sh': sub.quiet_start_hour, 'q_sm': sub.quiet_start_minute,
         'q_eh': sub.quiet_end_hour, 'q_em': sub.quiet_end_minute,
-        'sleep_minutes': sub.sleep_minutes,
-        'end_ts': sub.end_ts
+        'sleep_minutes': sub.sleep_minutes, 'end_ts': sub.end_ts
     }
     t = MonitorThread(cfg)
     ACTIVE_THREADS[sub.id] = t
@@ -252,8 +248,7 @@ def register():
         phone = request.form.get('phone')
         otp = str(random.randint(1000, 9999))
         session['temp_user'] = {
-            'username': request.form.get('username'),
-            'phone': phone,
+            'username': request.form.get('username'), 'phone': phone,
             'password': generate_password_hash(request.form.get('password'), method='pbkdf2:sha256')
         }
         session['otp'] = otp
@@ -277,6 +272,38 @@ def verify():
         flash('كود التحقق غير صحيح!', 'danger')
     return render_template('verify.html')
 
+# -------- مسارات استعادة كلمة المرور --------
+@app.route('/forgot_password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        phone = request.form.get('phone')
+        user = User.query.filter_by(phone=phone).first()
+        if user:
+            otp = str(random.randint(1000, 9999))
+            session['reset_phone'] = phone
+            session['reset_otp'] = otp
+            send_whatsapp(create_session(), DEFAULT_TOKEN, phone, f"كود استعادة كلمة المرور: {otp}")
+            print(f"\n[ RESET OTP for {phone} ]: {otp} \n")
+            return redirect(url_for('reset_password'))
+        flash('رقم الجوال غير مسجل بالنظام!', 'danger')
+    return render_template('forgot_password.html')
+
+@app.route('/reset_password', methods=['GET', 'POST'])
+def reset_password():
+    if 'reset_phone' not in session: return redirect(url_for('forgot_password'))
+    if request.method == 'POST':
+        if request.form.get('otp') == session.get('reset_otp'):
+            user = User.query.filter_by(phone=session['reset_phone']).first()
+            user.password = generate_password_hash(request.form.get('new_password'), method='pbkdf2:sha256')
+            db.session.commit()
+            session.pop('reset_phone', None)
+            session.pop('reset_otp', None)
+            flash('تم تغيير كلمة المرور بنجاح! يمكنك الدخول الآن.', 'success')
+            return redirect(url_for('login'))
+        flash('كود التحقق غير صحيح!', 'danger')
+    return render_template('reset_password.html')
+# --------------------------------------------
+
 @app.route('/logout')
 @login_required
 def logout():
@@ -286,10 +313,11 @@ def logout():
 @app.route('/user_dashboard', methods=['GET', 'POST'])
 @login_required
 def user_dashboard():
-    if current_user.role == 'admin': return redirect(url_for('admin_dashboard'))
+    if current_user.role == 'admin' and 'admin_impersonating' not in session: 
+        return redirect(url_for('admin_dashboard'))
     
     sub = Subscription.query.filter_by(user_id=current_user.id).first()
-    logs = AdLog.query.filter_by(user_id=current_user.id).order_by(AdLog.timestamp.desc()).limit(50).all() # آخر 50 إعلان
+    logs = AdLog.query.filter_by(user_id=current_user.id).order_by(AdLog.timestamp.desc()).limit(100).all()
 
     if request.method == 'POST':
         name = request.form.get('name')
@@ -303,33 +331,23 @@ def user_dashboard():
         q_sm = int(request.form.get('q_sm', 0))
         q_eh = int(request.form.get('q_eh', 6))
         q_em = int(request.form.get('q_em', 0))
-        duration_days = int(request.form.get('duration_days', 7))
+        duration_days = int(request.form.get('duration_days', 30))
         end_time = (datetime.datetime.now() + datetime.timedelta(days=duration_days)).isoformat()
         
         if sub:
-            # تعديل الاشتراك الحالي
             if sub.id in ACTIVE_THREADS:
                 ACTIVE_THREADS[sub.id].stop()
                 del ACTIVE_THREADS[sub.id]
-            
-            sub.name = name
-            sub.keywords = keywords
-            sub.cities = cities
-            sub.city_filter_enabled = city_filter_enabled
-            sub.excluded_words = excluded_words
-            sub.exclude_enabled = exclude_enabled
-            sub.quiet_enabled = quiet_enabled
-            sub.quiet_start_hour = q_sh
-            sub.quiet_start_minute = q_sm
-            sub.quiet_end_hour = q_eh
-            sub.quiet_end_minute = q_em
-            sub.end_ts = end_time
-            sub.status = 'active'
+            sub.name = name; sub.keywords = keywords; sub.cities = cities
+            sub.city_filter_enabled = city_filter_enabled; sub.excluded_words = excluded_words
+            sub.exclude_enabled = exclude_enabled; sub.quiet_enabled = quiet_enabled
+            sub.quiet_start_hour = q_sh; sub.quiet_start_minute = q_sm
+            sub.quiet_end_hour = q_eh; sub.quiet_end_minute = q_em
+            sub.end_ts = end_time; sub.status = 'active'
             db.session.commit()
             start_thread_for_sub(sub)
             flash('تم تعديل الاشتراك وتحديث الرصد!', 'success')
         else:
-            # إضافة اشتراك جديد (يأخذ رقم الجوال من حساب العميل مباشرة)
             new_sub = Subscription(
                 user_id=current_user.id, name=name, keywords=keywords, recipients=current_user.phone,
                 cities=cities, city_filter_enabled=city_filter_enabled,
@@ -341,7 +359,6 @@ def user_dashboard():
             db.session.commit()
             start_thread_for_sub(new_sub)
             flash('تم حفظ الاشتراك وبدأ الرصد!', 'success')
-            
         return redirect(url_for('user_dashboard'))
         
     return render_template('user.html', sub=sub, logs=logs)
@@ -377,11 +394,37 @@ def delete_sub(sub_id):
         flash('تم حذف الاشتراك نهائياً 🗑️', 'info')
     return redirect(request.referrer)
 
+# ================= مسارات الإدارة (Admin) =================
 @app.route('/admin_dashboard')
 @login_required
 def admin_dashboard():
     if current_user.role != 'admin': return redirect(url_for('user_dashboard'))
-    return render_template('admin.html', users=User.query.all(), subs=Subscription.query.all(), active_threads=ACTIVE_THREADS)
+    users = User.query.all()
+    subs = Subscription.query.all()
+    global_logs = AdLog.query.order_by(AdLog.timestamp.desc()).limit(200).all()
+    return render_template('admin.html', users=users, subs=subs, logs=global_logs, active_threads=ACTIVE_THREADS)
+
+@app.route('/admin_edit_user/<int:user_id>', methods=['GET', 'POST'])
+@login_required
+def admin_edit_user(user_id):
+    if current_user.role != 'admin': return redirect(url_for('user_dashboard'))
+    user = User.query.get_or_404(user_id)
+    
+    if request.method == 'POST':
+        user.username = request.form.get('username')
+        user.phone = request.form.get('phone')
+        new_pass = request.form.get('password')
+        if new_pass:
+            user.password = generate_password_hash(new_pass, method='pbkdf2:sha256')
+        
+        # إذا عدل الإدمن رقم العميل، نحدثه في اشتراكه عشان تروح الرسايل للرقم الجديد
+        if user.subscription:
+            user.subscription.recipients = user.phone
+            
+        db.session.commit()
+        flash(f'تم تعديل بيانات العميل {user.username} بنجاح.', 'success')
+        return redirect(url_for('admin_dashboard'))
+    return render_template('admin_edit_user.html', user=user)
 
 @app.route('/toggle_user/<int:user_id>')
 @login_required
@@ -395,6 +438,27 @@ def toggle_user(user_id):
                     ACTIVE_THREADS[user.subscription.id].stop()
                     del ACTIVE_THREADS[user.subscription.id]
             db.session.commit()
+    return redirect(url_for('admin_dashboard'))
+
+# انتحال شخصية العميل للدعم الفني
+@app.route('/impersonate/<int:user_id>')
+@login_required
+def impersonate(user_id):
+    if current_user.role != 'admin': return redirect(url_for('index'))
+    user = User.query.get_or_404(user_id)
+    session['admin_impersonating'] = current_user.id
+    login_user(user)
+    flash(f'أنت الآن تتصفح وتتحكم بحساب العميل: {user.username}', 'warning')
+    return redirect(url_for('user_dashboard'))
+
+@app.route('/revert_impersonate')
+@login_required
+def revert_impersonate():
+    if 'admin_impersonating' in session:
+        admin_user = User.query.get(session['admin_impersonating'])
+        login_user(admin_user)
+        session.pop('admin_impersonating', None)
+        flash('تمت العودة لحساب الإدارة بنجاح.', 'success')
     return redirect(url_for('admin_dashboard'))
 
 with app.app_context():
