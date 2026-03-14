@@ -19,13 +19,25 @@
             <a class="navbar-brand" href="#">لوحة المستخدم | راصد حراج المتقدم</a>
             <span class="text-light ms-auto me-3">مرحباً، {{ current_user.username }}</span>
             {% if session.get('admin_impersonating') %}
-                <a href="/revert_impersonate" class="btn btn-warning btn-sm me-2">رجوع لحساب الإدارة 👑</a>
+                <a href="/revert_impersonate" class="btn btn-warning btn-sm me-2 fw-bold">رجوع لحساب الإدارة 👑</a>
             {% endif %}
             <a href="/logout" class="btn btn-outline-danger btn-sm">تسجيل خروج</a>
         </div>
     </nav>
 
     <div class="container">
+        {% if is_expired %}
+            <div class="alert alert-danger shadow-sm text-center mb-4">
+                <h4 class="alert-heading fw-bold">⚠️ عذراً، اشتراكك منتهي!</h4>
+                <p class="mb-0">فترة اشتراكك أو تجربتك المجانية قد انتهت. تم إيقاف الرصد مؤقتاً، لا يمكنك التعديل حتى تقوم بتجديد اشتراكك بالتواصل مع الإدارة.</p>
+            </div>
+        {% else %}
+            <div class="alert alert-info shadow-sm text-center mb-4">
+                <span class="fw-bold">📅 ينتهي اشتراكك في:</span> 
+                <span dir="ltr" class="text-primary fw-bold">{{ current_user.account_expiration.strftime('%Y-%m-%d') if current_user.account_expiration else 'غير محدد' }}</span>
+            </div>
+        {% endif %}
+
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
@@ -40,56 +52,56 @@
                     <h5 class="mb-4 {% if sub %}text-success{% else %}text-primary{% endif %}">
                         {% if sub %}✏️ تعديل اشتراكي الحالي{% else %}➕ إضافة اشتراكي الأول{% endif %}
                     </h5>
-                    <form action="/user_dashboard" method="POST">
-                        <div class="section-title">المعلومات الأساسية</div>
-                        <div class="mb-3">
-                            <label class="form-label text-muted small">اسم الاشتراك</label>
-                            <input type="text" name="name" class="form-control" required placeholder="مثال: بحث سيارات" value="{{ sub.name if sub else '' }}">
-                        </div>
-                        <div class="mb-4">
-                            <label class="form-label text-muted small">كلمات البحث الأساسية (مفصول بفاصلة)</label>
-                            <input type="text" name="keywords" class="form-control" required placeholder="لاندكروزر, شاص" value="{{ sub.keywords if sub else '' }}">
-                        </div>
-
-                        <div class="section-title">إعدادات الفلترة الدقيقة</div>
-                        <div class="form-check form-switch mb-2">
-                            <input class="form-check-input" type="checkbox" name="city_filter_enabled" id="citySwitch" {% if sub and sub.city_filter_enabled %}checked{% endif %}>
-                            <label class="form-check-label" for="citySwitch">تفعيل فلترة المدن</label>
-                        </div>
-                        <div class="mb-3">
-                            <input type="text" name="cities" class="form-control form-control-sm" placeholder="الرياض, جدة, مكة" value="{{ sub.cities if sub else '' }}">
-                        </div>
-
-                        <div class="form-check form-switch mb-2">
-                            <input class="form-check-input" type="checkbox" name="exclude_enabled" id="excSwitch" {% if sub and sub.exclude_enabled %}checked{% endif %}>
-                            <label class="form-check-label" for="excSwitch">تفعيل الكلمات المستبعدة</label>
-                        </div>
-                        <div class="mb-4">
-                            <input type="text" name="excluded_words" class="form-control form-control-sm" placeholder="مصدوم, تشليح, إيجار" value="{{ sub.excluded_words if sub else '' }}">
-                        </div>
-
-                        <div class="section-title">إعدادات أوقات الهدوء</div>
-                        <div class="form-check form-switch mb-2">
-                            <input class="form-check-input" type="checkbox" name="quiet_enabled" id="quietSwitch" {% if sub and sub.quiet_enabled %}checked{% endif %}>
-                            <label class="form-check-label text-danger" for="quietSwitch">تفعيل عدم الإزعاج</label>
-                        </div>
-                        <div class="row mb-4">
-                            <div class="col-6">
-                                <label class="text-muted small">من (ساعة)</label>
-                                <input type="number" name="q_sh" class="form-control form-control-sm" value="{{ sub.quiet_start_hour if sub else 1 }}" min="0" max="23">
+                    <fieldset {% if is_expired %}disabled{% endif %}>
+                        <form action="/user_dashboard" method="POST">
+                            <div class="section-title">المعلومات الأساسية</div>
+                            <div class="mb-3">
+                                <label class="form-label text-muted small">اسم الاشتراك</label>
+                                <input type="text" name="name" class="form-control" required placeholder="مثال: بحث سيارات" value="{{ sub.name if sub else '' }}">
                             </div>
-                            <div class="col-6">
-                                <label class="text-muted small">إلى (ساعة)</label>
-                                <input type="number" name="q_eh" class="form-control form-control-sm" value="{{ sub.quiet_end_hour if sub else 6 }}" min="0" max="23">
+                            <div class="mb-4">
+                                <label class="form-label text-muted small">كلمات البحث الأساسية (مفصول بفاصلة)</label>
+                                <input type="text" name="keywords" class="form-control" required placeholder="لاندكروزر, شاص" value="{{ sub.keywords if sub else '' }}">
                             </div>
-                        </div>
 
-                        <input type="hidden" name="duration_days" value="30">
+                            <div class="section-title">إعدادات الفلترة الدقيقة</div>
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" name="city_filter_enabled" id="citySwitch" {% if sub and sub.city_filter_enabled %}checked{% endif %}>
+                                <label class="form-check-label" for="citySwitch">تفعيل فلترة المدن</label>
+                            </div>
+                            <div class="mb-3">
+                                <input type="text" name="cities" class="form-control form-control-sm" placeholder="الرياض, جدة, مكة" value="{{ sub.cities if sub else '' }}">
+                            </div>
 
-                        <button type="submit" class="btn {% if sub %}btn-success{% else %}btn-primary{% endif %} w-100 py-2 fw-bold">
-                            {% if sub %}💾 حفظ التعديلات{% else %}حفظ وبدء الرصد المتقدم{% endif %}
-                        </button>
-                    </form>
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" name="exclude_enabled" id="excSwitch" {% if sub and sub.exclude_enabled %}checked{% endif %}>
+                                <label class="form-check-label" for="excSwitch">تفعيل الكلمات المستبعدة</label>
+                            </div>
+                            <div class="mb-4">
+                                <input type="text" name="excluded_words" class="form-control form-control-sm" placeholder="مصدوم, تشليح, إيجار" value="{{ sub.excluded_words if sub else '' }}">
+                            </div>
+
+                            <div class="section-title">إعدادات أوقات الهدوء</div>
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" name="quiet_enabled" id="quietSwitch" {% if sub and sub.quiet_enabled %}checked{% endif %}>
+                                <label class="form-check-label text-danger" for="quietSwitch">تفعيل عدم الإزعاج</label>
+                            </div>
+                            <div class="row mb-4">
+                                <div class="col-6">
+                                    <label class="text-muted small">من (ساعة)</label>
+                                    <input type="number" name="q_sh" class="form-control form-control-sm" value="{{ sub.quiet_start_hour if sub else 1 }}" min="0" max="23">
+                                </div>
+                                <div class="col-6">
+                                    <label class="text-muted small">إلى (ساعة)</label>
+                                    <input type="number" name="q_eh" class="form-control form-control-sm" value="{{ sub.quiet_end_hour if sub else 6 }}" min="0" max="23">
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn {% if sub %}btn-success{% else %}btn-primary{% endif %} w-100 py-2 fw-bold">
+                                {% if sub %}💾 حفظ التعديلات{% else %}حفظ وبدء الرصد المتقدم{% endif %}
+                            </button>
+                        </form>
+                    </fieldset>
                 </div>
             </div>
 
@@ -119,9 +131,14 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <a href="/toggle_sub/{{ sub.id }}" class="btn btn-sm {% if sub.status == 'active' %}btn-warning{% else %}btn-success{% endif %}">
-                                            {% if sub.status == 'active' %}إيقاف مؤقت ⏸{% else %}استئناف ▶️{% endif %}
-                                        </a>
+                                        {% if is_expired %}
+                                            <button class="btn btn-sm btn-secondary" disabled>منتهي</button>
+                                        {% else %}
+                                            <a href="/toggle_sub/{{ sub.id }}" class="btn btn-sm {% if sub.status == 'active' %}btn-warning{% else %}btn-success{% endif %}">
+                                                {% if sub.status == 'active' %}إيقاف مؤقت ⏸{% else %}استئناف ▶️{% endif %}
+                                            </a>
+                                        {% endif %}
+                                        
                                         <a href="/delete_sub/{{ sub.id }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من حذف الاشتراك؟')">حذف</a>
                                     </td>
                                 </tr>
