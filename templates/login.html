@@ -3,20 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <title>تسجيل الدخول - راصد حراج</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
-    <style> body { background-color: #f8f9fa; display: flex; align-items: center; justify-content: center; height: 100vh; } .auth-card { background: white; padding: 2.5rem; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); width: 100%; max-width: 400px; } </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: 'Cairo', sans-serif; background: linear-gradient(180deg, #e6f7f4 0%, #f8f9fa 100%); display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+        .auth-card { background: white; padding: 2.5rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); width: 100%; max-width: 400px; position: relative; overflow: hidden; }
+        .form-control { border-radius: 12px; padding: 12px; background-color: #f8f9fa; border: 1px solid #e9ecef; }
+        .form-control:focus { border-color: #1abc9c; box-shadow: 0 0 0 0.25rem rgba(26, 188, 156, 0.25); }
+        .btn-primary { background-color: #2c3e50; border: none; border-radius: 12px; padding: 12px; font-weight: 700; font-size: 1.1rem; }
+        .btn-primary:hover { background-color: #1a252f; }
+        
+        #loader-overlay {
+            display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.9); z-index: 10;
+            flex-direction: column; align-items: center; justify-content: center; text-align: center;
+        }
+        .spinner { border: 4px solid rgba(44, 62, 80, 0.2); border-top: 4px solid #2c3e50; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
 </head>
 <body>
     <div class="auth-card">
-        <div class="text-center mb-4"><h3 style="color: #2c3e50;">👋 أهلاً بك في راصد حراج</h3><p class="text-muted">سجل دخولك لمتابعة إعلاناتك</p></div>
-        {% with messages = get_flashed_messages(with_categories=true) %}{% if messages %}{% for category, message in messages %}<div class="alert alert-{{ category }} alert-dismissible">{{ message }}</div>{% endfor %}{% endif %}{% endwith %}
-        <form method="POST" action="/login">
-            <div class="mb-3"><label class="form-label">اسم المستخدم</label><input type="text" name="username" class="form-control" required></div>
-            <div class="mb-2"><label class="form-label">كلمة المرور</label><input type="password" name="password" class="form-control" required></div>
-            <div class="text-end mb-4"><a href="/forgot_password" class="text-decoration-none small text-danger">نسيت كلمة المرور؟</a></div>
-            <button type="submit" class="btn btn-primary w-100 mb-3">دخول</button>
+        <div id="loader-overlay">
+            <div class="spinner mb-3"></div>
+            <h5 class="fw-bold" style="color: #2c3e50;">جاري الدخول...</h5>
+        </div>
+
+        <div class="text-center mb-4">
+            <i class="fas fa-sign-in-alt fa-3x mb-3" style="color: #2c3e50;"></i>
+            <h3 class="fw-bold" style="color: #2c3e50;">تسجيل الدخول</h3>
+            <p class="text-muted small">مرحباً بعودتك لرادارك الخاص</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} rounded-3 small fw-bold">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="/login" id="loginForm">
+            <div class="mb-3">
+                <label class="form-label fw-bold small text-muted">اسم المستخدم</label>
+                <input type="text" name="username" class="form-control" required>
+            </div>
+            <div class="mb-2">
+                <label class="form-label fw-bold small text-muted">كلمة المرور</label>
+                <input type="password" name="password" class="form-control" required>
+            </div>
+            <div class="text-end mb-4">
+                <a href="/forgot_password" class="text-decoration-none small text-danger fw-bold">نسيت كلمة المرور؟</a>
+            </div>
+            <button type="submit" class="btn btn-primary w-100 mb-3 shadow-sm">دخول للمنصة</button>
         </form>
-        <div class="text-center"><span class="text-muted">ليس لديك حساب؟</span> <a href="/register" class="text-decoration-none">سجل حساب جديد</a></div>
+        <div class="text-center mt-3">
+            <span class="text-muted">ليس لديك حساب؟</span> 
+            <a href="/register" class="text-decoration-none fw-bold" style="color: #1abc9c;">تجربة مجانية</a>
+        </div>
     </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', function() {
+            document.getElementById('loader-overlay').style.display = 'flex';
+        });
+    </script>
 </body>
 </html>
