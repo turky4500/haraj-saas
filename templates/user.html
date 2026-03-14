@@ -5,39 +5,82 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>لوحة التحكم - راصد حراج</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { background-color: #f0f2f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #f4f7f6; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         .navbar { background-color: #2c3e50; }
-        .card { border-radius: 12px; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 20px;}
-        .section-title { font-size: 1.1rem; font-weight: bold; color: #34495e; border-bottom: 2px solid #ecf0f1; padding-bottom: 8px; margin-bottom: 15px;}
+        
+        /* بطاقات التصميم الجديد المستوحى من الصورة */
+        .glass-card { 
+            background: #ffffff; 
+            border-radius: 20px; 
+            border: none; 
+            box-shadow: 0 8px 20px rgba(0,0,0,0.04); 
+            margin-bottom: 25px;
+            padding: 25px;
+        }
+        
+        .section-title { 
+            font-size: 1.2rem; 
+            font-weight: bold; 
+            color: #1e3c72; 
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .form-control { border-radius: 10px; background-color: #f8f9fa; border: 1px solid #e9ecef; }
+        .form-control:focus { box-shadow: none; border-color: #3498db; }
+        
+        /* تصميم الكلمات المضافة (Tags) */
+        .tag-chip {
+            display: inline-flex;
+            align-items: center;
+            background-color: #e1f0fa;
+            color: #0d6efd;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            margin: 5px 5px 5px 0;
+            font-weight: 500;
+            border: 1px solid #cde4f7;
+        }
+        .tag-chip i { margin-right: 8px; cursor: pointer; color: #dc3545; transition: 0.2s; }
+        .tag-chip i:hover { color: #a71d2a; transform: scale(1.1); }
+        
+        .btn-add { border-radius: 10px; background-color: #e9ecef; color: #495057; font-weight: bold; border: none; }
+        .btn-add:hover { background-color: #dde0e3; }
+        
         .log-table { max-height: 400px; overflow-y: auto; }
+        .main-btn { border-radius: 12px; font-size: 1.1rem; padding: 12px; }
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-dark mb-4">
+    <nav class="navbar navbar-dark mb-4 shadow-sm">
         <div class="container">
-            <a class="navbar-brand" href="#">لوحة المستخدم | راصد حراج المتقدم</a>
+            <a class="navbar-brand fw-bold" href="#"><i class="fas fa-radar text-success"></i> راصد حراج المتقدم</a>
             <span class="text-light ms-auto me-3">
                 مرحباً، {{ current_user.username }}
             </span>
             {% if session.get('admin_impersonating') %}
-                <a href="/revert_impersonate" class="btn btn-warning btn-sm me-2 fw-bold">رجوع للإدارة 👑</a>
+                <a href="/revert_impersonate" class="btn btn-warning btn-sm me-2 fw-bold"><i class="fas fa-crown"></i> رجوع للإدارة</a>
             {% endif %}
-            <a href="/user_profile" class="btn btn-light btn-sm me-2 fw-bold">الملف الشخصي 👤</a>
-            <a href="/logout" class="btn btn-outline-danger btn-sm">تسجيل خروج</a>
+            <a href="/user_profile" class="btn btn-light btn-sm me-2 fw-bold"><i class="fas fa-user-cog"></i> حسابي</a>
+            <a href="/logout" class="btn btn-outline-danger btn-sm"><i class="fas fa-sign-out-alt"></i> خروج</a>
         </div>
     </nav>
 
     <div class="container">
         {% if is_expired %}
-            <div class="alert alert-danger shadow-sm text-center mb-4">
-                <h4 class="alert-heading fw-bold">⚠️ عذراً، اشتراكك منتهي!</h4>
-                <p class="mb-0">فترة اشتراكك أو تجربتك المجانية قد انتهت. تم إيقاف الرصد مؤقتاً، لا يمكنك التعديل حتى تقوم بتجديد اشتراكك بالتواصل مع الإدارة.</p>
+            <div class="alert alert-danger shadow-sm text-center mb-4" style="border-radius: 15px;">
+                <h4 class="alert-heading fw-bold"><i class="fas fa-exclamation-triangle"></i> عذراً، اشتراكك منتهي!</h4>
+                <p class="mb-0">فترة اشتراكك أو تجربتك المجانية قد انتهت. تم إيقاف الرصد مؤقتاً، تواصل مع الإدارة للتجديد.</p>
             </div>
         {% else %}
-            <div class="alert alert-info shadow-sm text-center mb-4">
-                <span class="fw-bold">📅 ينتهي اشتراكك في:</span> 
-                <span dir="ltr" class="text-primary fw-bold">
+            <div class="alert alert-info shadow-sm text-center mb-4" style="border-radius: 15px; background-color: #e1f0fa; border: none;">
+                <span class="fw-bold text-dark"><i class="fas fa-calendar-alt text-primary"></i> ينتهي اشتراكك في:</span> 
+                <span dir="ltr" class="text-primary fw-bold fs-5">
                     {{ current_user.account_expiration.strftime('%Y-%m-%d') if current_user.account_expiration else 'مفتوح (لا ينتهي)' }}
                 </span>
             </div>
@@ -46,64 +89,75 @@
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show">{{ message }}</div>
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" style="border-radius: 15px;">{{ message }}</div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
 
         <div class="row">
             <div class="col-md-5">
-                <div class="card p-4">
-                    <h5 class="mb-4 {% if sub %}text-success{% else %}text-primary{% endif %}">
-                        {% if sub %}✏️ تعديل اشتراكي الحالي{% else %}➕ إضافة اشتراكي الأول{% endif %}
+                <div class="glass-card">
+                    <h5 class="mb-4 fw-bold text-center {% if sub %}text-success{% else %}text-primary{% endif %}">
+                        {% if sub %}<i class="fas fa-edit"></i> إعدادات الرصد الخاصة بك{% else %}<i class="fas fa-plus-circle"></i> إعدادات الرصد الجديدة{% endif %}
                     </h5>
                     <fieldset {% if is_expired %}disabled{% endif %}>
-                        <form action="/user_dashboard" method="POST">
-                            <div class="section-title">المعلومات الأساسية</div>
-                            <div class="mb-3">
-                                <label class="form-label text-muted small">اسم الاشتراك</label>
-                                <input type="text" name="name" class="form-control" required placeholder="مثال: بحث سيارات" value="{{ sub.name if sub else '' }}">
-                            </div>
+                        <form action="/user_dashboard" method="POST" id="monitorForm">
+                            
                             <div class="mb-4">
-                                <label class="form-label text-muted small">كلمات البحث الأساسية (مفصول بفاصلة)</label>
-                                <input type="text" name="keywords" class="form-control" required placeholder="لاندكروزر, شاص" value="{{ sub.keywords if sub else '' }}">
+                                <label class="form-label text-muted fw-bold small"><i class="fas fa-tag"></i> اسم الاشتراك</label>
+                                <input type="text" name="name" class="form-control form-control-lg" required placeholder="مثال: بحث سيارات" value="{{ sub.name if sub else '' }}">
                             </div>
 
-                            <div class="section-title">إعدادات الفلترة الدقيقة</div>
-                            <div class="form-check form-switch mb-2">
-                                <input class="form-check-input" type="checkbox" name="city_filter_enabled" id="citySwitch" {% if sub and sub.city_filter_enabled %}checked{% endif %}>
-                                <label class="form-check-label" for="citySwitch">تفعيل فلترة المدن</label>
+                            <div class="section-title"><i class="fas fa-bullseye text-danger"></i> الكلمات المستهدفة (إجباري)</div>
+                            <div class="input-group mb-2">
+                                <input type="text" id="kwInput" class="form-control" placeholder="مثال: لاندكروزر 2024">
+                                <button type="button" class="btn btn-add px-4" onclick="addTag('kwInput', 'kwTags', 'keywordsHidden')">إضافة الكلمة</button>
                             </div>
-                            <div class="mb-3">
-                                <input type="text" name="cities" class="form-control form-control-sm" placeholder="الرياض, جدة, مكة" value="{{ sub.cities if sub else '' }}">
-                            </div>
+                            <div id="kwTags" class="mb-4 min-vh-25"></div>
+                            <input type="hidden" name="keywords" id="keywordsHidden" required>
 
+                            <div class="section-title"><i class="fas fa-ban text-secondary"></i> الكلمات المحظورة (اختياري)</div>
                             <div class="form-check form-switch mb-2">
                                 <input class="form-check-input" type="checkbox" name="exclude_enabled" id="excSwitch" {% if sub and sub.exclude_enabled %}checked{% endif %}>
-                                <label class="form-check-label" for="excSwitch">تفعيل الكلمات المستبعدة</label>
+                                <label class="form-check-label text-muted small" for="excSwitch">تفعيل الحظر</label>
                             </div>
-                            <div class="mb-4">
-                                <input type="text" name="excluded_words" class="form-control form-control-sm" placeholder="مصدوم, تشليح, إيجار" value="{{ sub.excluded_words if sub else '' }}">
+                            <div class="input-group mb-2">
+                                <input type="text" id="excInput" class="form-control" placeholder="مثال: مصدوم، تشليح">
+                                <button type="button" class="btn btn-add px-4" onclick="addTag('excInput', 'excTags', 'excHidden')">إضافة الكلمة</button>
                             </div>
+                            <div id="excTags" class="mb-4"></div>
+                            <input type="hidden" name="excluded_words" id="excHidden">
 
-                            <div class="section-title">إعدادات أوقات الهدوء</div>
+                            <div class="section-title"><i class="fas fa-map-marker-alt text-success"></i> نطاق البحث للمدن (اختياري)</div>
                             <div class="form-check form-switch mb-2">
-                                <input class="form-check-input" type="checkbox" name="quiet_enabled" id="quietSwitch" {% if sub and sub.quiet_enabled %}checked{% endif %}>
-                                <label class="form-check-label text-danger" for="quietSwitch">تفعيل عدم الإزعاج</label>
+                                <input class="form-check-input" type="checkbox" name="city_filter_enabled" id="citySwitch" {% if sub and sub.city_filter_enabled %}checked{% endif %}>
+                                <label class="form-check-label text-muted small" for="citySwitch">تفعيل تحديد المدن</label>
                             </div>
-                            <div class="row mb-4">
+                            <div class="input-group mb-2">
+                                <input type="text" id="cityInput" class="form-control" placeholder="أضف مدينة..">
+                                <button type="button" class="btn btn-add px-4" onclick="addTag('cityInput', 'cityTags', 'cityHidden')">إضافة المدينة</button>
+                            </div>
+                            <div id="cityTags" class="mb-4"></div>
+                            <input type="hidden" name="cities" id="cityHidden">
+
+                            <div class="section-title"><i class="fas fa-bed text-info"></i> وضع عدم الإزعاج</div>
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" name="quiet_enabled" id="quietSwitch" {% if sub and sub.quiet_enabled %}checked{% endif %}>
+                                <label class="form-check-label text-muted small" for="quietSwitch">تفعيل وقت النوم (إيقاف الرصد)</label>
+                            </div>
+                            <div class="row mb-4 bg-light p-3 rounded-3 border">
                                 <div class="col-6">
-                                    <label class="text-muted small">من (ساعة)</label>
-                                    <input type="number" name="q_sh" class="form-control form-control-sm" value="{{ sub.quiet_start_hour if sub else 1 }}" min="0" max="23">
+                                    <label class="text-muted small fw-bold">من الساعة:</label>
+                                    <input type="number" name="q_sh" class="form-control text-center" value="{{ sub.quiet_start_hour if sub else 1 }}" min="0" max="23">
                                 </div>
                                 <div class="col-6">
-                                    <label class="text-muted small">إلى (ساعة)</label>
-                                    <input type="number" name="q_eh" class="form-control form-control-sm" value="{{ sub.quiet_end_hour if sub else 6 }}" min="0" max="23">
+                                    <label class="text-muted small fw-bold">إلى الساعة:</label>
+                                    <input type="number" name="q_eh" class="form-control text-center" value="{{ sub.quiet_end_hour if sub else 6 }}" min="0" max="23">
                                 </div>
                             </div>
 
-                            <button type="submit" class="btn {% if sub %}btn-success{% else %}btn-primary{% endif %} w-100 py-2 fw-bold">
-                                {% if sub %}💾 حفظ التعديلات{% else %}حفظ وبدء الرصد المتقدم{% endif %}
+                            <button type="button" onclick="submitForm()" class="btn main-btn {% if sub %}btn-success{% else %}btn-primary{% endif %} w-100 fw-bold shadow-sm">
+                                {% if sub %}<i class="fas fa-save"></i> حفظ التعديلات وبدء الرصد{% else %}<i class="fas fa-rocket"></i> تفعيل الرادار الآن{% endif %}
                             </button>
                         </form>
                     </fieldset>
@@ -111,44 +165,44 @@
             </div>
 
             <div class="col-md-7">
-                <div class="card p-4 mb-4">
-                    <h5 class="mb-4 text-secondary">📋 اشتراكي الحالي</h5>
+                <div class="glass-card mb-4">
+                    <h5 class="mb-4 text-secondary fw-bold"><i class="fas fa-file-invoice"></i> حالة الرادار الحالي</h5>
                     <div class="table-responsive">
-                        <table class="table table-hover align-middle text-center">
-                            <thead class="table-light">
+                        <table class="table align-middle text-center table-borderless">
+                            <thead class="table-light rounded-3">
                                 <tr>
                                     <th>الاسم</th>
                                     <th>الإرساليات</th>
                                     <th>الحالة</th>
-                                    <th>إجراءات الإيقاف والحذف</th>
+                                    <th>إجراءات</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% if sub %}
-                                <tr>
-                                    <td><strong>{{ sub.name }}</strong></td>
-                                    <td><span class="badge bg-secondary">{{ sub.sent_count }}</span></td>
+                                <tr class="border-bottom">
+                                    <td class="fw-bold text-primary">{{ sub.name }}</td>
+                                    <td><span class="badge bg-dark rounded-pill px-3">{{ sub.sent_count }}</span></td>
                                     <td>
                                         {% if sub.status == 'active' %}
-                                            <span class="badge bg-success">نشط 🟢</span>
+                                            <span class="badge bg-success rounded-pill px-3"><i class="fas fa-broadcast-tower"></i> نشط</span>
                                         {% else %}
-                                            <span class="badge bg-warning text-dark">موقوف ⏸</span>
+                                            <span class="badge bg-warning text-dark rounded-pill px-3"><i class="fas fa-pause-circle"></i> موقوف</span>
                                         {% endif %}
                                     </td>
                                     <td>
                                         {% if is_expired %}
-                                            <button class="btn btn-sm btn-secondary" disabled>منتهي</button>
+                                            <button class="btn btn-sm btn-secondary rounded-pill px-3" disabled>منتهي</button>
                                         {% else %}
-                                            <a href="/toggle_sub/{{ sub.id }}" class="btn btn-sm {% if sub.status == 'active' %}btn-warning{% else %}btn-success{% endif %}">
-                                                {% if sub.status == 'active' %}إيقاف مؤقت ⏸{% else %}استئناف ▶️{% endif %}
+                                            <a href="/toggle_sub/{{ sub.id }}" class="btn btn-sm rounded-pill px-3 {% if sub.status == 'active' %}btn-warning{% else %}btn-success{% endif %}">
+                                                {% if sub.status == 'active' %}<i class="fas fa-pause"></i>{% else %}<i class="fas fa-play"></i>{% endif %}
                                             </a>
                                         {% endif %}
-                                        <a href="/delete_sub/{{ sub.id }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من حذف الاشتراك؟')">حذف</a>
+                                        <a href="/delete_sub/{{ sub.id }}" class="btn btn-sm btn-outline-danger rounded-pill px-3" onclick="return confirm('هل أنت متأكد من الحذف نهائياً؟')"><i class="fas fa-trash"></i></a>
                                     </td>
                                 </tr>
                                 {% else %}
                                 <tr>
-                                    <td colspan="4" class="text-center text-muted py-4">لا يوجد اشتراك حالياً.</td>
+                                    <td colspan="4" class="text-center text-muted py-5"><i class="fas fa-sleep fa-2x mb-2 d-block opacity-50"></i>الرادار متوقف. أضف إعداداتك من اليمين لتفعيله.</td>
                                 </tr>
                                 {% endif %}
                             </tbody>
@@ -156,11 +210,107 @@
                     </div>
                 </div>
 
-                <div class="card p-4 log-table">
-                    <h5 class="mb-4 text-secondary">🗂️ أرشيف الإعلانات المرسلة</h5>
+                <div class="glass-card log-table">
+                    <h5 class="mb-4 text-secondary fw-bold"><i class="fas fa-history"></i> الإعلانات التي تم اصطيادها</h5>
                     <div class="table-responsive">
-                        <table class="table table-sm table-striped align-middle">
-                            <thead>
+                        <table class="table table-sm table-hover align-middle">
+                            <tbody>
+                                {% for log in logs %}
+                                <tr>
+                                    <td style="width: 25%;"><span class="badge bg-light text-primary border rounded-pill"><i class="fas fa-search"></i> {{ log.keyword_matched }}</span></td>
+                                    <td><a href="{{ log.url }}" target="_blank" class="text-decoration-none text-dark fw-bold">{{ log.title[:50] }}...</a></td>
+                                    <td class="text-muted small text-end" dir="ltr" style="width: 20%;">{{ log.timestamp.strftime('%H:%M | %m-%d') }}</td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="3" class="text-center text-muted py-5"><i class="fas fa-box-open fa-2x mb-2 d-block opacity-50"></i>لم يتم اصطياد أي إعلانات حتى الآن.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // المتغيرات لحفظ الكلمات
+        let keywordsArray = [];
+        let excludedArray = [];
+        let citiesArray = [];
+
+        // جلب البيانات القديمة إذا كان فيه اشتراك للتعديل
+        window.onload = function() {
+            let initKw = "{{ sub.keywords if sub else '' }}";
+            let initExc = "{{ sub.excluded_words if sub else '' }}";
+            let initCity = "{{ sub.cities if sub else '' }}";
+
+            if(initKw) { keywordsArray = initKw.split(',').map(s => s.trim()).filter(s => s !== ''); renderTags('kwTags', keywordsArray, 'keywordsHidden'); }
+            if(initExc) { excludedArray = initExc.split(',').map(s => s.trim()).filter(s => s !== ''); renderTags('excTags', excludedArray, 'excHidden'); }
+            if(initCity) { citiesArray = initCity.split(',').map(s => s.trim()).filter(s => s !== ''); renderTags('cityTags', citiesArray, 'cityHidden'); }
+        };
+
+        // دالة إضافة الكلمة
+        function addTag(inputId, containerId, hiddenId) {
+            let input = document.getElementById(inputId);
+            let val = input.value.trim();
+            if(val === "") return;
+
+            let targetArray;
+            if(containerId === 'kwTags') targetArray = keywordsArray;
+            else if(containerId === 'excTags') targetArray = excludedArray;
+            else if(containerId === 'cityTags') targetArray = citiesArray;
+
+            if(!targetArray.includes(val)) {
+                targetArray.push(val);
+                renderTags(containerId, targetArray, hiddenId);
+            }
+            input.value = "";
+        }
+
+        // دالة رسم المربعات
+        function renderTags(containerId, arr, hiddenId) {
+            let container = document.getElementById(containerId);
+            let hidden = document.getElementById(hiddenId);
+            container.innerHTML = "";
+            
+            arr.forEach((item, index) => {
+                let span = document.createElement("span");
+                span.className = "tag-chip shadow-sm";
+                span.innerHTML = `${item} <i class="fas fa-times-circle" onclick="removeTag('${containerId}', ${index}, '${hiddenId}')"></i>`;
+                container.appendChild(span);
+            });
+            
+            // تحديث الحقل المخفي عشان السيرفر يقراه
+            hidden.value = arr.join(",");
+        }
+
+        // دالة حذف الكلمة
+        function removeTag(containerId, index, hiddenId) {
+            if(containerId === 'kwTags') { keywordsArray.splice(index, 1); renderTags(containerId, keywordsArray, hiddenId); }
+            else if(containerId === 'excTags') { excludedArray.splice(index, 1); renderTags(containerId, excludedArray, hiddenId); }
+            else if(containerId === 'cityTags') { citiesArray.splice(index, 1); renderTags(containerId, citiesArray, hiddenId); }
+        }
+
+        // دعم الضغط على زر Enter لإضافة الكلمة
+        document.getElementById('kwInput').addEventListener('keypress', function(e) { if(e.key === 'Enter') { e.preventDefault(); addTag('kwInput', 'kwTags', 'keywordsHidden'); } });
+        document.getElementById('excInput').addEventListener('keypress', function(e) { if(e.key === 'Enter') { e.preventDefault(); addTag('excInput', 'excTags', 'excHidden'); } });
+        document.getElementById('cityInput').addEventListener('keypress', function(e) { if(e.key === 'Enter') { e.preventDefault(); addTag('cityInput', 'cityTags', 'cityHidden'); } });
+
+        // التأكد من وجود كلمات مستهدفة قبل الحفظ
+        function submitForm() {
+            if(keywordsArray.length === 0) {
+                alert("الرجاء إضافة كلمة مستهدفة واحدة على الأقل قبل الحفظ!");
+                return;
+            }
+            document.getElementById('monitorForm').submit();
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+              <thead>
                                 <tr>
                                     <th>الوقت</th>
                                     <th>الكلمة</th>
