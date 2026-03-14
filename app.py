@@ -12,7 +12,10 @@ from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
-app.secret_key = "haraj_super_secret_key_v5"
+app.secret_key = "haraj_super_secret_key_v6"
+
+# تمرير دالة الوقت للواجهات عشان نقارن التواريخ
+app.jinja_env.globals.update(now=datetime.datetime.now)
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(BASE_DIR, 'haraj.db')
@@ -40,6 +43,7 @@ class User(UserMixin, db.Model):
     password = db.Column(db.String(200), nullable=False)
     role = db.Column(db.String(20), default='user')
     is_active_account = db.Column(db.Boolean, default=True)
+    account_expiration = db.Column(db.DateTime, nullable=True) # تاريخ انتهاء اشتراك العميل
     subscription = db.relationship('Subscription', backref='owner', uselist=False, lazy=True)
     logs = db.relationship('AdLog', backref='owner', lazy=True)
 
@@ -62,7 +66,7 @@ class Subscription(db.Model):
     quiet_end_hour = db.Column(db.Integer, default=6)
     quiet_end_minute = db.Column(db.Integer, default=0)
     sleep_minutes = db.Column(db.Integer, default=15) 
-    end_ts = db.Column(db.String(50))
+    end_ts = db.Column(db.String(50)) # غير مستخدم فعلياً الآن لأننا نعتمد على حساب العميل
 
 class AdLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -155,9 +159,16 @@ class MonitorThread(threading.Thread):
             self.seen_ids = set()
 
     def run(self):
-        end_time = datetime.datetime.fromisoformat(self.cfg['end_ts'])
         while not self.stop_evt.is_set():
-            if datetime.datetime.now() > end_time: break
+            # التأكد من صلاحية اشتراك العميل قبل الفحص
+            with app.app_context():
+                user = User.query.get(self.cfg['user_id'])
+                if not user or not user.is_active_account or (user.account_expiration and user.account_expiration < datetime.datetime.now()):
+                    sub = Subscription.query.get(self.cfg['id'])
+                    if sub: 
+                        sub.status = 'paused'
+                        db.session.commit()
+                    break # توقيف الثريد لأن الاشتراك انتهى أو توقف
                 
             if not is_quiet_now(self.cfg['quiet_enabled'], self.cfg['q_sh'], self.cfg['q_sm'], self.cfg['q_eh'], self.cfg['q_em']):
                 for kw in self.cfg['keywords']:
@@ -175,7 +186,6 @@ class MonitorThread(threading.Thread):
                                 if is_target_city(full_text, self.cfg['cities'], self.cfg['city_filter_enabled']) and \
                                    matches_keyword_precise(full_text, kw, self.cfg['excluded_words'], self.cfg['exclude_enabled']):
                                     
-                                    # حماية الرقم: تأخير عشوائي قبل الإرسال كما في الكود الأصلي
                                     delay = random.uniform(30, 60)
                                     time.sleep(delay)
                                     
@@ -194,7 +204,6 @@ class MonitorThread(threading.Thread):
                     except:
                         pass
             
-            # النوم (ثابت حسب إعداداتك)
             sleep_seconds = self.cfg['sleep_minutes'] * 60
             for _ in range(sleep_seconds):
                 if self.stop_evt.is_set(): break
@@ -225,12 +234,14 @@ def start_thread_for_sub(sub):
 
 @app.route('/')
 def index():
-    if current_user.is_authenticated:
-        return redirect(url_for('admin_dashboard') if current_user.role == 'admin' else url_for('user_dashboard'))
-    return redirect(url_for('login'))
+    # هذي صفحة الهبوط الفخمة
+    return render_template('index.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('admin_dashboard') if current_user.role == 'admin' else url_for('user_dashboard'))
+    
     if request.method == 'POST':
         user = User.query.filter_by(username=request.form.get('username')).first()
         if user and check_password_hash(user.password, request.form.get('password')):
@@ -238,7 +249,7 @@ def login():
                 flash('حسابك موقوف من قبل الإدارة.', 'danger')
                 return redirect(url_for('login'))
             login_user(user)
-            return redirect(url_for('index'))
+            return redirect(url_for('admin_dashboard') if user.role == 'admin' else url_for('user_dashboard'))
         flash('بيانات الدخول غير صحيحة!', 'danger')
     return render_template('login.html')
 
@@ -263,16 +274,22 @@ def verify():
         if request.form.get('otp') == session.get('otp'):
             temp = session['temp_user']
             new_user = User(username=temp['username'], phone=temp['phone'], password=temp['password'])
-            if User.query.count() == 0: new_user.role = 'admin'
+            
+            # أول مستخدم هو الإدمن ومفتوح اشتراكه، غيره ياخذ يومين مجاناً
+            if User.query.count() == 0: 
+                new_user.role = 'admin'
+                new_user.account_expiration = datetime.datetime.now() + datetime.timedelta(days=3650) # 10 سنوات
+            else:
+                new_user.account_expiration = datetime.datetime.now() + datetime.timedelta(days=2) # يومين مجاناً
+
             db.session.add(new_user)
             db.session.commit()
             session.clear()
-            flash('تم التسجيل بنجاح!', 'success')
+            flash('تم التسجيل بنجاح! تم منحك تجربة مجانية لمدة يومين 🎁', 'success')
             return redirect(url_for('login'))
         flash('كود التحقق غير صحيح!', 'danger')
     return render_template('verify.html')
 
-# -------- مسارات استعادة كلمة المرور --------
 @app.route('/forgot_password', methods=['GET', 'POST'])
 def forgot_password():
     if request.method == 'POST':
@@ -302,13 +319,12 @@ def reset_password():
             return redirect(url_for('login'))
         flash('كود التحقق غير صحيح!', 'danger')
     return render_template('reset_password.html')
-# --------------------------------------------
 
 @app.route('/logout')
 @login_required
 def logout():
     logout_user()
-    return redirect(url_for('login'))
+    return redirect(url_for('index'))
 
 @app.route('/user_dashboard', methods=['GET', 'POST'])
 @login_required
@@ -319,7 +335,16 @@ def user_dashboard():
     sub = Subscription.query.filter_by(user_id=current_user.id).first()
     logs = AdLog.query.filter_by(user_id=current_user.id).order_by(AdLog.timestamp.desc()).limit(100).all()
 
+    # التأكد من صلاحية الاشتراك
+    is_expired = False
+    if current_user.account_expiration and datetime.datetime.now() > current_user.account_expiration:
+        is_expired = True
+
     if request.method == 'POST':
+        if is_expired:
+            flash('عذراً، اشتراكك منتهي! لا يمكنك إضافة أو تعديل الرصد. تواصل مع الإدارة.', 'danger')
+            return redirect(url_for('user_dashboard'))
+
         name = request.form.get('name')
         keywords = request.form.get('keywords')
         cities = request.form.get('cities', '')
@@ -331,8 +356,7 @@ def user_dashboard():
         q_sm = int(request.form.get('q_sm', 0))
         q_eh = int(request.form.get('q_eh', 6))
         q_em = int(request.form.get('q_em', 0))
-        duration_days = int(request.form.get('duration_days', 30))
-        end_time = (datetime.datetime.now() + datetime.timedelta(days=duration_days)).isoformat()
+        end_time = current_user.account_expiration.isoformat() if current_user.account_expiration else ""
         
         if sub:
             if sub.id in ACTIVE_THREADS:
@@ -361,7 +385,7 @@ def user_dashboard():
             flash('تم حفظ الاشتراك وبدأ الرصد!', 'success')
         return redirect(url_for('user_dashboard'))
         
-    return render_template('user.html', sub=sub, logs=logs)
+    return render_template('user.html', sub=sub, logs=logs, is_expired=is_expired)
 
 @app.route('/toggle_sub/<int:sub_id>')
 @login_required
@@ -375,9 +399,12 @@ def toggle_sub(sub_id):
                 del ACTIVE_THREADS[sub.id]
             flash('تم إيقاف الاشتراك مؤقتاً ⏸', 'warning')
         else:
-            sub.status = 'active'
-            start_thread_for_sub(sub)
-            flash('تم استئناف الاشتراك بنجاح ▶️', 'success')
+            if current_user.account_expiration and datetime.datetime.now() > current_user.account_expiration:
+                flash('لا يمكن الاستئناف، حسابك منتهي.', 'danger')
+            else:
+                sub.status = 'active'
+                start_thread_for_sub(sub)
+                flash('تم استئناف الاشتراك بنجاح ▶️', 'success')
         db.session.commit()
     return redirect(request.referrer)
 
@@ -414,12 +441,17 @@ def admin_edit_user(user_id):
         user.username = request.form.get('username')
         user.phone = request.form.get('phone')
         new_pass = request.form.get('password')
+        exp_date_str = request.form.get('account_expiration')
+        
         if new_pass:
             user.password = generate_password_hash(new_pass, method='pbkdf2:sha256')
+            
+        if exp_date_str:
+            user.account_expiration = datetime.datetime.strptime(exp_date_str, '%Y-%m-%d')
         
-        # إذا عدل الإدمن رقم العميل، نحدثه في اشتراكه عشان تروح الرسايل للرقم الجديد
         if user.subscription:
             user.subscription.recipients = user.phone
+            user.subscription.end_ts = user.account_expiration.isoformat() if user.account_expiration else ""
             
         db.session.commit()
         flash(f'تم تعديل بيانات العميل {user.username} بنجاح.', 'success')
@@ -440,7 +472,6 @@ def toggle_user(user_id):
             db.session.commit()
     return redirect(url_for('admin_dashboard'))
 
-# انتحال شخصية العميل للدعم الفني
 @app.route('/impersonate/<int:user_id>')
 @login_required
 def impersonate(user_id):
@@ -467,5 +498,6 @@ with app.app_context():
 if __name__ == '__main__':
     with app.app_context():
         for sub in Subscription.query.filter_by(status='active').all():
-            if sub.owner.is_active_account: start_thread_for_sub(sub)
+            if sub.owner.is_active_account and (not sub.owner.account_expiration or sub.owner.account_expiration > datetime.datetime.now()):
+                start_thread_for_sub(sub)
     app.run(host='0.0.0.0', port=5000)
