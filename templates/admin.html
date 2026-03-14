@@ -16,8 +16,10 @@
     <nav class="navbar navbar-dark mb-4">
         <div class="container">
             <a class="navbar-brand" href="#">لوحة الإدارة الكبرى | راصد حراج</a>
-            <span class="text-light ms-auto me-3">مرحباً أيها المدير</span>
-            <a href="/logout" class="btn btn-outline-light btn-sm">تسجيل خروج</a>
+            <span class="text-light ms-auto me-3">
+                <a href="/admin_settings" class="btn btn-light btn-sm fw-bold me-2">⚙️ إعدادات النظام</a>
+                <a href="/logout" class="btn btn-outline-light btn-sm">تسجيل خروج</a>
+            </span>
         </div>
     </nav>
 
@@ -33,16 +35,15 @@
         <div class="row">
             <div class="col-md-12 mb-4">
                 <div class="card p-4">
-                    <h5 class="mb-4">👥 إدارة العملاء والتحكم الكامل</h5>
+                    <h5 class="mb-4">👥 إدارة العملاء والاشتراكات</h5>
                     <div class="table-responsive">
                         <table class="table table-bordered align-middle text-center">
                             <thead class="table-dark">
                                 <tr>
-                                    <th>رقم العميل</th>
-                                    <th>اسم المستخدم</th>
+                                    <th>العميل</th>
                                     <th>رقم الجوال</th>
                                     <th>تاريخ الانتهاء</th>
-                                    <th>عدد الإرساليات</th>
+                                    <th>الاشتراك / الإرساليات</th>
                                     <th>حالة الحساب</th>
                                     <th>إجراءات الدعم الفني</th>
                                 </tr>
@@ -50,30 +51,40 @@
                             <tbody>
                                 {% for user in users %}
                                 <tr>
-                                    <td>{{ user.id }}</td>
                                     <td>
-                                        {{ user.username }}
-                                        {% if user.role == 'admin' %}<span class="badge bg-warning text-dark d-block">مدير</span>{% endif %}
+                                        <strong>{{ user.username }}</strong>
+                                        {% if user.role == 'admin' %}<span class="badge bg-warning text-dark d-block mt-1">مدير</span>{% endif %}
                                     </td>
                                     <td dir="ltr">{{ user.phone }}</td>
                                     <td dir="ltr" class="text-danger fw-bold">
                                         {{ user.account_expiration.strftime('%Y-%m-%d') if user.account_expiration else 'مفتوح' }}
                                     </td>
-                                    <td><span class="badge bg-info text-dark">{{ user.subscription.sent_count if user.subscription else 0 }}</span></td>
+                                    <td>
+                                        {% if user.subscription %}
+                                            <span class="badge bg-info text-dark d-block mb-1">رسائل: {{ user.subscription.sent_count }}</span>
+                                            <a href="/admin_toggle_sub/{{ user.subscription.id }}" class="btn btn-sm {% if user.subscription.status == 'active' %}btn-outline-warning{% else %}btn-outline-success{% endif %} w-100">
+                                                {% if user.subscription.status == 'active' %}إيقاف الاشتراك ⏸{% else %}تشغيل الاشتراك ▶{% endif %}
+                                            </a>
+                                        {% else %}
+                                            <span class="text-muted small">لا يوجد اشتراك</span>
+                                        {% endif %}
+                                    </td>
                                     <td>
                                         {% if user.is_active_account %}
-                                            <span class="badge bg-success">فعال</span>
+                                            <span class="badge bg-success">حساب فعال</span>
                                         {% else %}
-                                            <span class="badge bg-danger">موقوف</span>
+                                            <span class="badge bg-danger">حساب موقوف</span>
                                         {% endif %}
                                     </td>
                                     <td>
                                         {% if user.id != current_user.id %}
-                                            <a href="/admin_edit_user/{{ user.id }}" class="btn btn-sm btn-primary">تعديل/تمديد</a>
-                                            <a href="/impersonate/{{ user.id }}" class="btn btn-sm btn-dark">دخول بحسابه</a>
-                                            <a href="/toggle_user/{{ user.id }}" class="btn btn-sm {% if user.is_active_account %}btn-danger{% else %}btn-success{% endif %}">
-                                                {% if user.is_active_account %}إيقاف ⏸{% else %}تفعيل ▶{% endif %}
-                                            </a>
+                                            <div class="d-flex flex-column gap-1">
+                                                <a href="/admin_edit_user/{{ user.id }}" class="btn btn-sm btn-primary">تعديل/تمديد</a>
+                                                <a href="/impersonate/{{ user.id }}" class="btn btn-sm btn-dark">دخول بحسابه</a>
+                                                <a href="/toggle_user/{{ user.id }}" class="btn btn-sm {% if user.is_active_account %}btn-danger{% else %}btn-success{% endif %}">
+                                                    {% if user.is_active_account %}إيقاف الحساب كلياً 🚫{% else %}تفعيل الحساب ✅{% endif %}
+                                                </a>
+                                            </div>
                                         {% else %}
                                             <span class="text-muted">حسابك الشخصي</span>
                                         {% endif %}
