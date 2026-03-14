@@ -29,8 +29,8 @@ APP_BASE_DIR = Path(__file__).resolve().parent
 SUBS_BASE_DIR = APP_BASE_DIR / "subs"
 SUBS_BASE_DIR.mkdir(exist_ok=True)
 
-# متغيرات عامة
-DEFAULT_TOKEN = "5a4b25b5228bab88c0df7aac67a458b45e63442f"
+# متغيرات عامة - تم تحديث التوكن هنا بناء على طلبك
+DEFAULT_TOKEN = "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
 HARAJ_BASE = "https://haraj.com.sa"
 HARAJ_HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Accept-Language": "ar-SA"}
 ACTIVE_THREADS = {} 
@@ -39,7 +39,7 @@ ACTIVE_THREADS = {}
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False)
-    phone = db.Column(db.String(20), nullable=False) # الحقل الجديد لرقم الجوال
+    phone = db.Column(db.String(20), nullable=False)
     password = db.Column(db.String(200), nullable=False)
     role = db.Column(db.String(20), default='user')
     is_active_account = db.Column(db.Boolean, default=True)
@@ -80,8 +80,11 @@ def send_whatsapp(req_session, token, to_msisdn, text):
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     try:
         r = req_session.post(url, json={"to": to_msisdn, "message": text}, headers=headers, timeout=20, verify=False)
+        print(f"\n[WhatsApp API Response]: Status Code: {r.status_code}")
+        print(f"[WhatsApp API Body]: {r.text}\n")
         return 200 <= r.status_code < 300
-    except:
+    except Exception as e:
+        print(f"\n[WhatsApp API Error]: {e}\n")
         return False
 
 # ================= خيط المراقبة (Thread) =================
@@ -162,10 +165,8 @@ def register():
             flash('اسم المستخدم موجود مسبقاً!', 'warning')
             return redirect(url_for('register'))
 
-        # توليد رمز تحقق من 4 أرقام
         otp = str(random.randint(1000, 9999))
         
-        # حفظ البيانات مؤقتاً في الجلسة
         session['temp_user'] = {
             'username': username,
             'phone': phone,
@@ -173,17 +174,20 @@ def register():
         }
         session['otp'] = otp
 
-        # إرسال كود التحقق واتساب
         msg = f"مرحباً بك في منصة راصد حراج 🚀\nكود التحقق الخاص بك هو: {otp}\nالرجاء عدم مشاركة الكود مع أحد."
         req_session = create_session()
         success = send_whatsapp(req_session, DEFAULT_TOKEN, phone, msg)
+
+        print(f"\n==============================================")
+        print(f"كود التحقق السري لرقم {phone} هو: [ {otp} ]")
+        print(f"==============================================\n")
 
         if success:
             flash('تم إرسال كود التحقق إلى رقمك على الواتساب.', 'info')
             return redirect(url_for('verify'))
         else:
-            flash('فشل إرسال رسالة الواتساب، تأكد من كتابة الرقم بالشكل الصحيح (مثال: 9665...)', 'danger')
-            return redirect(url_for('register'))
+            flash('تنبيه: فشل مزود الواتساب في الإرسال! راجع شاشة Logs في Render لنسخ كود التحقق واستكمال التسجيل.', 'danger')
+            return redirect(url_for('verify'))
 
     return render_template('register.html')
 
@@ -196,7 +200,6 @@ def verify():
     if request.method == 'POST':
         user_otp = request.form.get('otp')
         if user_otp == session['otp']:
-            # الرمز صحيح، ننشئ الحساب
             temp_user = session['temp_user']
             new_user = User(
                 username=temp_user['username'],
@@ -210,7 +213,6 @@ def verify():
             db.session.add(new_user)
             db.session.commit()
 
-            # تنظيف الجلسة
             session.pop('temp_user', None)
             session.pop('otp', None)
 
