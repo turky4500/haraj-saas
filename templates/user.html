@@ -34,7 +34,9 @@
         {% else %}
             <div class="alert alert-info shadow-sm text-center mb-4">
                 <span class="fw-bold">📅 ينتهي اشتراكك في:</span> 
-                <span dir="ltr" class="text-primary fw-bold">{{ current_user.account_expiration.strftime('%Y-%m-%d') if current_user.account_expiration else 'غير محدد' }}</span>
+                <span dir="ltr" class="text-primary fw-bold">
+                    {{ current_user.account_expiration.strftime('%Y-%m-%d') if current_user.account_expiration else 'مفتوح (لا ينتهي)' }}
+                </span>
             </div>
         {% endif %}
 
@@ -138,7 +140,6 @@
                                                 {% if sub.status == 'active' %}إيقاف مؤقت ⏸{% else %}استئناف ▶️{% endif %}
                                             </a>
                                         {% endif %}
-                                        
                                         <a href="/delete_sub/{{ sub.id }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من حذف الاشتراك؟')">حذف</a>
                                     </td>
                                 </tr>
