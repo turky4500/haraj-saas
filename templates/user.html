@@ -10,12 +10,13 @@
         .navbar { background-color: #2c3e50; }
         .card { border-radius: 12px; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 20px;}
         .section-title { font-size: 1.1rem; font-weight: bold; color: #34495e; border-bottom: 2px solid #ecf0f1; padding-bottom: 8px; margin-bottom: 15px;}
+        .log-table { max-height: 400px; overflow-y: auto; }
     </style>
 </head>
 <body>
     <nav class="navbar navbar-dark mb-4">
         <div class="container">
-            <a class="navbar-brand" href="#">لوحة المستخدم | راصد حراج المتقدم</a>
+            <a class="navbar-brand" href="#">لوحة المستخدم | راصد حراج המتقدم</a>
             <span class="text-light ms-auto me-3">مرحباً، {{ current_user.username }}</span>
             <a href="/logout" class="btn btn-outline-danger btn-sm">تسجيل خروج</a>
         </div>
@@ -33,109 +34,125 @@
         <div class="row">
             <div class="col-md-5">
                 <div class="card p-4">
-                    <h5 class="mb-4 text-primary">➕ إضافة اشتراك احترافي</h5>
+                    <h5 class="mb-4 {% if sub %}text-success{% else %}text-primary{% endif %}">
+                        {% if sub %}✏️ تعديل اشتراكي الحالي{% else %}➕ إضافة اشتراكي الأول{% endif %}
+                    </h5>
                     <form action="/user_dashboard" method="POST">
                         <div class="section-title">المعلومات الأساسية</div>
                         <div class="mb-3">
                             <label class="form-label text-muted small">اسم الاشتراك</label>
-                            <input type="text" name="name" class="form-control" required placeholder="مثال: بحث سيارات">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label text-muted small">كلمات البحث الأساسية (مفصول بفاصلة)</label>
-                            <input type="text" name="keywords" class="form-control" required placeholder="لاندكروزر, شاص">
+                            <input type="text" name="name" class="form-control" required placeholder="مثال: بحث سيارات" value="{{ sub.name if sub else '' }}">
                         </div>
                         <div class="mb-4">
-                            <label class="form-label text-muted small">رقم الجوال لتلقي الإشعارات</label>
-                            <input type="text" name="recipients" class="form-control" required placeholder="9665xxxxxxxx">
+                            <label class="form-label text-muted small">كلمات البحث الأساسية (مفصول بفاصلة)</label>
+                            <input type="text" name="keywords" class="form-control" required placeholder="لاندكروزر, شاص" value="{{ sub.keywords if sub else '' }}">
                         </div>
 
                         <div class="section-title">إعدادات الفلترة الدقيقة</div>
-                        
                         <div class="form-check form-switch mb-2">
-                            <input class="form-check-input" type="checkbox" name="city_filter_enabled" id="citySwitch">
+                            <input class="form-check-input" type="checkbox" name="city_filter_enabled" id="citySwitch" {% if sub and sub.city_filter_enabled %}checked{% endif %}>
                             <label class="form-check-label" for="citySwitch">تفعيل فلترة المدن</label>
                         </div>
                         <div class="mb-3">
-                            <input type="text" name="cities" class="form-control form-control-sm" placeholder="الرياض, جدة, مكة">
+                            <input type="text" name="cities" class="form-control form-control-sm" placeholder="الرياض, جدة, مكة" value="{{ sub.cities if sub else '' }}">
                         </div>
 
                         <div class="form-check form-switch mb-2">
-                            <input class="form-check-input" type="checkbox" name="exclude_enabled" id="excSwitch">
+                            <input class="form-check-input" type="checkbox" name="exclude_enabled" id="excSwitch" {% if sub and sub.exclude_enabled %}checked{% endif %}>
                             <label class="form-check-label" for="excSwitch">تفعيل الكلمات المستبعدة</label>
                         </div>
                         <div class="mb-4">
-                            <input type="text" name="excluded_words" class="form-control form-control-sm" placeholder="مصدوم, تشليح, إيجار">
+                            <input type="text" name="excluded_words" class="form-control form-control-sm" placeholder="مصدوم, تشليح, إيجار" value="{{ sub.excluded_words if sub else '' }}">
                         </div>
 
-                        <div class="section-title">إعدادات التوقيت والهدوء</div>
-                        
+                        <div class="section-title">إعدادات أوقات الهدوء</div>
                         <div class="form-check form-switch mb-2">
-                            <input class="form-check-input" type="checkbox" name="quiet_enabled" id="quietSwitch">
-                            <label class="form-check-label text-danger" for="quietSwitch">تفعيل أوقات الهدوء (عدم الإزعاج)</label>
+                            <input class="form-check-input" type="checkbox" name="quiet_enabled" id="quietSwitch" {% if sub and sub.quiet_enabled %}checked{% endif %}>
+                            <label class="form-check-label text-danger" for="quietSwitch">تفعيل عدم الإزعاج</label>
                         </div>
-                        <div class="row mb-3">
+                        <div class="row mb-4">
                             <div class="col-6">
                                 <label class="text-muted small">من (ساعة)</label>
-                                <input type="number" name="q_sh" class="form-control form-control-sm" value="1" min="0" max="23">
+                                <input type="number" name="q_sh" class="form-control form-control-sm" value="{{ sub.quiet_start_hour if sub else 1 }}" min="0" max="23">
                             </div>
                             <div class="col-6">
                                 <label class="text-muted small">إلى (ساعة)</label>
-                                <input type="number" name="q_eh" class="form-control form-control-sm" value="6" min="0" max="23">
+                                <input type="number" name="q_eh" class="form-control form-control-sm" value="{{ sub.quiet_end_hour if sub else 6 }}" min="0" max="23">
                             </div>
                         </div>
 
-                        <div class="row mb-4">
-                            <div class="col-6">
-                                <label class="text-muted small">مدة الفحص (بالدقائق)</label>
-                                <input type="number" name="sleep_minutes" class="form-control form-control-sm" value="15" min="1">
-                            </div>
-                            <div class="col-6">
-                                <label class="text-muted small">مدة الاشتراك (بالأيام)</label>
-                                <input type="number" name="duration_days" class="form-control form-control-sm" value="7" min="1">
-                            </div>
-                        </div>
+                        <input type="hidden" name="duration_days" value="30">
 
-                        <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">حفظ وبدء الرصد المتقدم</button>
+                        <button type="submit" class="btn {% if sub %}btn-success{% else %}btn-primary{% endif %} w-100 py-2 fw-bold">
+                            {% if sub %}💾 حفظ التعديلات{% else %}حفظ وبدء الرصد المتقدم{% endif %}
+                        </button>
                     </form>
                 </div>
             </div>
 
             <div class="col-md-7">
-                <div class="card p-4">
-                    <h5 class="mb-4 text-secondary">📋 اشتراكاتي النشطة</h5>
+                <div class="card p-4 mb-4">
+                    <h5 class="mb-4 text-secondary">📋 اشتراكي الحالي</h5>
                     <div class="table-responsive">
-                        <table class="table table-hover align-middle">
+                        <table class="table table-hover align-middle text-center">
                             <thead class="table-light">
                                 <tr>
-                                    <th>الاسم / الكلمات</th>
-                                    <th>الإعدادات المفعلة</th>
+                                    <th>الاسم</th>
                                     <th>الإرساليات</th>
                                     <th>الحالة</th>
-                                    <th>إجراءات</th>
+                                    <th>إجراءات الإيقاف والحذف</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for sub in subs %}
+                                {% if sub %}
                                 <tr>
+                                    <td><strong>{{ sub.name }}</strong></td>
+                                    <td><span class="badge bg-secondary">{{ sub.sent_count }}</span></td>
                                     <td>
-                                        <strong>{{ sub.name }}</strong><br>
-                                        <small class="text-muted">{{ sub.keywords }}</small>
+                                        {% if sub.status == 'active' %}
+                                            <span class="badge bg-success">نشط 🟢</span>
+                                        {% else %}
+                                            <span class="badge bg-warning text-dark">موقوف ⏸</span>
+                                        {% endif %}
                                     </td>
                                     <td>
-                                        {% if sub.city_filter_enabled %}<span class="badge bg-info text-dark">مدن</span>{% endif %}
-                                        {% if sub.exclude_enabled %}<span class="badge bg-warning text-dark">استبعاد</span>{% endif %}
-                                        {% if sub.quiet_enabled %}<span class="badge bg-dark">هدوء</span>{% endif %}
-                                        <br><small class="text-muted">كل {{ sub.sleep_minutes }} د</small>
-                                    </td>
-                                    <td class="text-center"><span class="badge bg-secondary">{{ sub.sent_count }}</span></td>
-                                    <td><span class="badge bg-success">نشط 🟢</span></td>
-                                    <td>
+                                        <a href="/toggle_sub/{{ sub.id }}" class="btn btn-sm {% if sub.status == 'active' %}btn-warning{% else %}btn-success{% endif %}">
+                                            {% if sub.status == 'active' %}إيقاف مؤقت ⏸{% else %}استئناف ▶️{% endif %}
+                                        </a>
                                         <a href="/delete_sub/{{ sub.id }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من حذف الاشتراك؟')">حذف</a>
                                     </td>
                                 </tr>
                                 {% else %}
                                 <tr>
-                                    <td colspan="5" class="text-center text-muted py-4">لا توجد اشتراكات حالياً. أضف اشتراكك الأول من اليمين.</td>
+                                    <td colspan="4" class="text-center text-muted py-4">لا يوجد اشتراك حالياً.</td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card p-4 log-table">
+                    <h5 class="mb-4 text-secondary">🗂️ أرشيف الإعلانات المرسلة</h5>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped align-middle">
+                            <thead>
+                                <tr>
+                                    <th>الوقت</th>
+                                    <th>الكلمة</th>
+                                    <th>عنوان الإعلان</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for log in logs %}
+                                <tr>
+                                    <td class="text-muted small" dir="ltr">{{ log.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    <td><span class="badge bg-info text-dark">{{ log.keyword_matched }}</span></td>
+                                    <td><a href="{{ log.url }}" target="_blank" class="text-decoration-none">{{ log.title[:40] }}...</a></td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="3" class="text-center text-muted py-3">لم يتم إرسال أي إعلانات حتى الآن.</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
