@@ -12,7 +12,7 @@ from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
-app.secret_key = "haraj_super_secret_key_v3"
+app.secret_key = "haraj_super_secret_key_v4"
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(BASE_DIR, 'haraj.db')
@@ -40,18 +40,18 @@ class User(UserMixin, db.Model):
     password = db.Column(db.String(200), nullable=False)
     role = db.Column(db.String(20), default='user')
     is_active_account = db.Column(db.Boolean, default=True)
-    subscriptions = db.relationship('Subscription', backref='owner', lazy=True)
+    subscription = db.relationship('Subscription', backref='owner', uselist=False, lazy=True)
+    logs = db.relationship('AdLog', backref='owner', lazy=True) # أرشيف الإعلانات
 
 class Subscription(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     name = db.Column(db.String(100), nullable=False)
     keywords = db.Column(db.String(500), nullable=False)
-    recipients = db.Column(db.String(100), nullable=False)
-    status = db.Column(db.String(20), default='active')
+    recipients = db.Column(db.String(100), nullable=False) # بناخذه تلقائي من العميل
+    status = db.Column(db.String(20), default='active') # active, paused
     sent_count = db.Column(db.Integer, default=0)
     
-    # الخصائص المتقدمة
     cities = db.Column(db.String(500), default="")
     city_filter_enabled = db.Column(db.Boolean, default=False)
     excluded_words = db.Column(db.String(500), default="")
@@ -61,8 +61,16 @@ class Subscription(db.Model):
     quiet_start_minute = db.Column(db.Integer, default=0)
     quiet_end_hour = db.Column(db.Integer, default=6)
     quiet_end_minute = db.Column(db.Integer, default=0)
-    sleep_minutes = db.Column(db.Integer, default=15)
-    end_ts = db.Column(db.String(50)) # تاريخ الانتهاء
+    sleep_minutes = db.Column(db.Integer, default=15) # ثابت في الخلفية
+    end_ts = db.Column(db.String(50))
+
+class AdLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    title = db.Column(db.String(255), nullable=False)
+    url = db.Column(db.String(500), nullable=False)
+    keyword_matched = db.Column(db.String(100))
+    timestamp = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -152,11 +160,9 @@ class MonitorThread(threading.Thread):
     def run(self):
         end_time = datetime.datetime.fromisoformat(self.cfg['end_ts'])
         while not self.stop_evt.is_set():
-            # التحقق من انتهاء الاشتراك
             if datetime.datetime.now() > end_time:
                 break
                 
-            # التحقق من أوقات الهدوء
             if not is_quiet_now(self.cfg['quiet_enabled'], self.cfg['q_sh'], self.cfg['q_sm'], self.cfg['q_eh'], self.cfg['q_em']):
                 for kw in self.cfg['keywords']:
                     if self.stop_evt.is_set(): break
@@ -166,7 +172,6 @@ class MonitorThread(threading.Thread):
                         for title, ad_url in extract_ads(html, HARAJ_BASE):
                             ad_id = re.search(r"/(\d+)(?:/|$)", ad_url).group(1)
                             if ad_id not in self.seen_ids:
-                                # فلترة المدن والكلمات المستبعدة (تتطلب جلب نص الإعلان)
                                 ad_html = self.req_session.get(ad_url, headers=HARAJ_HEADERS, timeout=15, verify=False).content
                                 soup = BeautifulSoup(ad_html, "html.parser")
                                 full_text = soup.get_text(" ", strip=True)
@@ -183,12 +188,15 @@ class MonitorThread(threading.Thread):
                                             sub = Subscription.query.get(self.cfg['id'])
                                             if sub:
                                                 sub.sent_count += 1
+                                                # حفظ الإعلان في الأرشيف
+                                                new_log = AdLog(user_id=self.cfg['user_id'], title=title, url=ad_url, keyword_matched=kw)
+                                                db.session.add(new_log)
                                                 db.session.commit()
-                                    time.sleep(random.uniform(10, 20)) # حماية الرقم
+                                    time.sleep(random.uniform(5, 10))
                     except:
                         pass
             
-            # النوم بناءً على إعدادات العميل
+            # النوم (15 دقيقة ثابتة)
             sleep_seconds = self.cfg['sleep_minutes'] * 60
             for _ in range(sleep_seconds):
                 if self.stop_evt.is_set(): break
@@ -200,6 +208,7 @@ class MonitorThread(threading.Thread):
 def start_thread_for_sub(sub):
     cfg = {
         'id': sub.id,
+        'user_id': sub.user_id,
         'keywords': [k.strip() for k in sub.keywords.split(',') if k.strip()],
         'recipients': sub.recipients.split(',')[0].strip(),
         'cities': [c.strip() for c in sub.cities.split(',') if c.strip()],
@@ -249,7 +258,7 @@ def register():
         }
         session['otp'] = otp
         send_whatsapp(create_session(), DEFAULT_TOKEN, phone, f"كود التحقق الخاص بك هو: {otp}")
-        print(f"\n[ OTP CODE for {phone} ]: {otp} \n") # لنسخه من الـ Logs
+        print(f"\n[ OTP CODE for {phone} ]: {otp} \n")
         return redirect(url_for('verify'))
     return render_template('register.html')
 
@@ -278,36 +287,82 @@ def logout():
 @login_required
 def user_dashboard():
     if current_user.role == 'admin': return redirect(url_for('admin_dashboard'))
+    
+    sub = Subscription.query.filter_by(user_id=current_user.id).first()
+    logs = AdLog.query.filter_by(user_id=current_user.id).order_by(AdLog.timestamp.desc()).limit(50).all() # آخر 50 إعلان
+
     if request.method == 'POST':
+        name = request.form.get('name')
+        keywords = request.form.get('keywords')
+        cities = request.form.get('cities', '')
+        city_filter_enabled = 'city_filter_enabled' in request.form
+        excluded_words = request.form.get('excluded_words', '')
+        exclude_enabled = 'exclude_enabled' in request.form
+        quiet_enabled = 'quiet_enabled' in request.form
+        q_sh = int(request.form.get('q_sh', 1))
+        q_sm = int(request.form.get('q_sm', 0))
+        q_eh = int(request.form.get('q_eh', 6))
+        q_em = int(request.form.get('q_em', 0))
         duration_days = int(request.form.get('duration_days', 7))
         end_time = (datetime.datetime.now() + datetime.timedelta(days=duration_days)).isoformat()
         
-        new_sub = Subscription(
-            user_id=current_user.id,
-            name=request.form.get('name'),
-            keywords=request.form.get('keywords'),
-            recipients=request.form.get('recipients'),
-            cities=request.form.get('cities', ''),
-            city_filter_enabled='city_filter_enabled' in request.form,
-            excluded_words=request.form.get('excluded_words', ''),
-            exclude_enabled='exclude_enabled' in request.form,
-            quiet_enabled='quiet_enabled' in request.form,
-            quiet_start_hour=int(request.form.get('q_sh', 1)),
-            quiet_start_minute=int(request.form.get('q_sm', 0)),
-            quiet_end_hour=int(request.form.get('q_eh', 6)),
-            quiet_end_minute=int(request.form.get('q_em', 0)),
-            sleep_minutes=int(request.form.get('sleep_minutes', 15)),
-            end_ts=end_time
-        )
-        db.session.add(new_sub)
-        db.session.commit()
-        
-        start_thread_for_sub(new_sub)
-        flash('تم حفظ الاشتراك وتفعيل كافة الخصائص!', 'success')
+        if sub:
+            # تعديل الاشتراك الحالي
+            if sub.id in ACTIVE_THREADS:
+                ACTIVE_THREADS[sub.id].stop()
+                del ACTIVE_THREADS[sub.id]
+            
+            sub.name = name
+            sub.keywords = keywords
+            sub.cities = cities
+            sub.city_filter_enabled = city_filter_enabled
+            sub.excluded_words = excluded_words
+            sub.exclude_enabled = exclude_enabled
+            sub.quiet_enabled = quiet_enabled
+            sub.quiet_start_hour = q_sh
+            sub.quiet_start_minute = q_sm
+            sub.quiet_end_hour = q_eh
+            sub.quiet_end_minute = q_em
+            sub.end_ts = end_time
+            sub.status = 'active'
+            db.session.commit()
+            start_thread_for_sub(sub)
+            flash('تم تعديل الاشتراك وتحديث الرصد!', 'success')
+        else:
+            # إضافة اشتراك جديد (يأخذ رقم الجوال من حساب العميل مباشرة)
+            new_sub = Subscription(
+                user_id=current_user.id, name=name, keywords=keywords, recipients=current_user.phone,
+                cities=cities, city_filter_enabled=city_filter_enabled,
+                excluded_words=excluded_words, exclude_enabled=exclude_enabled,
+                quiet_enabled=quiet_enabled, quiet_start_hour=q_sh, quiet_start_minute=q_sm,
+                quiet_end_hour=q_eh, quiet_end_minute=q_em, sleep_minutes=15, end_ts=end_time
+            )
+            db.session.add(new_sub)
+            db.session.commit()
+            start_thread_for_sub(new_sub)
+            flash('تم حفظ الاشتراك وبدأ الرصد!', 'success')
+            
         return redirect(url_for('user_dashboard'))
         
-    subs = Subscription.query.filter_by(user_id=current_user.id).all()
-    return render_template('user.html', subs=subs)
+    return render_template('user.html', sub=sub, logs=logs)
+
+@app.route('/toggle_sub/<int:sub_id>')
+@login_required
+def toggle_sub(sub_id):
+    sub = Subscription.query.get_or_404(sub_id)
+    if sub.user_id == current_user.id or current_user.role == 'admin':
+        if sub.status == 'active':
+            sub.status = 'paused'
+            if sub.id in ACTIVE_THREADS:
+                ACTIVE_THREADS[sub.id].stop()
+                del ACTIVE_THREADS[sub.id]
+            flash('تم إيقاف الاشتراك مؤقتاً ⏸', 'warning')
+        else:
+            sub.status = 'active'
+            start_thread_for_sub(sub)
+            flash('تم استئناف الاشتراك بنجاح ▶️', 'success')
+        db.session.commit()
+    return redirect(request.referrer)
 
 @app.route('/delete_sub/<int:sub_id>')
 @login_required
@@ -319,6 +374,7 @@ def delete_sub(sub_id):
             del ACTIVE_THREADS[sub.id]
         db.session.delete(sub)
         db.session.commit()
+        flash('تم حذف الاشتراك نهائياً 🗑️', 'info')
     return redirect(request.referrer)
 
 @app.route('/admin_dashboard')
@@ -334,11 +390,10 @@ def toggle_user(user_id):
         user = User.query.get_or_404(user_id)
         if user.id != current_user.id:
             user.is_active_account = not user.is_active_account
-            if not user.is_active_account:
-                for sub in user.subscriptions:
-                    if sub.id in ACTIVE_THREADS:
-                        ACTIVE_THREADS[sub.id].stop()
-                        del ACTIVE_THREADS[sub.id]
+            if not user.is_active_account and user.subscription:
+                if user.subscription.id in ACTIVE_THREADS:
+                    ACTIVE_THREADS[user.subscription.id].stop()
+                    del ACTIVE_THREADS[user.subscription.id]
             db.session.commit()
     return redirect(url_for('admin_dashboard'))
 
