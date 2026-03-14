@@ -9,46 +9,109 @@
         body { background-color: #ecf0f1; }
         .navbar { background-color: #27ae60; }
         .card { border-radius: 12px; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px;}
-        .log-box { background: #1e1e1e; color: #a9b7c6; height: 300px; overflow-y: scroll; padding: 15px; font-family: monospace; border-radius: 8px;}
     </style>
 </head>
 <body>
     <nav class="navbar navbar-dark mb-4">
         <div class="container">
-            <a class="navbar-brand" href="#">لوحة الإدارة | راصد حراج</a>
-            <a href="/" class="btn btn-outline-light btn-sm">خروج</a>
+            <a class="navbar-brand" href="#">لوحة الإدارة الكبرى | راصد حراج</a>
+            <span class="text-light ms-auto me-3">مرحباً أيها المدير</span>
+            <a href="/logout" class="btn btn-outline-light btn-sm">تسجيل خروج</a>
         </div>
     </nav>
 
     <div class="container">
         <div class="row">
             <div class="col-md-12 mb-4">
-                <div class="card p-4 text-center">
-                    <h4 class="mb-3">التحكم العام بالنظام</h4>
-                    <p>حالة النظام الحالية: 
-                        {% if global_running %}
-                            <span class="badge bg-success fs-6">شغال 🟢</span>
-                        {% else %}
-                            <span class="badge bg-danger fs-6">متوقف ⏸</span>
-                        {% endif %}
-                    </p>
-                    <div>
-                        <a href="/api/toggle_global" class="btn btn-lg {% if global_running %}btn-danger{% else %}btn-success{% endif %} px-5">
-                            {% if global_running %}إيقاف التشغيل العام ⏸{% else %}بدء التشغيل العام ▶{% endif %}
-                        </a>
+                <div class="card p-4">
+                    <h5 class="mb-4">👥 إدارة العملاء (المستخدمين)</h5>
+                    <div class="table-responsive">
+                        <table class="table table-bordered align-middle text-center">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>رقم العميل</th>
+                                    <th>اسم المستخدم</th>
+                                    <th>نوع الحساب</th>
+                                    <th>حالة الحساب</th>
+                                    <th>إجراءات الإدارة</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in users %}
+                                <tr>
+                                    <td>{{ user.id }}</td>
+                                    <td>{{ user.username }}</td>
+                                    <td>
+                                        {% if user.role == 'admin' %}
+                                            <span class="badge bg-warning text-dark">مدير عام</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">عميل</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if user.is_active_account %}
+                                            <span class="badge bg-success">فعال</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">موقوف</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if user.id != current_user.id %}
+                                            <a href="/toggle_user/{{ user.id }}" class="btn btn-sm {% if user.is_active_account %}btn-danger{% else %}btn-success{% endif %}">
+                                                {% if user.is_active_account %}إيقاف العميل ⏸{% else %}تفعيل العميل ▶{% endif %}
+                                            </a>
+                                        {% else %}
+                                            <span class="text-muted">حسابك الشخصي</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
 
             <div class="col-md-12">
                 <div class="card p-4">
-                    <h5>📜 سجل النظام الحقيقي (Logs)</h5>
-                    <div class="log-box">
-                        {% for log in logs %}
-                            <div>{{ log }}</div>
-                        {% else %}
-                            <div>لا توجد أحداث مسجلة بعد.</div>
-                        {% endfor %}
+                    <h5 class="mb-4">📡 جميع الاشتراكات النشطة في السيرفر</h5>
+                    <div class="table-responsive">
+                        <table class="table table-striped align-middle text-center">
+                            <thead class="table-primary">
+                                <tr>
+                                    <th>رقم الاشتراك</th>
+                                    <th>صاحب الاشتراك</th>
+                                    <th>اسم الاشتراك</th>
+                                    <th>الكلمات</th>
+                                    <th>حالة المحرك (Thread)</th>
+                                    <th>حذف إجباري</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for sub in subs %}
+                                <tr>
+                                    <td>{{ sub.id }}</td>
+                                    <td>{{ sub.owner.username }}</td>
+                                    <td>{{ sub.name }}</td>
+                                    <td>{{ sub.keywords }}</td>
+                                    <td>
+                                        {% if sub.id in active_threads %}
+                                            <span class="badge bg-success">يفحص الآن 🚀</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">متوقف 🔴</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="/delete_sub/{{ sub.id }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('حذف اشتراك العميل؟')">حذف</a>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="6" class="text-muted">لا توجد أي اشتراكات في النظام</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
