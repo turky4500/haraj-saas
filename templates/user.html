@@ -17,10 +17,13 @@
     <nav class="navbar navbar-dark mb-4">
         <div class="container">
             <a class="navbar-brand" href="#">لوحة المستخدم | راصد حراج المتقدم</a>
-            <span class="text-light ms-auto me-3">مرحباً، {{ current_user.username }}</span>
+            <span class="text-light ms-auto me-3">
+                مرحباً، {{ current_user.username }}
+            </span>
             {% if session.get('admin_impersonating') %}
-                <a href="/revert_impersonate" class="btn btn-warning btn-sm me-2 fw-bold">رجوع لحساب الإدارة 👑</a>
+                <a href="/revert_impersonate" class="btn btn-warning btn-sm me-2 fw-bold">رجوع للإدارة 👑</a>
             {% endif %}
+            <a href="/user_profile" class="btn btn-light btn-sm me-2 fw-bold">الملف الشخصي 👤</a>
             <a href="/logout" class="btn btn-outline-danger btn-sm">تسجيل خروج</a>
         </div>
     </nav>
