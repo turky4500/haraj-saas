@@ -12,7 +12,7 @@ from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
-app.secret_key = "haraj_super_secret_key_v12"
+app.secret_key = "haraj_super_secret_key_v13"
 
 app.jinja_env.globals.update(now=datetime.datetime.now)
 
@@ -33,6 +33,7 @@ HARAJ_BASE = "https://haraj.com.sa"
 HARAJ_HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Accept-Language": "ar-SA"}
 ACTIVE_THREADS = {} 
 
+# ================= باتش منع السكون والتنظيف التلقائي =================
 def keep_alive_patch():
     while True:
         try:
@@ -40,7 +41,24 @@ def keep_alive_patch():
         except: pass
         time.sleep(600) 
 
+def cleanup_old_logs():
+    """ينظف الأرشيف كل ساعة لضمان بقاء 2000 إعلان كحد أقصى للحفاظ على المساحة"""
+    while True:
+        time.sleep(3600) # فحص كل ساعة
+        with app.app_context():
+            try:
+                total_logs = AdLog.query.count()
+                if total_logs > 2000:
+                    excess = total_logs - 2000
+                    old_logs = AdLog.query.order_by(AdLog.timestamp.asc()).limit(excess).all()
+                    for l in old_logs:
+                        db.session.delete(l)
+                    db.session.commit()
+            except:
+                pass
+
 threading.Thread(target=keep_alive_patch, daemon=True).start()
+threading.Thread(target=cleanup_old_logs, daemon=True).start()
 
 # ================= النماذج =================
 class SystemSettings(db.Model):
@@ -178,6 +196,7 @@ class MonitorThread(threading.Thread):
                 settings = SystemSettings.query.first()
                 current_token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
 
+                # التحقق وإرسال رسالة الانتهاء
                 if not user or not user.is_active_account or not sub or sub.status != 'active' or (user.account_expiration and user.account_expiration < datetime.datetime.now()):
                     if sub and sub.status == 'active': 
                         sub.status = 'paused'
@@ -388,8 +407,6 @@ def user_dashboard():
         return redirect(url_for('admin_dashboard'))
     
     sub = Subscription.query.filter_by(user_id=current_user.id).first()
-    
-    # استرجاع الأرشيف (logs) ليعرض في الواجهة
     logs = AdLog.query.filter_by(user_id=current_user.id).order_by(AdLog.timestamp.desc()).limit(100).all()
 
     is_expired = False
@@ -571,6 +588,13 @@ def admin_add_user():
         db.session.add(new_user)
         db.session.commit()
 
+        # إرسال رسالة الترحيب مباشرة عند إنشاء الحساب من قبل الإدارة
+        settings = SystemSettings.query.first()
+        current_token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
+        exp_text = exp_date.strftime('%Y-%m-%d') if exp_date else "مفتوح"
+        welcome_msg = f"مرحباً بك في راصد حراج! 🎯\nتم إنشاء حسابك وتفعيل الرادار بنجاح من قبل الإدارة.\n\nتاريخ الانتهاء: {exp_text}\n\nنتمنى لك صيدات موفقة! 🚀"
+        send_whatsapp(create_session(), current_token, phone, welcome_msg)
+
         if keywords:
             end_ts = exp_date.isoformat() if exp_date else ""
             new_sub = Subscription(
@@ -585,12 +609,6 @@ def admin_add_user():
             
             if not exp_date or exp_date > datetime.datetime.now():
                 start_thread_for_sub(new_sub)
-                
-                settings = SystemSettings.query.first()
-                current_token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
-                exp_text = exp_date.strftime('%Y-%m-%d') if exp_date else "مفتوح"
-                welcome_msg = f"مرحباً بك في راصد حراج! 🎯\nتم تفعيل الرادار الخاص بك بنجاح من قبل الإدارة.\n\nالاسم: {sub_name}\nتاريخ الانتهاء: {exp_text}\n\nنتمنى لك صيدات موفقة! 🚀"
-                send_whatsapp(create_session(), current_token, phone, welcome_msg)
 
         flash('تم إضافة العميل وإعداد راداره بنجاح! 🚀', 'success')
         return redirect(url_for('admin_dashboard'))
