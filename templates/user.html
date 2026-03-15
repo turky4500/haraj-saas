@@ -7,55 +7,30 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { background-color: #f4f7f6; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .navbar { background-color: #2c3e50; }
-        
-        .glass-card { 
-            background: #ffffff; 
-            border-radius: 20px; 
-            border: none; 
-            box-shadow: 0 8px 20px rgba(0,0,0,0.04); 
-            margin-bottom: 25px;
-            padding: 25px;
-        }
-        
-        .section-title { 
-            font-size: 1.2rem; 
-            font-weight: bold; 
-            color: #1e3c72; 
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .form-control { border-radius: 10px; background-color: #f8f9fa; border: 1px solid #e9ecef; }
-        .form-control:focus { box-shadow: none; border-color: #3498db; }
-        
-        .tag-chip {
-            display: inline-flex; align-items: center; background-color: #e1f0fa;
-            color: #0d6efd; padding: 5px 15px; border-radius: 20px; font-size: 0.9rem;
-            margin: 5px 5px 5px 0; font-weight: 500; border: 1px solid #cde4f7;
-        }
+        :root { --bg-color: #f4f7f6; --text-color: #2c3e50; --card-bg: #ffffff; --nav-bg: #2c3e50; }
+        body.dark-mode { --bg-color: #121212; --text-color: #e0e0e0; --card-bg: #1e1e1e; --nav-bg: #000000; }
+        body { background-color: var(--bg-color); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: var(--text-color); transition: 0.3s; }
+        .navbar { background-color: var(--nav-bg); }
+        .glass-card { background: var(--card-bg); border-radius: 20px; border: 1px solid rgba(128,128,128,0.1); box-shadow: 0 8px 20px rgba(0,0,0,0.04); margin-bottom: 25px; padding: 25px; }
+        .section-title { font-size: 1.2rem; font-weight: bold; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+        .form-control { border-radius: 10px; background-color: var(--bg-color); color: var(--text-color); border: 1px solid rgba(128,128,128,0.2); }
+        .tag-chip { display: inline-flex; align-items: center; background-color: #e1f0fa; color: #0d6efd; padding: 5px 15px; border-radius: 20px; font-size: 0.9rem; margin: 5px 5px 5px 0; font-weight: 500; border: 1px solid #cde4f7; }
         .tag-chip i { margin-right: 8px; cursor: pointer; color: #dc3545; transition: 0.2s; }
-        .tag-chip i:hover { color: #a71d2a; transform: scale(1.1); }
-        
-        .btn-add { border-radius: 10px; background-color: #e9ecef; color: #495057; font-weight: bold; border: none; }
-        .btn-add:hover { background-color: #dde0e3; }
-        
+        .btn-add { border-radius: 10px; background-color: var(--bg-color); color: var(--text-color); font-weight: bold; border: 1px solid rgba(128,128,128,0.2); }
         .main-btn { border-radius: 12px; font-size: 1.1rem; padding: 12px; }
         .log-table { max-height: 350px; overflow-y: auto; }
+        table { color: var(--text-color) !important; }
+        .dark-toggle { background: transparent; border: none; color: white; font-size: 1.2rem; cursor: pointer; }
     </style>
 </head>
 <body>
     <nav class="navbar navbar-dark mb-4 shadow-sm">
-        <div class="container">
+        <div class="container d-flex align-items-center">
+            <button id="darkModeToggle" class="dark-toggle me-3"><i class="fas fa-moon"></i></button>
             <a class="navbar-brand fw-bold" href="#"><i class="fas fa-radar text-success"></i> راصد حراج المتقدم</a>
-            <span class="text-light ms-auto me-3">
-                مرحباً، {{ current_user.username }}
-            </span>
+            <span class="text-light ms-auto me-3">مرحباً، {{ current_user.username }}</span>
             {% if session.get('admin_impersonating') %}
-                <a href="/revert_impersonate" class="btn btn-warning btn-sm me-2 fw-bold"><i class="fas fa-crown"></i> رجوع للإدارة</a>
+                <a href="/revert_impersonate" class="btn btn-warning btn-sm me-2 fw-bold"><i class="fas fa-crown"></i> للإدارة</a>
             {% endif %}
             <a href="/user_profile" class="btn btn-light btn-sm me-2 fw-bold"><i class="fas fa-user-cog"></i> حسابي</a>
             <a href="/logout" class="btn btn-outline-danger btn-sm"><i class="fas fa-sign-out-alt"></i> خروج</a>
@@ -66,13 +41,13 @@
         {% if is_expired %}
             <div class="alert alert-danger shadow-sm text-center mb-4" style="border-radius: 15px;">
                 <h4 class="alert-heading fw-bold"><i class="fas fa-exclamation-triangle"></i> عذراً، اشتراكك منتهي!</h4>
-                <p class="mb-0">فترة اشتراكك أو تجربتك المجانية قد انتهت. تم إيقاف الرصد مؤقتاً، تواصل مع الإدارة للتجديد.</p>
+                <p class="mb-0">فترة اشتراكك قد انتهت. تم إيقاف الرصد مؤقتاً، تواصل مع الإدارة للتجديد.</p>
             </div>
         {% else %}
-            <div class="alert alert-info shadow-sm text-center mb-4" style="border-radius: 15px; background-color: #e1f0fa; border: none;">
+            <div class="alert alert-info shadow-sm text-center mb-4" style="border-radius: 15px; border: none;">
                 <span class="fw-bold text-dark"><i class="fas fa-calendar-alt text-primary"></i> ينتهي اشتراكك في:</span> 
                 <span dir="ltr" class="text-primary fw-bold fs-5">
-                    {{ current_user.account_expiration.strftime('%Y-%m-%d') if current_user.account_expiration else 'مفتوح (لا ينتهي)' }}
+                    {{ current_user.account_expiration.strftime('%Y-%m-%d') if current_user.account_expiration else 'مفتوح' }}
                 </span>
             </div>
         {% endif %}
@@ -80,7 +55,7 @@
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show" style="border-radius: 15px;">{{ message }}</div>
+                    <div class="alert alert-{{ category }} alert-dismissible fade show">{{ message }}</div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
@@ -88,68 +63,63 @@
         <div class="row">
             <div class="col-md-6">
                 <div class="glass-card">
-                    <h5 class="mb-4 fw-bold text-center {% if sub %}text-success{% else %}text-primary{% endif %}">
-                        {% if sub %}<i class="fas fa-edit"></i> إعدادات الرصد الخاصة بك{% else %}<i class="fas fa-plus-circle"></i> إعدادات الرصد الجديدة{% endif %}
-                    </h5>
+                    <h5 class="mb-4 fw-bold text-center text-success"><i class="fas fa-edit"></i> إعدادات الرصد</h5>
                     <fieldset {% if is_expired %}disabled{% endif %}>
                         <form action="/user_dashboard" method="POST" id="monitorForm">
-                            
                             <div class="mb-4">
-                                <label class="form-label text-muted fw-bold small"><i class="fas fa-tag"></i> اسم الاشتراك</label>
-                                <input type="text" name="name" class="form-control form-control-lg" required placeholder="مثال: بحث سيارات" value="{{ sub.name if sub else '' }}">
+                                <label class="form-label fw-bold small"><i class="fas fa-tag"></i> اسم الاشتراك</label>
+                                <input type="text" name="name" class="form-control" required value="{{ sub.name if sub else '' }}">
                             </div>
 
-                            <div class="section-title"><i class="fas fa-bullseye text-danger"></i> الكلمات المستهدفة (إجباري)</div>
+                            <div class="section-title"><i class="fas fa-bullseye text-danger"></i> الكلمات المستهدفة</div>
                             <div class="input-group mb-2">
-                                <input type="text" id="kwInput" class="form-control" placeholder="مثال: لاندكروزر 2024">
-                                <button type="button" class="btn btn-add px-4" onclick="addTag('kwInput', 'kwTags', 'keywordsHidden')">إضافة الكلمة</button>
+                                <input type="text" id="kwInput" class="form-control" placeholder="مثال: لاندكروزر">
+                                <button type="button" class="btn btn-add px-4" onclick="addTag('kwInput', 'kwTags', 'keywordsHidden')">إضافة</button>
                             </div>
-                            <div id="kwTags" class="mb-4 min-vh-25"></div>
+                            <div id="kwTags" class="mb-4"></div>
                             <input type="hidden" name="keywords" id="keywordsHidden" required>
 
-                            <div class="section-title"><i class="fas fa-ban text-secondary"></i> الكلمات المحظورة (اختياري)</div>
+                            <div class="section-title"><i class="fas fa-ban text-secondary"></i> الكلمات المحظورة</div>
                             <div class="form-check form-switch mb-2">
                                 <input class="form-check-input" type="checkbox" name="exclude_enabled" id="excSwitch" {% if sub and sub.exclude_enabled %}checked{% endif %}>
-                                <label class="form-check-label text-muted small" for="excSwitch">تفعيل الحظر</label>
+                                <label class="form-check-label small" for="excSwitch">تفعيل الحظر</label>
                             </div>
                             <div class="input-group mb-2">
-                                <input type="text" id="excInput" class="form-control" placeholder="مثال: مصدوم، تشليح">
-                                <button type="button" class="btn btn-add px-4" onclick="addTag('excInput', 'excTags', 'excHidden')">إضافة الكلمة</button>
+                                <input type="text" id="excInput" class="form-control" placeholder="مصدوم...">
+                                <button type="button" class="btn btn-add px-4" onclick="addTag('excInput', 'excTags', 'excHidden')">إضافة</button>
                             </div>
                             <div id="excTags" class="mb-4"></div>
                             <input type="hidden" name="excluded_words" id="excHidden">
 
-                            <div class="section-title"><i class="fas fa-map-marker-alt text-success"></i> نطاق البحث للمدن (اختياري)</div>
+                            <div class="section-title"><i class="fas fa-map-marker-alt text-success"></i> نطاق المدن</div>
                             <div class="form-check form-switch mb-2">
                                 <input class="form-check-input" type="checkbox" name="city_filter_enabled" id="citySwitch" {% if sub and sub.city_filter_enabled %}checked{% endif %}>
-                                <label class="form-check-label text-muted small" for="citySwitch">تفعيل تحديد المدن</label>
+                                <label class="form-check-label small" for="citySwitch">تفعيل تحديد المدن</label>
                             </div>
                             <div class="input-group mb-2">
-                                <input type="text" id="cityInput" class="form-control" placeholder="أضف مدينة..">
-                                <button type="button" class="btn btn-add px-4" onclick="addTag('cityInput', 'cityTags', 'cityHidden')">إضافة المدينة</button>
+                                <input type="text" id="cityInput" class="form-control" placeholder="الرياض...">
+                                <button type="button" class="btn btn-add px-4" onclick="addTag('cityInput', 'cityTags', 'cityHidden')">إضافة</button>
                             </div>
                             <div id="cityTags" class="mb-4"></div>
                             <input type="hidden" name="cities" id="cityHidden">
 
-                            <div class="section-title"><i class="fas fa-bed text-info"></i> وضع عدم الإزعاج</div>
+                            <div class="section-title"><i class="fas fa-bed text-info"></i> عدم الإزعاج</div>
                             <div class="form-check form-switch mb-3">
                                 <input class="form-check-input" type="checkbox" name="quiet_enabled" id="quietSwitch" {% if sub and sub.quiet_enabled %}checked{% endif %}>
-                                <label class="form-check-label text-muted small" for="quietSwitch">تفعيل وقت النوم (إيقاف الرصد)</label>
+                                <label class="form-check-label small" for="quietSwitch">تفعيل وقت النوم</label>
                             </div>
-                            <div class="row mb-4 bg-light p-3 rounded-3 border">
+                            <div class="row mb-4">
                                 <div class="col-6">
-                                    <label class="text-muted small fw-bold">من الساعة:</label>
+                                    <label class="small fw-bold">من الساعة:</label>
                                     <input type="number" name="q_sh" class="form-control text-center" value="{{ sub.quiet_start_hour if sub else 1 }}" min="0" max="23">
                                 </div>
                                 <div class="col-6">
-                                    <label class="text-muted small fw-bold">إلى الساعة:</label>
+                                    <label class="small fw-bold">إلى الساعة:</label>
                                     <input type="number" name="q_eh" class="form-control text-center" value="{{ sub.quiet_end_hour if sub else 6 }}" min="0" max="23">
                                 </div>
                             </div>
 
-                            <button type="button" onclick="submitForm()" class="btn main-btn {% if sub %}btn-success{% else %}btn-primary{% endif %} w-100 fw-bold shadow-sm">
-                                {% if sub %}<i class="fas fa-save"></i> حفظ التعديلات وبدء الرصد{% else %}<i class="fas fa-rocket"></i> تفعيل الرادار الآن{% endif %}
-                            </button>
+                            <button type="button" onclick="submitForm()" class="btn main-btn btn-success w-100 fw-bold shadow-sm">حفظ التعديلات وبدء الرصد</button>
                         </form>
                     </fieldset>
                 </div>
@@ -157,44 +127,32 @@
 
             <div class="col-md-6">
                 <div class="glass-card mb-4">
-                    <h5 class="mb-4 text-secondary fw-bold"><i class="fas fa-file-invoice"></i> حالة الرادار الحالي</h5>
+                    <h5 class="mb-4 fw-bold"><i class="fas fa-file-invoice"></i> حالة الرادار الحالي</h5>
                     <div class="table-responsive">
                         <table class="table align-middle text-center table-borderless">
-                            <thead class="table-light rounded-3">
-                                <tr>
-                                    <th>الاسم</th>
-                                    <th>الإرساليات</th>
-                                    <th>الحالة</th>
-                                    <th>إجراءات</th>
-                                </tr>
-                            </thead>
                             <tbody>
                                 {% if sub %}
                                 <tr class="border-bottom">
                                     <td class="fw-bold text-primary">{{ sub.name }}</td>
-                                    <td><span class="badge bg-dark rounded-pill px-3">{{ sub.sent_count }}</span></td>
+                                    <td><span class="badge bg-dark px-3">{{ sub.sent_count }}</span></td>
                                     <td>
                                         {% if sub.status == 'active' %}
-                                            <span class="badge bg-success rounded-pill px-3"><i class="fas fa-broadcast-tower"></i> نشط</span>
+                                            <span class="badge bg-success px-3">نشط</span>
                                         {% else %}
-                                            <span class="badge bg-warning text-dark rounded-pill px-3"><i class="fas fa-pause-circle"></i> موقوف</span>
+                                            <span class="badge bg-warning text-dark px-3">موقوف</span>
                                         {% endif %}
                                     </td>
                                     <td>
-                                        {% if is_expired %}
-                                            <button class="btn btn-sm btn-secondary rounded-pill px-3" disabled>منتهي</button>
-                                        {% else %}
-                                            <a href="/toggle_sub/{{ sub.id }}" class="btn btn-sm rounded-pill px-3 {% if sub.status == 'active' %}btn-warning{% else %}btn-success{% endif %}">
+                                        {% if not is_expired %}
+                                            <a href="/toggle_sub/{{ sub.id }}" class="btn btn-sm {% if sub.status == 'active' %}btn-warning{% else %}btn-success{% endif %}">
                                                 {% if sub.status == 'active' %}<i class="fas fa-pause"></i>{% else %}<i class="fas fa-play"></i>{% endif %}
                                             </a>
                                         {% endif %}
-                                        <a href="/delete_sub/{{ sub.id }}" class="btn btn-sm btn-outline-danger rounded-pill px-3" onclick="return confirm('هل أنت متأكد من الحذف نهائياً؟')"><i class="fas fa-trash"></i></a>
+                                        <a href="/delete_sub/{{ sub.id }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('حذف نهائياً؟')"><i class="fas fa-trash"></i></a>
                                     </td>
                                 </tr>
                                 {% else %}
-                                <tr>
-                                    <td colspan="4" class="text-center text-muted py-5"><i class="fas fa-sleep fa-2x mb-2 d-block opacity-50"></i>الرادار متوقف. أضف إعداداتك من اليمين لتفعيله.</td>
-                                </tr>
+                                <tr><td colspan="4" class="text-muted">لا يوجد اشتراك حالياً.</td></tr>
                                 {% endif %}
                             </tbody>
                         </table>
@@ -203,96 +161,81 @@
 
                 <div class="glass-card log-table">
                     <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h5 class="text-secondary fw-bold mb-0"><i class="fas fa-history"></i> أرشيف الإعلانات (آخر 100)</h5>
-                        <span class="badge bg-primary rounded-pill fs-6">{{ sub.sent_count if sub else 0 }} إعلان</span>
+                        <h5 class="fw-bold mb-0"><i class="fas fa-history"></i> أرشيف الإعلانات (آخر 100)</h5>
+                        <span class="badge bg-primary rounded-pill">{{ sub.sent_count if sub else 0 }} إعلان</span>
                     </div>
                     <div class="table-responsive">
                         <table class="table table-sm table-hover align-middle">
                             <tbody>
                                 {% for log in logs %}
                                 <tr>
-                                    <td style="width: 25%;"><span class="badge bg-light text-primary border rounded-pill"><i class="fas fa-search"></i> {{ log.keyword_matched }}</span></td>
-                                    <td><a href="{{ log.url }}" target="_blank" class="text-decoration-none text-dark fw-bold">{{ log.title[:50] }}...</a></td>
-                                    <td class="text-muted small text-end" dir="ltr" style="width: 20%;">{{ log.timestamp.strftime('%H:%M | %m-%d') }}</td>
+                                    <td style="width: 25%;"><span class="badge bg-light text-primary border rounded-pill">{{ log.keyword_matched }}</span></td>
+                                    <td><a href="{{ log.url }}" target="_blank" class="text-decoration-none text-info fw-bold">{{ log.title[:40] }}...</a></td>
+                                    <td class="small text-end" dir="ltr" style="width: 20%;">{{ log.timestamp.strftime('%H:%M | %m-%d') }}</td>
                                 </tr>
                                 {% else %}
-                                <tr>
-                                    <td colspan="3" class="text-center text-muted py-5"><i class="fas fa-box-open fa-2x mb-2 d-block opacity-50"></i>لم يتم اصطياد أي إعلانات حتى الآن.</td>
-                                </tr>
+                                <tr><td colspan="3" class="text-center text-muted">لا توجد إعلانات.</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
                 </div>
-
             </div>
         </div>
     </div>
 
     <script>
-        let keywordsArray = [];
-        let excludedArray = [];
-        let citiesArray = [];
+        const toggleBtn = document.getElementById('darkModeToggle');
+        const body = document.body;
+        if(localStorage.getItem('darkMode') === 'enabled') {
+            body.classList.add('dark-mode');
+            toggleBtn.innerHTML = '<i class="fas fa-sun text-warning"></i>';
+        }
+        toggleBtn.addEventListener('click', () => {
+            body.classList.toggle('dark-mode');
+            if(body.classList.contains('dark-mode')) {
+                localStorage.setItem('darkMode', 'enabled');
+                toggleBtn.innerHTML = '<i class="fas fa-sun text-warning"></i>';
+            } else {
+                localStorage.setItem('darkMode', 'disabled');
+                toggleBtn.innerHTML = '<i class="fas fa-moon"></i>';
+            }
+        });
 
+        let keywordsArray = []; let excludedArray = []; let citiesArray = [];
         window.onload = function() {
-            let initKw = "{{ sub.keywords if sub else '' }}";
-            let initExc = "{{ sub.excluded_words if sub else '' }}";
-            let initCity = "{{ sub.cities if sub else '' }}";
-
+            let initKw = "{{ sub.keywords if sub else '' }}"; let initExc = "{{ sub.excluded_words if sub else '' }}"; let initCity = "{{ sub.cities if sub else '' }}";
             if(initKw) { keywordsArray = initKw.split(',').map(s => s.trim()).filter(s => s !== ''); renderTags('kwTags', keywordsArray, 'keywordsHidden'); }
             if(initExc) { excludedArray = initExc.split(',').map(s => s.trim()).filter(s => s !== ''); renderTags('excTags', excludedArray, 'excHidden'); }
             if(initCity) { citiesArray = initCity.split(',').map(s => s.trim()).filter(s => s !== ''); renderTags('cityTags', citiesArray, 'cityHidden'); }
         };
-
         function addTag(inputId, containerId, hiddenId) {
-            let input = document.getElementById(inputId);
-            let val = input.value.trim();
-            if(val === "") return;
-
-            let targetArray;
-            if(containerId === 'kwTags') targetArray = keywordsArray;
-            else if(containerId === 'excTags') targetArray = excludedArray;
-            else if(containerId === 'cityTags') targetArray = citiesArray;
-
-            if(!targetArray.includes(val)) {
-                targetArray.push(val);
-                renderTags(containerId, targetArray, hiddenId);
-            }
+            let input = document.getElementById(inputId); let val = input.value.trim(); if(val === "") return;
+            let targetArray; if(containerId === 'kwTags') targetArray = keywordsArray; else if(containerId === 'excTags') targetArray = excludedArray; else if(containerId === 'cityTags') targetArray = citiesArray;
+            if(!targetArray.includes(val)) { targetArray.push(val); renderTags(containerId, targetArray, hiddenId); }
             input.value = "";
         }
-
         function renderTags(containerId, arr, hiddenId) {
-            let container = document.getElementById(containerId);
-            let hidden = document.getElementById(hiddenId);
-            container.innerHTML = "";
-            
+            let container = document.getElementById(containerId); let hidden = document.getElementById(hiddenId); container.innerHTML = "";
             arr.forEach((item, index) => {
-                let span = document.createElement("span");
-                span.className = "tag-chip shadow-sm";
+                let span = document.createElement("span"); span.className = "tag-chip shadow-sm";
                 span.innerHTML = `${item} <i class="fas fa-times-circle" onclick="removeTag('${containerId}', ${index}, '${hiddenId}')"></i>`;
                 container.appendChild(span);
             });
             hidden.value = arr.join(",");
         }
-
         function removeTag(containerId, index, hiddenId) {
             if(containerId === 'kwTags') { keywordsArray.splice(index, 1); renderTags(containerId, keywordsArray, hiddenId); }
             else if(containerId === 'excTags') { excludedArray.splice(index, 1); renderTags(containerId, excludedArray, hiddenId); }
             else if(containerId === 'cityTags') { citiesArray.splice(index, 1); renderTags(containerId, citiesArray, hiddenId); }
         }
-
         document.getElementById('kwInput').addEventListener('keypress', function(e) { if(e.key === 'Enter') { e.preventDefault(); addTag('kwInput', 'kwTags', 'keywordsHidden'); } });
         document.getElementById('excInput').addEventListener('keypress', function(e) { if(e.key === 'Enter') { e.preventDefault(); addTag('excInput', 'excTags', 'excHidden'); } });
         document.getElementById('cityInput').addEventListener('keypress', function(e) { if(e.key === 'Enter') { e.preventDefault(); addTag('cityInput', 'cityTags', 'cityHidden'); } });
-
         function submitForm() {
-            if(keywordsArray.length === 0) {
-                alert("الرجاء إضافة كلمة مستهدفة واحدة على الأقل قبل الحفظ!");
-                return;
-            }
+            if(keywordsArray.length === 0) { alert("الرجاء إضافة كلمة مستهدفة واحدة على الأقل قبل الحفظ!"); return; }
             document.getElementById('monitorForm').submit();
         }
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
