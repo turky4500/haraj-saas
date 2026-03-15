@@ -12,7 +12,7 @@ from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
-app.secret_key = "haraj_super_secret_key_v10"
+app.secret_key = "haraj_super_secret_key_v11"
 
 app.jinja_env.globals.update(now=datetime.datetime.now)
 
@@ -189,7 +189,6 @@ class MonitorThread(threading.Thread):
                 for kw in self.cfg['keywords']:
                     if self.stop_evt.is_set(): break
                     
-                    # فحص أول 3 صفحات كما هو بالمنطق الأساسي
                     for page in range(1, 4):
                         if self.stop_evt.is_set(): break
                         
@@ -407,9 +406,7 @@ def user_dashboard():
         exclude_enabled = 'exclude_enabled' in request.form
         quiet_enabled = 'quiet_enabled' in request.form
         q_sh = int(request.form.get('q_sh', 1))
-        q_sm = int(request.form.get('q_sm', 0))
         q_eh = int(request.form.get('q_eh', 6))
-        q_em = int(request.form.get('q_em', 0))
         end_time = current_user.account_expiration.isoformat() if current_user.account_expiration else ""
         
         if sub:
@@ -419,8 +416,8 @@ def user_dashboard():
             sub.name = name; sub.keywords = keywords; sub.cities = cities
             sub.city_filter_enabled = city_filter_enabled; sub.excluded_words = excluded_words
             sub.exclude_enabled = exclude_enabled; sub.quiet_enabled = quiet_enabled
-            sub.quiet_start_hour = q_sh; sub.quiet_start_minute = q_sm
-            sub.quiet_end_hour = q_eh; sub.quiet_end_minute = q_em
+            sub.quiet_start_hour = q_sh; sub.quiet_start_minute = 0
+            sub.quiet_end_hour = q_eh; sub.quiet_end_minute = 0
             sub.end_ts = end_time; sub.status = 'active'
             db.session.commit()
             start_thread_for_sub(sub)
@@ -430,4 +427,272 @@ def user_dashboard():
                 user_id=current_user.id, name=name, keywords=keywords, recipients=current_user.phone,
                 cities=cities, city_filter_enabled=city_filter_enabled,
                 excluded_words=excluded_words, exclude_enabled=exclude_enabled,
-                quiet_enabled=quiet_enabled, quiet_star
+                quiet_enabled=quiet_enabled, quiet_start_hour=q_sh, quiet_start_minute=0,
+                quiet_end_hour=q_eh, quiet_end_minute=0, sleep_minutes=15, end_ts=end_time
+            )
+            db.session.add(new_sub)
+            db.session.commit()
+            start_thread_for_sub(new_sub)
+            flash('تم حفظ الاشتراك وبدأ الرصد!', 'success')
+        return redirect(url_for('user_dashboard'))
+        
+    return render_template('user.html', sub=sub, logs=logs, is_expired=is_expired)
+
+@app.route('/toggle_sub/<int:sub_id>')
+@login_required
+def toggle_sub(sub_id):
+    sub = Subscription.query.get_or_404(sub_id)
+    if sub.user_id == current_user.id or current_user.role == 'admin':
+        if sub.status == 'active':
+            sub.status = 'paused'
+            if sub.id in ACTIVE_THREADS:
+                ACTIVE_THREADS[sub.id].stop()
+                del ACTIVE_THREADS[sub.id]
+            flash('تم إيقاف الاشتراك مؤقتاً ⏸', 'warning')
+        else:
+            user_owner = User.query.get(sub.user_id)
+            if user_owner.account_expiration and datetime.datetime.now() > user_owner.account_expiration:
+                flash('لا يمكن الاستئناف، حساب العميل منتهي.', 'danger')
+            else:
+                sub.status = 'active'
+                start_thread_for_sub(sub)
+                flash('تم استئناف الاشتراك بنجاح ▶️', 'success')
+        db.session.commit()
+    return redirect(request.referrer)
+
+@app.route('/delete_sub/<int:sub_id>')
+@login_required
+def delete_sub(sub_id):
+    sub = Subscription.query.get_or_404(sub_id)
+    if sub.user_id == current_user.id or current_user.role == 'admin':
+        if sub.id in ACTIVE_THREADS:
+            ACTIVE_THREADS[sub.id].stop()
+            del ACTIVE_THREADS[sub.id]
+        db.session.delete(sub)
+        db.session.commit()
+        flash('تم حذف الاشتراك نهائياً 🗑️', 'info')
+    return redirect(request.referrer)
+
+# ================= مسارات الإدارة (Admin) =================
+@app.route('/admin_dashboard')
+@login_required
+def admin_dashboard():
+    if current_user.role != 'admin': return redirect(url_for('user_dashboard'))
+    
+    users = User.query.all()
+    subs = Subscription.query.all()
+    global_logs = AdLog.query.order_by(AdLog.timestamp.desc()).limit(200).all()
+
+    total_users = User.query.count()
+    active_users = User.query.filter_by(is_active_account=True).count()
+    inactive_users = total_users - active_users
+
+    seven_days_ago = datetime.datetime.utcnow() - datetime.timedelta(days=7)
+    recent_logs = AdLog.query.filter(AdLog.timestamp >= seven_days_ago).all()
+    
+    daily_ads = {}
+    for i in range(6, -1, -1):
+        day = (datetime.datetime.utcnow() - datetime.timedelta(days=i)).strftime('%m-%d')
+        daily_ads[day] = 0
+
+    for log in recent_logs:
+        day = log.timestamp.strftime('%m-%d')
+        if day in daily_ads:
+            daily_ads[day] += 1
+
+    chart_labels = list(daily_ads.keys())
+    chart_data = list(daily_ads.values())
+
+    return render_template('admin.html', 
+                           users=users, subs=subs, logs=global_logs, 
+                           active_threads=ACTIVE_THREADS,
+                           total_users=total_users, active_users=active_users, inactive_users=inactive_users,
+                           chart_labels=chart_labels, chart_data=chart_data)
+
+@app.route('/admin_settings', methods=['GET', 'POST'])
+@login_required
+def admin_settings():
+    if current_user.role != 'admin': return redirect(url_for('user_dashboard'))
+    settings = SystemSettings.query.first()
+    
+    if request.method == 'POST':
+        settings.whatsapp_token = request.form.get('whatsapp_token')
+        settings.trial_days = int(request.form.get('trial_days', 2))
+        db.session.commit()
+        flash('تم حفظ إعدادات النظام بنجاح ⚙️', 'success')
+        return redirect(url_for('admin_settings'))
+        
+    return render_template('admin_settings.html', settings=settings)
+
+# ------- مسار إضافة عميل جديد للإدمن --------
+@app.route('/admin_add_user', methods=['GET', 'POST'])
+@login_required
+def admin_add_user():
+    if current_user.role != 'admin': return redirect(url_for('user_dashboard'))
+    
+    if request.method == 'POST':
+        # بيانات العميل
+        username = request.form.get('username')
+        phone = request.form.get('phone')
+        password = request.form.get('password')
+        exp_date_str = request.form.get('account_expiration')
+
+        # بيانات الاشتراك
+        sub_name = request.form.get('name')
+        keywords = request.form.get('keywords')
+        cities = request.form.get('cities', '')
+        city_filter_enabled = 'city_filter_enabled' in request.form
+        excluded_words = request.form.get('excluded_words', '')
+        exclude_enabled = 'exclude_enabled' in request.form
+        quiet_enabled = 'quiet_enabled' in request.form
+        q_sh = int(request.form.get('q_sh', 1))
+        q_eh = int(request.form.get('q_eh', 6))
+
+        # التحقق من عدم التكرار
+        if User.query.filter_by(username=username).first() or User.query.filter_by(phone=phone).first():
+            flash('اسم المستخدم أو رقم الجوال مسجل مسبقاً!', 'danger')
+            return redirect(url_for('admin_add_user'))
+
+        exp_date = datetime.datetime.strptime(exp_date_str, '%Y-%m-%d') if exp_date_str else None
+
+        # 1. إنشاء العميل
+        new_user = User(
+            username=username,
+            phone=phone,
+            password=generate_password_hash(password, method='pbkdf2:sha256'),
+            account_expiration=exp_date
+        )
+        db.session.add(new_user)
+        db.session.commit()
+
+        # 2. إنشاء الاشتراك (إذا كان فيه كلمات)
+        if keywords:
+            end_ts = exp_date.isoformat() if exp_date else ""
+            new_sub = Subscription(
+                user_id=new_user.id,
+                name=sub_name or "اشتراك جديد",
+                keywords=keywords,
+                recipients=phone,
+                cities=cities,
+                city_filter_enabled=city_filter_enabled,
+                excluded_words=excluded_words,
+                exclude_enabled=exclude_enabled,
+                quiet_enabled=quiet_enabled,
+                quiet_start_hour=q_sh,
+                quiet_start_minute=0,
+                quiet_end_hour=q_eh,
+                quiet_end_minute=0,
+                sleep_minutes=15,
+                end_ts=end_ts
+            )
+            db.session.add(new_sub)
+            db.session.commit()
+            
+            # تشغيل الرادار فوراً إذا الحساب غير منتهي
+            if not exp_date or exp_date > datetime.datetime.now():
+                start_thread_for_sub(new_sub)
+
+        flash('تم إضافة العميل وإعداد راداره بنجاح! 🚀', 'success')
+        return redirect(url_for('admin_dashboard'))
+
+    return render_template('admin_add_user.html')
+# ---------------------------------------------
+
+@app.route('/admin_edit_user/<int:user_id>', methods=['GET', 'POST'])
+@login_required
+def admin_edit_user(user_id):
+    if current_user.role != 'admin': return redirect(url_for('user_dashboard'))
+    user = User.query.get_or_404(user_id)
+    
+    if request.method == 'POST':
+        user.username = request.form.get('username')
+        user.phone = request.form.get('phone')
+        new_pass = request.form.get('password')
+        exp_date_str = request.form.get('account_expiration')
+        
+        if new_pass:
+            user.password = generate_password_hash(new_pass, method='pbkdf2:sha256')
+            
+        if exp_date_str:
+            user.account_expiration = datetime.datetime.strptime(exp_date_str, '%Y-%m-%d')
+        else:
+            user.account_expiration = None 
+        
+        if user.subscription:
+            user.subscription.recipients = user.phone
+            user.subscription.end_ts = user.account_expiration.isoformat() if user.account_expiration else ""
+            
+        db.session.commit()
+        flash(f'تم تعديل بيانات العميل {user.username} بنجاح.', 'success')
+        return redirect(url_for('admin_dashboard'))
+    return render_template('admin_edit_user.html', user=user)
+
+@app.route('/toggle_user/<int:user_id>')
+@login_required
+def toggle_user(user_id):
+    if current_user.role == 'admin':
+        user = User.query.get_or_404(user_id)
+        if user.id != current_user.id:
+            user.is_active_account = not user.is_active_account
+            if not user.is_active_account and user.subscription:
+                sub_id = user.subscription.id
+                if sub_id in ACTIVE_THREADS:
+                    ACTIVE_THREADS[sub_id].stop()
+                    del ACTIVE_THREADS[sub_id]
+            db.session.commit()
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin_toggle_sub/<int:sub_id>')
+@login_required
+def admin_toggle_sub(sub_id):
+    if current_user.role != 'admin': return redirect(url_for('index'))
+    sub = Subscription.query.get_or_404(sub_id)
+    if sub.status == 'active':
+        sub.status = 'paused'
+        if sub.id in ACTIVE_THREADS:
+            ACTIVE_THREADS[sub.id].stop()
+            del ACTIVE_THREADS[sub.id]
+        flash('تم إيقاف اشتراك العميل بنجاح.', 'warning')
+    else:
+        user_owner = User.query.get(sub.user_id)
+        if user_owner.account_expiration and datetime.datetime.now() > user_owner.account_expiration:
+            flash('لا يمكن استئناف اشتراك العميل لأن حسابه منتهي الصلاحية!', 'danger')
+        else:
+            sub.status = 'active'
+            start_thread_for_sub(sub)
+            flash('تم استئناف اشتراك العميل بنجاح.', 'success')
+    db.session.commit()
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/impersonate/<int:user_id>')
+@login_required
+def impersonate(user_id):
+    if current_user.role != 'admin': return redirect(url_for('index'))
+    user = User.query.get_or_404(user_id)
+    session['admin_impersonating'] = current_user.id
+    login_user(user)
+    flash(f'أنت الآن تتصفح وتتحكم بحساب العميل: {user.username}', 'warning')
+    return redirect(url_for('user_dashboard'))
+
+@app.route('/revert_impersonate')
+@login_required
+def revert_impersonate():
+    if 'admin_impersonating' in session:
+        admin_user = User.query.get(session['admin_impersonating'])
+        login_user(admin_user)
+        session.pop('admin_impersonating', None)
+        flash('تمت العودة لحساب الإدارة بنجاح.', 'success')
+    return redirect(url_for('admin_dashboard'))
+
+with app.app_context():
+    db.create_all()
+    if not SystemSettings.query.first():
+        db.session.add(SystemSettings())
+        db.session.commit()
+
+if __name__ == '__main__':
+    with app.app_context():
+        for sub in Subscription.query.filter_by(status='active').all():
+            if sub.owner.is_active_account and (not sub.owner.account_expiration or sub.owner.account_expiration > datetime.datetime.now()):
+                start_thread_for_sub(sub)
+    app.run(host='0.0.0.0', port=5000)
