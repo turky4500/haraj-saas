@@ -2,37 +2,71 @@
 <html dir="rtl" lang="ar">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>إعدادات النظام - الإدارة</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root { --bg-color: #ecf0f1; --text-color: #2c3e50; --card-bg: #ffffff; --nav-bg: #27ae60; --border-color: rgba(0,0,0,0.1); }
+        body.dark-mode { --bg-color: #121212; --text-color: #e0e0e0; --card-bg: #1e1e1e; --nav-bg: #145c32; --border-color: rgba(255,255,255,0.1); }
+        body { background-color: var(--bg-color); font-family: 'Segoe UI', Tahoma, sans-serif; color: var(--text-color); transition: 0.3s; }
+        .navbar { background-color: var(--nav-bg); }
+        .card { background-color: var(--card-bg); border-radius: 15px; border: 1px solid var(--border-color); box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .form-control { background-color: var(--bg-color); color: var(--text-color); border: 1px solid var(--border-color); }
+        .form-control:focus { background-color: var(--bg-color); color: var(--text-color); }
+        .text-muted { color: #6c757d !important; }
+        body.dark-mode .text-muted { color: #adb5bd !important; }
+    </style>
 </head>
-<body style="background-color: #ecf0f1; display: flex; align-items: center; justify-content: center; height: 100vh;">
-    <div class="card p-4 shadow-lg" style="width: 100%; max-width: 600px; border-radius: 15px; border-top: 5px solid #27ae60;">
-        <h4 class="mb-4 text-center text-success">⚙️ إعدادات النظام العامة</h4>
-        
+<body>
+    <nav class="navbar navbar-dark mb-4 shadow-sm">
+        <div class="container d-flex align-items-center">
+            <a class="navbar-brand fw-bold" href="/admin_dashboard"><i class="fas fa-arrow-right"></i> عودة للإدارة</a>
+            <span class="text-light ms-auto fw-bold"><i class="fas fa-cog"></i> إعدادات النظام الكبرى</span>
+        </div>
+    </nav>
+
+    <div class="container mt-5" style="max-width: 600px;">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                    <div class="alert alert-{{ category }} shadow-sm">{{ message }}</div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
 
-        <form method="POST">
-            <div class="mb-4">
-                <label class="form-label fw-bold">مدة الاشتراك المجاني (بالأيام)</label>
-                <input type="number" name="trial_days" class="form-control" value="{{ settings.trial_days if settings else 2 }}" min="0" required>
-                <div class="form-text text-muted">أي عميل يسجل جديد سيحصل على هذا العدد من الأيام كفترة تجربة. (ضع 0 لإلغاء التجربة المجانية).</div>
-            </div>
+        <div class="card p-4">
+            <h4 class="mb-4 text-center fw-bold text-success"><i class="fas fa-sliders-h"></i> إعدادات المنصة والإشعارات</h4>
             
-            <div class="mb-4">
-                <label class="form-label fw-bold">مفتاح الربط (Token) الخاص بالواتساب</label>
-                <input type="text" name="whatsapp_token" class="form-control text-start" dir="ltr" value="{{ settings.whatsapp_token if settings else '' }}" required>
-                <div class="form-text text-muted">مفتاح الربط من مزود الخدمة (tkwin). تأكد من صحته حتى تصل الرسائل.</div>
-            </div>
-            
-            <button type="submit" class="btn btn-success w-100 mb-2 py-2 fw-bold">💾 حفظ إعدادات النظام</button>
-            <a href="/admin_dashboard" class="btn btn-secondary w-100">العودة للوحة الإدارة</a>
-        </form>
+            <form action="/admin_settings" method="POST">
+                
+                <div class="mb-4 pb-3 border-bottom">
+                    <label class="form-label fw-bold"><i class="fab fa-whatsapp text-success"></i> توكن الربط (WhatsApp Token)</label>
+                    <input type="text" name="whatsapp_token" class="form-control" dir="ltr" value="{{ settings.whatsapp_token }}" required>
+                    <small class="text-muted">مفتاح الربط الخاص بخدمة إرسال الواتساب.</small>
+                </div>
+
+                <div class="mb-4 pb-3 border-bottom">
+                    <label class="form-label fw-bold"><i class="fas fa-gift text-warning"></i> أيام التجربة المجانية للعميل الجديد</label>
+                    <input type="number" name="trial_days" class="form-control text-center" value="{{ settings.trial_days }}" min="0" required>
+                    <small class="text-muted">كم يوم تجربة يحصل عليها العميل تلقائياً عند التسجيل؟</small>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-bold"><i class="fas fa-mobile-alt text-primary"></i> رقم جوال الإدارة (لإشعارات النظام)</label>
+                    <input type="text" name="admin_phone" class="form-control" dir="ltr" placeholder="مثال: 9665xxxxxxxx" value="{{ notify.admin_phone if notify else '' }}">
+                    <small class="text-muted">سنرسل لهذا الرقم تنبيهات تسجيل العملاء الجدد وإحصائية الزوار اليومية.</small>
+                </div>
+
+                <button type="submit" class="btn btn-success w-100 py-3 fw-bold fs-5 shadow-sm"><i class="fas fa-save"></i> حفظ جميع الإعدادات</button>
+            </form>
+        </div>
     </div>
+    
+    <script>
+        if(localStorage.getItem('darkMode') === 'enabled') {
+            document.body.classList.add('dark-mode');
+        }
+    </script>
 </body>
 </html>
