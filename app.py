@@ -12,12 +12,24 @@ from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
-app.secret_key = "haraj_super_secret_key_v14"
+app.secret_key = "haraj_super_secret_key_v15_cloud"
 
 app.jinja_env.globals.update(now=datetime.datetime.now)
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(BASE_DIR, 'haraj.db')
+
+# ================= ربط قاعدة البيانات السحابية (الجديد) =================
+db_url = os.environ.get("DATABASE_URL")
+if db_url:
+    # إصلاح بسيط مطلوب في لغة بايثون للروابط السحابية
+    if db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql://", 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = db_url
+else:
+    # يعمل كاحتياط محلي في حال لم يجد الرابط
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(BASE_DIR, 'haraj.db')
+# ========================================================================
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -127,14 +139,12 @@ def matches_keyword_precise(text, kw, excluded_list, exclude_enabled):
     """
     nt = normalize_text(text)
     
-    # 1. التحقق من الكلمات المحظورة أولاً
     if exclude_enabled and excluded_list:
         for neg in excluded_list:
             norm_neg = normalize_text(neg)
             if norm_neg and re.search(r'(^|\s)' + re.escape(norm_neg) + r'($|\s)', nt): 
                 return False
                 
-    # 2. التحقق من الكلمة المستهدفة כكتلة واحدة بالضبط
     norm_kw = normalize_text(kw)
     if not norm_kw: 
         return True
@@ -236,7 +246,6 @@ class MonitorThread(threading.Thread):
                                     soup = BeautifulSoup(ad_html, "html.parser")
                                     full_text = soup.get_text(" ", strip=True)
                                     
-                                    # تطبيق المنطق الأصلي الدقيق للفلترة
                                     if is_target_city(full_text, self.cfg['cities'], self.cfg['city_filter_enabled']) and \
                                        matches_keyword_precise(full_text, kw, self.cfg['excluded_words'], self.cfg['exclude_enabled']):
                                         
