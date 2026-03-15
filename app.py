@@ -178,7 +178,6 @@ class MonitorThread(threading.Thread):
                 settings = SystemSettings.query.first()
                 current_token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
 
-                # 📌 إرسال رسالة الانتهاء وتوقف الرصد
                 if not user or not user.is_active_account or not sub or sub.status != 'active' or (user.account_expiration and user.account_expiration < datetime.datetime.now()):
                     if sub and sub.status == 'active': 
                         sub.status = 'paused'
@@ -292,7 +291,6 @@ def register():
         settings = SystemSettings.query.first()
         current_token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
         
-        # 📌 رسالة التفعيل المحسنة
         otp_msg = f"مرحباً بك في راصد حراج! 🎯\n\nكود التفعيل الخاص بك هو: *{otp}*\n\nيرجى إدخاله في الموقع لإكمال التسجيل."
         send_whatsapp(create_session(), current_token, phone, otp_msg)
         
@@ -340,7 +338,6 @@ def forgot_password():
             
             settings = SystemSettings.query.first()
             current_token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
-            # 📌 رسالة استعادة محسنة
             reset_msg = f"أهلاً بك 🛡️\n\nكود استعادة كلمة المرور لحسابك هو: *{otp}*"
             send_whatsapp(create_session(), current_token, phone, reset_msg)
             
@@ -391,6 +388,9 @@ def user_dashboard():
         return redirect(url_for('admin_dashboard'))
     
     sub = Subscription.query.filter_by(user_id=current_user.id).first()
+    
+    # استرجاع الأرشيف (logs) ليعرض في الواجهة
+    logs = AdLog.query.filter_by(user_id=current_user.id).order_by(AdLog.timestamp.desc()).limit(100).all()
 
     is_expired = False
     if current_user.account_expiration and datetime.datetime.now() > current_user.account_expiration:
@@ -440,7 +440,6 @@ def user_dashboard():
             db.session.commit()
             start_thread_for_sub(new_sub)
             
-            # 📌 رسالة الترحيب عند الاشتراك
             exp_text = current_user.account_expiration.strftime('%Y-%m-%d') if current_user.account_expiration else "مفتوح"
             welcome_msg = f"مرحباً بك في راصد حراج! 🎯\nتم تفعيل الرادار الخاص بك بنجاح.\n\nالاسم: {name}\nتاريخ الانتهاء: {exp_text}\n\nنتمنى لك صيدات موفقة! 🚀"
             send_whatsapp(create_session(), current_token, current_user.phone, welcome_msg)
@@ -449,7 +448,7 @@ def user_dashboard():
             
         return redirect(url_for('user_dashboard'))
         
-    return render_template('user.html', sub=sub, is_expired=is_expired)
+    return render_template('user.html', sub=sub, logs=logs, is_expired=is_expired)
 
 @app.route('/toggle_sub/<int:sub_id>')
 @login_required
@@ -587,7 +586,6 @@ def admin_add_user():
             if not exp_date or exp_date > datetime.datetime.now():
                 start_thread_for_sub(new_sub)
                 
-                # 📌 رسالة الترحيب للعميل المضاف من الإدارة
                 settings = SystemSettings.query.first()
                 current_token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
                 exp_text = exp_date.strftime('%Y-%m-%d') if exp_date else "مفتوح"
