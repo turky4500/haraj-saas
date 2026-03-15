@@ -12,7 +12,7 @@ from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
-app.secret_key = "haraj_super_secret_key_v13"
+app.secret_key = "haraj_super_secret_key_v14"
 
 app.jinja_env.globals.update(now=datetime.datetime.now)
 
@@ -110,7 +110,7 @@ class AdLog(db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# ================= دوال مساعدة =================
+# ================= دوال مساعدة وخوارزمية البحث الدقيقة =================
 _AR_DIACRITICS_RE = re.compile(r"[\u064B-\u0652\u0670\u0640]")
 _AR_NORM_MAP = str.maketrans({"أ": "ا", "إ": "ا", "آ": "ا", "ؤ": "و", "ئ": "ي", "ى": "ي", "ة": "ه"})
 
@@ -122,16 +122,27 @@ def normalize_text(s):
     return re.sub(r"\s+", " ", s).strip()
 
 def matches_keyword_precise(text, kw, excluded_list, exclude_enabled):
+    """
+    المنطق الأصلي: البحث عن الكلمة المستهدفة ككتلة واحدة (Exact Phrase Match)
+    """
     nt = normalize_text(text)
+    
+    # 1. التحقق من الكلمات المحظورة أولاً
     if exclude_enabled and excluded_list:
         for neg in excluded_list:
-            if normalize_text(neg) and re.search(r'(^|\s)' + re.escape(normalize_text(neg)) + r'($|\s)', nt): 
+            norm_neg = normalize_text(neg)
+            if norm_neg and re.search(r'(^|\s)' + re.escape(norm_neg) + r'($|\s)', nt): 
                 return False
-    kw_tokens = [t for t in normalize_text(kw).split() if t]
-    if not kw_tokens: return True
-    for token in kw_tokens:
-        if not re.search(r'(^|\s)' + re.escape(token) + r'($|\s)', nt): return False
-    return True
+                
+    # 2. التحقق من الكلمة المستهدفة כكتلة واحدة بالضبط
+    norm_kw = normalize_text(kw)
+    if not norm_kw: 
+        return True
+        
+    if re.search(r'(^|\s)' + re.escape(norm_kw) + r'($|\s)', nt):
+        return True
+        
+    return False
 
 def is_target_city(full_text, cities_list, city_filter_enabled):
     if not city_filter_enabled or not cities_list: return True
@@ -196,7 +207,6 @@ class MonitorThread(threading.Thread):
                 settings = SystemSettings.query.first()
                 current_token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
 
-                # التحقق وإرسال رسالة الانتهاء
                 if not user or not user.is_active_account or not sub or sub.status != 'active' or (user.account_expiration and user.account_expiration < datetime.datetime.now()):
                     if sub and sub.status == 'active': 
                         sub.status = 'paused'
@@ -226,6 +236,7 @@ class MonitorThread(threading.Thread):
                                     soup = BeautifulSoup(ad_html, "html.parser")
                                     full_text = soup.get_text(" ", strip=True)
                                     
+                                    # تطبيق المنطق الأصلي الدقيق للفلترة
                                     if is_target_city(full_text, self.cfg['cities'], self.cfg['city_filter_enabled']) and \
                                        matches_keyword_precise(full_text, kw, self.cfg['excluded_words'], self.cfg['exclude_enabled']):
                                         
@@ -588,7 +599,6 @@ def admin_add_user():
         db.session.add(new_user)
         db.session.commit()
 
-        # إرسال رسالة الترحيب مباشرة عند إنشاء الحساب من قبل الإدارة
         settings = SystemSettings.query.first()
         current_token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
         exp_text = exp_date.strftime('%Y-%m-%d') if exp_date else "مفتوح"
