@@ -12,7 +12,7 @@ from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
-app.secret_key = "haraj_super_secret_key_v17_quiet_fix"
+app.secret_key = "haraj_super_secret_key_v18_speed"
 
 app.jinja_env.globals.update(now=datetime.datetime.now)
 
@@ -43,9 +43,7 @@ HARAJ_BASE = "https://haraj.com.sa"
 HARAJ_HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Accept-Language": "ar-SA"}
 ACTIVE_THREADS = {} 
 
-# ================= ضبط توقيت السعودية (KSA) =================
 def get_ksa_time():
-    """هذه الدالة تجبر السيرفر الأمريكي على حساب الوقت بتوقيت السعودية"""
     return datetime.datetime.utcnow() + datetime.timedelta(hours=3)
 
 # ================= باتش منع السكون والتنظيف والإحصائيات =================
@@ -150,7 +148,7 @@ class AdLog(db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# ================= دوال مساعدة وخوارزمية البحث الدقيقة =================
+# ================= دوال مساعدة =================
 _AR_DIACRITICS_RE = re.compile(r"[\u064B-\u0652\u0670\u0640]")
 _AR_NORM_MAP = str.maketrans({"أ": "ا", "إ": "ا", "آ": "ا", "ؤ": "و", "ئ": "ي", "ى": "ي", "ة": "ه"})
 
@@ -184,7 +182,7 @@ def is_target_city(full_text, cities_list, city_filter_enabled):
 
 def is_quiet_now(enabled, sh, sm, eh, em):
     if not enabled: return False
-    now = get_ksa_time() # استخدام توقيت السعودية
+    now = get_ksa_time()
     now_min = now.hour * 60 + now.minute
     start_min = sh * 60 + sm
     end_min = eh * 60 + em
@@ -216,7 +214,7 @@ def send_whatsapp(req_session, token, to_msisdn, text):
     except:
         return False
 
-# ================= خيط المراقبة (مع ميزة طابور فترة الهدوء) =================
+# ================= خيط المراقبة =================
 class MonitorThread(threading.Thread):
     def __init__(self, sub_config):
         super().__init__(daemon=True)
@@ -230,7 +228,6 @@ class MonitorThread(threading.Thread):
         else:
             self.seen_ids = set()
 
-        # ملف خاص لحفظ الإعلانات أثناء فترة الهدوء
         self.queue_file = SUBS_BASE_DIR / f"queue_{self.cfg['id']}.json"
         if self.queue_file.exists():
             with open(self.queue_file, 'r') as f: self.queued_ads = json.load(f)
@@ -255,7 +252,6 @@ class MonitorThread(threading.Thread):
             
             currently_quiet = is_quiet_now(self.cfg['quiet_enabled'], self.cfg['q_sh'], self.cfg['q_sm'], self.cfg['q_eh'], self.cfg['q_em'])
 
-            # 1. إرسال الطابور إذا انتهت فترة الهدوء
             if not currently_quiet and self.queued_ads:
                 wake_msg = "🌅 انتهت فترة الهدوء!\nإليك الإعلانات التي تم رصدها وتخزينها أثناء نومك:"
                 send_whatsapp(self.req_session, current_token, self.cfg['recipients'], wake_msg)
@@ -264,15 +260,12 @@ class MonitorThread(threading.Thread):
                     if self.stop_evt.is_set(): break
                     msg = f"إعلان ({ad['kw']}):\n{ad['title']}\n{ad['url']}"
                     send_whatsapp(self.req_session, current_token, self.cfg['recipients'], msg)
-                    # انتظار إضافي لتجنب الحظر عند إرسال دفعة كبيرة
                     time.sleep(random.uniform(5, 10))
                 
-                # تفريغ الطابور بعد الإرسال
                 self.queued_ads = []
                 if self.queue_file.exists():
                     with open(self.queue_file, 'w') as f: json.dump(self.queued_ads, f)
             
-            # 2. عملية البحث (تعمل سواء وقت هدوء أو لا، الفرق في طريقة الإرسال/التخزين)
             for kw in self.cfg['keywords']:
                 if self.stop_evt.is_set(): break
                 
@@ -296,22 +289,18 @@ class MonitorThread(threading.Thread):
                                 if is_target_city(full_text, self.cfg['cities'], self.cfg['city_filter_enabled']) and \
                                    matches_keyword_precise(full_text, kw, self.cfg['excluded_words'], self.cfg['exclude_enabled']):
                                     
-                                    # إضافة الإعلان لقائمة المرئيات
                                     self.seen_ids.add(ad_id)
                                     with open(self.seen_file, 'w') as f: json.dump(list(self.seen_ids), f)
                                     
                                     if currently_quiet:
-                                        # تخزين في الطابور بدلاً من الإرسال المباشر
                                         self.queued_ads.append({'kw': kw, 'title': title, 'url': ad_url})
                                         with open(self.queue_file, 'w') as f: json.dump(self.queued_ads, f)
                                     else:
-                                        # إرسال مباشر إذا لم يكن وقت هدوء
                                         delay = random.uniform(30, 60)
                                         time.sleep(delay)
                                         msg = f"إعلان جديد ({kw}):\n{title}\n{ad_url}"
                                         send_whatsapp(self.req_session, current_token, self.cfg['recipients'], msg)
                                         
-                                    # في الحالتين يحفظ الإعلان في أرشيف الموقع
                                     with app.app_context():
                                         log_sub = Subscription.query.get(self.cfg['id'])
                                         if log_sub:
@@ -323,6 +312,7 @@ class MonitorThread(threading.Thread):
                         pass
                     time.sleep(random.uniform(3, 7))
             
+            # هنا التعديل: السيرفر ينام حسب الدقائق المخصصة لكل عميل
             sleep_seconds = self.cfg['sleep_minutes'] * 60
             for _ in range(sleep_seconds):
                 if self.stop_evt.is_set(): break
@@ -343,7 +333,8 @@ def start_thread_for_sub(sub):
         'quiet_enabled': sub.quiet_enabled,
         'q_sh': sub.quiet_start_hour, 'q_sm': sub.quiet_start_minute,
         'q_eh': sub.quiet_end_hour, 'q_em': sub.quiet_end_minute,
-        'sleep_minutes': sub.sleep_minutes, 'end_ts': sub.end_ts
+        'sleep_minutes': sub.sleep_minutes, # يتم التمرير من قاعدة البيانات
+        'end_ts': sub.end_ts
     }
     t = MonitorThread(cfg)
     ACTIVE_THREADS[sub.id] = t
@@ -665,6 +656,9 @@ def admin_add_user():
         quiet_enabled = 'quiet_enabled' in request.form
         q_sh = int(request.form.get('q_sh', 1))
         q_eh = int(request.form.get('q_eh', 6))
+        
+        # التعديل الجديد: التقاط سرعة الفحص من الإدارة
+        sleep_minutes = int(request.form.get('sleep_minutes', 15))
 
         if User.query.filter_by(username=username).first() or User.query.filter_by(phone=phone).first():
             flash('اسم المستخدم أو رقم الجوال مسجل مسبقاً!', 'danger')
@@ -693,7 +687,8 @@ def admin_add_user():
                 cities=cities, city_filter_enabled=city_filter_enabled,
                 excluded_words=excluded_words, exclude_enabled=exclude_enabled,
                 quiet_enabled=quiet_enabled, quiet_start_hour=q_sh, quiet_start_minute=0, quiet_end_hour=q_eh, quiet_end_minute=0,
-                sleep_minutes=15, end_ts=end_ts
+                sleep_minutes=sleep_minutes, # يتم الحفظ هنا
+                end_ts=end_ts
             )
             db.session.add(new_sub)
             db.session.commit()
@@ -717,6 +712,7 @@ def admin_edit_user(user_id):
         user.phone = request.form.get('phone')
         new_pass = request.form.get('password')
         exp_date_str = request.form.get('account_expiration')
+        sleep_mins = request.form.get('sleep_minutes') # التعديل الجديد
         
         if new_pass:
             user.password = generate_password_hash(new_pass, method='pbkdf2:sha256')
@@ -729,6 +725,16 @@ def admin_edit_user(user_id):
         if user.subscription:
             user.subscription.recipients = user.phone
             user.subscription.end_ts = user.account_expiration.isoformat() if user.account_expiration else ""
+            
+            # تحديث سرعة الفحص وإعادة تشغيل الخيط برمجياً لتطبيق السرعة الجديدة
+            if sleep_mins:
+                old_sleep = user.subscription.sleep_minutes
+                user.subscription.sleep_minutes = int(sleep_mins)
+                if old_sleep != int(sleep_mins) and user.subscription.status == 'active':
+                    if user.subscription.id in ACTIVE_THREADS:
+                        ACTIVE_THREADS[user.subscription.id].stop()
+                        del ACTIVE_THREADS[user.subscription.id]
+                    start_thread_for_sub(user.subscription)
             
         db.session.commit()
         flash(f'تم تعديل بيانات العميل {user.username} بنجاح.', 'success')
