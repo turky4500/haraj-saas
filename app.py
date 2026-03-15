@@ -12,7 +12,7 @@ from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
-app.secret_key = "haraj_super_secret_key_v11"
+app.secret_key = "haraj_super_secret_key_v12"
 
 app.jinja_env.globals.update(now=datetime.datetime.now)
 
@@ -33,7 +33,6 @@ HARAJ_BASE = "https://haraj.com.sa"
 HARAJ_HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Accept-Language": "ar-SA"}
 ACTIVE_THREADS = {} 
 
-# ================= باتش منع السكون =================
 def keep_alive_patch():
     while True:
         try:
@@ -43,7 +42,7 @@ def keep_alive_patch():
 
 threading.Thread(target=keep_alive_patch, daemon=True).start()
 
-# ================= النماذج (قاعدة البيانات) =================
+# ================= النماذج =================
 class SystemSettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     whatsapp_token = db.Column(db.String(255), default="7a203d6ba6f4325ed3261ea87f6b2e751250ad97")
@@ -93,7 +92,7 @@ class AdLog(db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# ================= دوال المساعدة =================
+# ================= دوال مساعدة =================
 _AR_DIACRITICS_RE = re.compile(r"[\u064B-\u0652\u0670\u0640]")
 _AR_NORM_MAP = str.maketrans({"أ": "ا", "إ": "ا", "آ": "ا", "ؤ": "و", "ئ": "ي", "ى": "ي", "ة": "ه"})
 
@@ -158,7 +157,7 @@ def send_whatsapp(req_session, token, to_msisdn, text):
     except:
         return False
 
-# ================= خيط المراقبة (Thread) =================
+# ================= خيط المراقبة =================
 class MonitorThread(threading.Thread):
     def __init__(self, sub_config):
         super().__init__(daemon=True)
@@ -179,10 +178,13 @@ class MonitorThread(threading.Thread):
                 settings = SystemSettings.query.first()
                 current_token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
 
+                # 📌 إرسال رسالة الانتهاء وتوقف الرصد
                 if not user or not user.is_active_account or not sub or sub.status != 'active' or (user.account_expiration and user.account_expiration < datetime.datetime.now()):
-                    if sub: 
+                    if sub and sub.status == 'active': 
                         sub.status = 'paused'
                         db.session.commit()
+                        exp_msg = "⚠️ عذراً، انتهى اشتراكك في راصد حراج.\nتم إيقاف الرصد مؤقتاً، سعدنا بخدمتك ونرجو التواصل معنا لتجديد الاشتراك واستئناف الرصد. 🌹"
+                        send_whatsapp(self.req_session, current_token, self.cfg['recipients'], exp_msg)
                     break 
                 
             if not is_quiet_now(self.cfg['quiet_enabled'], self.cfg['q_sh'], self.cfg['q_sm'], self.cfg['q_eh'], self.cfg['q_em']):
@@ -226,7 +228,6 @@ class MonitorThread(threading.Thread):
                                                     db.session.commit()
                         except:
                             pass
-                        
                         time.sleep(random.uniform(3, 7))
             
             sleep_seconds = self.cfg['sleep_minutes'] * 60
@@ -255,7 +256,7 @@ def start_thread_for_sub(sub):
     ACTIVE_THREADS[sub.id] = t
     t.start()
 
-# ================= المسارات (Routes) =================
+# ================= المسارات =================
 
 @app.route('/')
 def index():
@@ -291,8 +292,10 @@ def register():
         settings = SystemSettings.query.first()
         current_token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
         
-        send_whatsapp(create_session(), current_token, phone, f"كود التحقق الخاص بك هو: {otp}")
-        print(f"\n[ OTP CODE for {phone} ]: {otp} \n")
+        # 📌 رسالة التفعيل المحسنة
+        otp_msg = f"مرحباً بك في راصد حراج! 🎯\n\nكود التفعيل الخاص بك هو: *{otp}*\n\nيرجى إدخاله في الموقع لإكمال التسجيل."
+        send_whatsapp(create_session(), current_token, phone, otp_msg)
+        
         return redirect(url_for('verify'))
     return render_template('register.html')
 
@@ -337,9 +340,10 @@ def forgot_password():
             
             settings = SystemSettings.query.first()
             current_token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
-            send_whatsapp(create_session(), current_token, phone, f"كود استعادة كلمة المرور: {otp}")
+            # 📌 رسالة استعادة محسنة
+            reset_msg = f"أهلاً بك 🛡️\n\nكود استعادة كلمة المرور لحسابك هو: *{otp}*"
+            send_whatsapp(create_session(), current_token, phone, reset_msg)
             
-            print(f"\n[ RESET OTP for {phone} ]: {otp} \n")
             return redirect(url_for('reset_password'))
         flash('رقم الجوال غير مسجل بالنظام!', 'danger')
     return render_template('forgot_password.html')
@@ -387,7 +391,6 @@ def user_dashboard():
         return redirect(url_for('admin_dashboard'))
     
     sub = Subscription.query.filter_by(user_id=current_user.id).first()
-    logs = AdLog.query.filter_by(user_id=current_user.id).order_by(AdLog.timestamp.desc()).limit(100).all()
 
     is_expired = False
     if current_user.account_expiration and datetime.datetime.now() > current_user.account_expiration:
@@ -409,6 +412,9 @@ def user_dashboard():
         q_eh = int(request.form.get('q_eh', 6))
         end_time = current_user.account_expiration.isoformat() if current_user.account_expiration else ""
         
+        settings = SystemSettings.query.first()
+        current_token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
+
         if sub:
             if sub.id in ACTIVE_THREADS:
                 ACTIVE_THREADS[sub.id].stop()
@@ -433,10 +439,17 @@ def user_dashboard():
             db.session.add(new_sub)
             db.session.commit()
             start_thread_for_sub(new_sub)
+            
+            # 📌 رسالة الترحيب عند الاشتراك
+            exp_text = current_user.account_expiration.strftime('%Y-%m-%d') if current_user.account_expiration else "مفتوح"
+            welcome_msg = f"مرحباً بك في راصد حراج! 🎯\nتم تفعيل الرادار الخاص بك بنجاح.\n\nالاسم: {name}\nتاريخ الانتهاء: {exp_text}\n\nنتمنى لك صيدات موفقة! 🚀"
+            send_whatsapp(create_session(), current_token, current_user.phone, welcome_msg)
+
             flash('تم حفظ الاشتراك وبدأ الرصد!', 'success')
+            
         return redirect(url_for('user_dashboard'))
         
-    return render_template('user.html', sub=sub, logs=logs, is_expired=is_expired)
+    return render_template('user.html', sub=sub, is_expired=is_expired)
 
 @app.route('/toggle_sub/<int:sub_id>')
 @login_required
@@ -473,7 +486,7 @@ def delete_sub(sub_id):
         flash('تم حذف الاشتراك نهائياً 🗑️', 'info')
     return redirect(request.referrer)
 
-# ================= مسارات الإدارة (Admin) =================
+# ================= مسارات الإدارة =================
 @app.route('/admin_dashboard')
 @login_required
 def admin_dashboard():
@@ -524,20 +537,17 @@ def admin_settings():
         
     return render_template('admin_settings.html', settings=settings)
 
-# ------- مسار إضافة عميل جديد للإدمن --------
 @app.route('/admin_add_user', methods=['GET', 'POST'])
 @login_required
 def admin_add_user():
     if current_user.role != 'admin': return redirect(url_for('user_dashboard'))
     
     if request.method == 'POST':
-        # بيانات العميل
         username = request.form.get('username')
         phone = request.form.get('phone')
         password = request.form.get('password')
         exp_date_str = request.form.get('account_expiration')
 
-        # بيانات الاشتراك
         sub_name = request.form.get('name')
         keywords = request.form.get('keywords')
         cities = request.form.get('cities', '')
@@ -548,55 +558,46 @@ def admin_add_user():
         q_sh = int(request.form.get('q_sh', 1))
         q_eh = int(request.form.get('q_eh', 6))
 
-        # التحقق من عدم التكرار
         if User.query.filter_by(username=username).first() or User.query.filter_by(phone=phone).first():
             flash('اسم المستخدم أو رقم الجوال مسجل مسبقاً!', 'danger')
             return redirect(url_for('admin_add_user'))
 
         exp_date = datetime.datetime.strptime(exp_date_str, '%Y-%m-%d') if exp_date_str else None
 
-        # 1. إنشاء العميل
         new_user = User(
-            username=username,
-            phone=phone,
+            username=username, phone=phone,
             password=generate_password_hash(password, method='pbkdf2:sha256'),
             account_expiration=exp_date
         )
         db.session.add(new_user)
         db.session.commit()
 
-        # 2. إنشاء الاشتراك (إذا كان فيه كلمات)
         if keywords:
             end_ts = exp_date.isoformat() if exp_date else ""
             new_sub = Subscription(
-                user_id=new_user.id,
-                name=sub_name or "اشتراك جديد",
-                keywords=keywords,
-                recipients=phone,
-                cities=cities,
-                city_filter_enabled=city_filter_enabled,
-                excluded_words=excluded_words,
-                exclude_enabled=exclude_enabled,
-                quiet_enabled=quiet_enabled,
-                quiet_start_hour=q_sh,
-                quiet_start_minute=0,
-                quiet_end_hour=q_eh,
-                quiet_end_minute=0,
-                sleep_minutes=15,
-                end_ts=end_ts
+                user_id=new_user.id, name=sub_name or "اشتراك جديد", keywords=keywords, recipients=phone,
+                cities=cities, city_filter_enabled=city_filter_enabled,
+                excluded_words=excluded_words, exclude_enabled=exclude_enabled,
+                quiet_enabled=quiet_enabled, quiet_start_hour=q_sh, quiet_start_minute=0, quiet_end_hour=q_eh, quiet_end_minute=0,
+                sleep_minutes=15, end_ts=end_ts
             )
             db.session.add(new_sub)
             db.session.commit()
             
-            # تشغيل الرادار فوراً إذا الحساب غير منتهي
             if not exp_date or exp_date > datetime.datetime.now():
                 start_thread_for_sub(new_sub)
+                
+                # 📌 رسالة الترحيب للعميل المضاف من الإدارة
+                settings = SystemSettings.query.first()
+                current_token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
+                exp_text = exp_date.strftime('%Y-%m-%d') if exp_date else "مفتوح"
+                welcome_msg = f"مرحباً بك في راصد حراج! 🎯\nتم تفعيل الرادار الخاص بك بنجاح من قبل الإدارة.\n\nالاسم: {sub_name}\nتاريخ الانتهاء: {exp_text}\n\nنتمنى لك صيدات موفقة! 🚀"
+                send_whatsapp(create_session(), current_token, phone, welcome_msg)
 
         flash('تم إضافة العميل وإعداد راداره بنجاح! 🚀', 'success')
         return redirect(url_for('admin_dashboard'))
 
     return render_template('admin_add_user.html')
-# ---------------------------------------------
 
 @app.route('/admin_edit_user/<int:user_id>', methods=['GET', 'POST'])
 @login_required
