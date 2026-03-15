@@ -72,7 +72,7 @@
                                     <th>العميل</th>
                                     <th>رقم الجوال</th>
                                     <th>تاريخ الانتهاء</th>
-                                    <th>الاشتراك / الإرساليات</th>
+                                    <th>الاشتراك / الإرساليات / سرعة الفحص</th>
                                     <th>حالة الحساب</th>
                                     <th>إجراءات الدعم الفني</th>
                                 </tr>
@@ -88,7 +88,8 @@
                                     <td dir="ltr" class="text-danger fw-bold">{{ user.account_expiration.strftime('%Y-%m-%d') if user.account_expiration else 'مفتوح' }}</td>
                                     <td>
                                         {% if user.subscription %}
-                                            <span class="badge bg-info text-dark d-block mb-2 fs-6">رسائل: {{ user.subscription.sent_count }}</span>
+                                            <span class="badge bg-info text-dark d-block mb-1 fs-6">رسائل: {{ user.subscription.sent_count }}</span>
+                                            <span class="badge bg-secondary d-block mb-2 fs-6"><i class="fas fa-stopwatch"></i> فحص كل: {{ user.subscription.sleep_minutes }} دقيقة</span>
                                             <a href="/admin_toggle_sub/{{ user.subscription.id }}" class="btn btn-sm {% if user.subscription.status == 'active' %}btn-outline-warning{% else %}btn-outline-success{% endif %} w-100 fw-bold">
                                                 {% if user.subscription.status == 'active' %}<i class="fas fa-pause"></i> إيقاف الرصد{% else %}<i class="fas fa-play"></i> تشغيل الرصد{% endif %}
                                             </a>
@@ -179,10 +180,9 @@
                 toggleBtn.innerHTML = '<i class="fas fa-moon"></i>';
                 Chart.defaults.color = '#2c3e50';
             }
-            window.location.reload(); // لتحديث ألوان الرسوم البيانية
+            window.location.reload(); 
         });
 
-        // رسم دائرة العملاء
         const ctxUsers = document.getElementById('usersChart').getContext('2d');
         new Chart(ctxUsers, { 
             type: 'doughnut', 
@@ -193,7 +193,6 @@
             options: { plugins: { legend: { position: 'bottom' } }, cutout: '70%' } 
         });
         
-        // رسم خط الإعلانات
         const ctxAds = document.getElementById('adsChart').getContext('2d');
         new Chart(ctxAds, { 
             type: 'line', 
