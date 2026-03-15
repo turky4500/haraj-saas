@@ -12,23 +12,21 @@ from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
-app.secret_key = "haraj_super_secret_key_v15_cloud"
+app.secret_key = "haraj_super_secret_key_v16_admin"
 
 app.jinja_env.globals.update(now=datetime.datetime.now)
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
-# ================= ربط قاعدة البيانات السحابية (الجديد) =================
+# ================= ربط قاعدة البيانات السحابية =================
 db_url = os.environ.get("DATABASE_URL")
 if db_url:
-    # إصلاح بسيط مطلوب في لغة بايثون للروابط السحابية
     if db_url.startswith("postgres://"):
         db_url = db_url.replace("postgres://", "postgresql://", 1)
     app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 else:
-    # يعمل كاحتياط محلي في حال لم يجد الرابط
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(BASE_DIR, 'haraj.db')
-# ========================================================================
+# ===============================================================
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -54,9 +52,8 @@ def keep_alive_patch():
         time.sleep(600) 
 
 def cleanup_old_logs():
-    """ينظف الأرشيف كل ساعة لضمان بقاء 2000 إعلان كحد أقصى للحفاظ على المساحة"""
     while True:
-        time.sleep(3600) # فحص كل ساعة
+        time.sleep(3600)
         with app.app_context():
             try:
                 total_logs = AdLog.query.count()
@@ -69,14 +66,45 @@ def cleanup_old_logs():
             except:
                 pass
 
+# ================= التحديث الجديد: إرسال الإحصائية اليومية للإدارة =================
+def daily_admin_report():
+    while True:
+        time.sleep(1800) # يفحص الوقت كل نص ساعة
+        with app.app_context():
+            try:
+                notify = AdminNotifySettings.query.first()
+                if notify and notify.admin_phone:
+                    now = datetime.datetime.now()
+                    # يرسل التقرير الساعة 11 بالليل
+                    if now.hour >= 23 and notify.last_report_date < now.date():
+                        settings = SystemSettings.query.first()
+                        token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
+                        
+                        msg = f"📊 تقرير نهاية اليوم لمنصة (راصد حراج):\n\n👥 عدد الزوار الجدد اليوم: {notify.daily_visitors} زائر.\n\nيعطيك العافية 🚀"
+                        send_whatsapp(create_session(), token, notify.admin_phone, msg)
+                        
+                        # تصفير العداد لليوم الجديد
+                        notify.daily_visitors = 0
+                        notify.last_report_date = now.date()
+                        db.session.commit()
+            except: pass
+
 threading.Thread(target=keep_alive_patch, daemon=True).start()
 threading.Thread(target=cleanup_old_logs, daemon=True).start()
+threading.Thread(target=daily_admin_report, daemon=True).start()
 
-# ================= النماذج =================
+# ================= النماذج (قواعد البيانات) =================
 class SystemSettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     whatsapp_token = db.Column(db.String(255), default="7a203d6ba6f4325ed3261ea87f6b2e751250ad97")
     trial_days = db.Column(db.Integer, default=2)
+
+# جدول الإشعارات المنفصل (عشان ما نخرب الشغل القديم)
+class AdminNotifySettings(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    admin_phone = db.Column(db.String(20), default="")
+    daily_visitors = db.Column(db.Integer, default=0)
+    last_report_date = db.Column(db.Date, default=datetime.date.today)
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -134,11 +162,7 @@ def normalize_text(s):
     return re.sub(r"\s+", " ", s).strip()
 
 def matches_keyword_precise(text, kw, excluded_list, exclude_enabled):
-    """
-    المنطق الأصلي: البحث عن الكلمة المستهدفة ككتلة واحدة (Exact Phrase Match)
-    """
     nt = normalize_text(text)
-    
     if exclude_enabled and excluded_list:
         for neg in excluded_list:
             norm_neg = normalize_text(neg)
@@ -146,12 +170,9 @@ def matches_keyword_precise(text, kw, excluded_list, exclude_enabled):
                 return False
                 
     norm_kw = normalize_text(kw)
-    if not norm_kw: 
-        return True
-        
+    if not norm_kw: return True
     if re.search(r'(^|\s)' + re.escape(norm_kw) + r'($|\s)', nt):
         return True
-        
     return False
 
 def is_target_city(full_text, cities_list, city_filter_enabled):
@@ -298,6 +319,14 @@ def start_thread_for_sub(sub):
 
 @app.route('/')
 def index():
+    # عداد الزوار الخفي للإدارة (يعد الزوار الجدد في الجلسة فقط)
+    if 'visited_today' not in session:
+        session['visited_today'] = True
+        notify = AdminNotifySettings.query.first()
+        if notify:
+            notify.daily_visitors += 1
+            db.session.commit()
+            
     return render_template('index.html')
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -354,6 +383,13 @@ def verify():
 
             db.session.add(new_user)
             db.session.commit()
+            
+            # إرسال تنبيه للإدارة بوجود تسجيل جديد
+            notify = AdminNotifySettings.query.first()
+            if notify and notify.admin_phone and new_user.role != 'admin':
+                admin_token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
+                admin_msg = f"🔔 عميل جديد سجل بالمنصة!\n\n👤 الاسم: {new_user.username}\n📱 الجوال: {new_user.phone}"
+                send_whatsapp(create_session(), admin_token, notify.admin_phone, admin_msg)
             
             login_user(new_user)
             session.pop('temp_user', None)
@@ -563,15 +599,21 @@ def admin_dashboard():
 def admin_settings():
     if current_user.role != 'admin': return redirect(url_for('user_dashboard'))
     settings = SystemSettings.query.first()
+    notify = AdminNotifySettings.query.first()
     
     if request.method == 'POST':
         settings.whatsapp_token = request.form.get('whatsapp_token')
         settings.trial_days = int(request.form.get('trial_days', 2))
+        
+        # حفظ رقم الإدارة الجديد
+        if notify:
+            notify.admin_phone = request.form.get('admin_phone', '')
+            
         db.session.commit()
         flash('تم حفظ إعدادات النظام بنجاح ⚙️', 'success')
         return redirect(url_for('admin_settings'))
         
-    return render_template('admin_settings.html', settings=settings)
+    return render_template('admin_settings.html', settings=settings, notify=notify)
 
 @app.route('/admin_add_user', methods=['GET', 'POST'])
 @login_required
@@ -724,6 +766,10 @@ with app.app_context():
     db.create_all()
     if not SystemSettings.query.first():
         db.session.add(SystemSettings())
+        db.session.commit()
+    # إنشاء جدول الإشعارات في حال ما كان موجود
+    if not AdminNotifySettings.query.first():
+        db.session.add(AdminNotifySettings())
         db.session.commit()
 
 if __name__ == '__main__':
