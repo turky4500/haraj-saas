@@ -12,7 +12,7 @@ from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
-app.secret_key = "haraj_super_secret_key_v16_admin"
+app.secret_key = "haraj_super_secret_key_v17_quiet_fix"
 
 app.jinja_env.globals.update(now=datetime.datetime.now)
 
@@ -43,7 +43,12 @@ HARAJ_BASE = "https://haraj.com.sa"
 HARAJ_HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Accept-Language": "ar-SA"}
 ACTIVE_THREADS = {} 
 
-# ================= باتش منع السكون والتنظيف التلقائي =================
+# ================= ضبط توقيت السعودية (KSA) =================
+def get_ksa_time():
+    """هذه الدالة تجبر السيرفر الأمريكي على حساب الوقت بتوقيت السعودية"""
+    return datetime.datetime.utcnow() + datetime.timedelta(hours=3)
+
+# ================= باتش منع السكون والتنظيف والإحصائيات =================
 def keep_alive_patch():
     while True:
         try:
@@ -66,16 +71,14 @@ def cleanup_old_logs():
             except:
                 pass
 
-# ================= التحديث الجديد: إرسال الإحصائية اليومية للإدارة =================
 def daily_admin_report():
     while True:
-        time.sleep(1800) # يفحص الوقت كل نص ساعة
+        time.sleep(1800)
         with app.app_context():
             try:
                 notify = AdminNotifySettings.query.first()
                 if notify and notify.admin_phone:
-                    now = datetime.datetime.now()
-                    # يرسل التقرير الساعة 11 بالليل
+                    now = get_ksa_time()
                     if now.hour >= 23 and notify.last_report_date < now.date():
                         settings = SystemSettings.query.first()
                         token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
@@ -83,7 +86,6 @@ def daily_admin_report():
                         msg = f"📊 تقرير نهاية اليوم لمنصة (راصد حراج):\n\n👥 عدد الزوار الجدد اليوم: {notify.daily_visitors} زائر.\n\nيعطيك العافية 🚀"
                         send_whatsapp(create_session(), token, notify.admin_phone, msg)
                         
-                        # تصفير العداد لليوم الجديد
                         notify.daily_visitors = 0
                         notify.last_report_date = now.date()
                         db.session.commit()
@@ -99,7 +101,6 @@ class SystemSettings(db.Model):
     whatsapp_token = db.Column(db.String(255), default="7a203d6ba6f4325ed3261ea87f6b2e751250ad97")
     trial_days = db.Column(db.Integer, default=2)
 
-# جدول الإشعارات المنفصل (عشان ما نخرب الشغل القديم)
 class AdminNotifySettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     admin_phone = db.Column(db.String(20), default="")
@@ -125,7 +126,6 @@ class Subscription(db.Model):
     recipients = db.Column(db.String(100), nullable=False) 
     status = db.Column(db.String(20), default='active') 
     sent_count = db.Column(db.Integer, default=0)
-    
     cities = db.Column(db.String(500), default="")
     city_filter_enabled = db.Column(db.Boolean, default=False)
     excluded_words = db.Column(db.String(500), default="")
@@ -168,7 +168,6 @@ def matches_keyword_precise(text, kw, excluded_list, exclude_enabled):
             norm_neg = normalize_text(neg)
             if norm_neg and re.search(r'(^|\s)' + re.escape(norm_neg) + r'($|\s)', nt): 
                 return False
-                
     norm_kw = normalize_text(kw)
     if not norm_kw: return True
     if re.search(r'(^|\s)' + re.escape(norm_kw) + r'($|\s)', nt):
@@ -185,7 +184,7 @@ def is_target_city(full_text, cities_list, city_filter_enabled):
 
 def is_quiet_now(enabled, sh, sm, eh, em):
     if not enabled: return False
-    now = datetime.datetime.now()
+    now = get_ksa_time() # استخدام توقيت السعودية
     now_min = now.hour * 60 + now.minute
     start_min = sh * 60 + sm
     end_min = eh * 60 + em
@@ -217,18 +216,26 @@ def send_whatsapp(req_session, token, to_msisdn, text):
     except:
         return False
 
-# ================= خيط المراقبة =================
+# ================= خيط المراقبة (مع ميزة طابور فترة الهدوء) =================
 class MonitorThread(threading.Thread):
     def __init__(self, sub_config):
         super().__init__(daemon=True)
         self.cfg = sub_config
         self.stop_evt = threading.Event()
         self.req_session = create_session()
+        
         self.seen_file = SUBS_BASE_DIR / f"seen_{self.cfg['id']}.json"
         if self.seen_file.exists():
             with open(self.seen_file, 'r') as f: self.seen_ids = set(json.load(f))
         else:
             self.seen_ids = set()
+
+        # ملف خاص لحفظ الإعلانات أثناء فترة الهدوء
+        self.queue_file = SUBS_BASE_DIR / f"queue_{self.cfg['id']}.json"
+        if self.queue_file.exists():
+            with open(self.queue_file, 'r') as f: self.queued_ads = json.load(f)
+        else:
+            self.queued_ads = []
 
     def run(self):
         while not self.stop_evt.is_set():
@@ -242,52 +249,79 @@ class MonitorThread(threading.Thread):
                     if sub and sub.status == 'active': 
                         sub.status = 'paused'
                         db.session.commit()
-                        exp_msg = "⚠️ عذراً، انتهى اشتراكك في راصد حراج.\nتم إيقاف الرصد مؤقتاً، سعدنا بخدمتك ونرجو التواصل معنا لتجديد الاشتراك واستئناف الرصد. 🌹"
+                        exp_msg = "⚠️ عذراً، انتهى اشتراكك في راصد حراج.\nتم إيقاف الرصد مؤقتاً، نرجو التواصل معنا لتجديد الاشتراك واستئناف الرصد. 🌹"
                         send_whatsapp(self.req_session, current_token, self.cfg['recipients'], exp_msg)
                     break 
+            
+            currently_quiet = is_quiet_now(self.cfg['quiet_enabled'], self.cfg['q_sh'], self.cfg['q_sm'], self.cfg['q_eh'], self.cfg['q_em'])
+
+            # 1. إرسال الطابور إذا انتهت فترة الهدوء
+            if not currently_quiet and self.queued_ads:
+                wake_msg = "🌅 انتهت فترة الهدوء!\nإليك الإعلانات التي تم رصدها وتخزينها أثناء نومك:"
+                send_whatsapp(self.req_session, current_token, self.cfg['recipients'], wake_msg)
+                time.sleep(3)
+                for ad in self.queued_ads:
+                    if self.stop_evt.is_set(): break
+                    msg = f"إعلان ({ad['kw']}):\n{ad['title']}\n{ad['url']}"
+                    send_whatsapp(self.req_session, current_token, self.cfg['recipients'], msg)
+                    # انتظار إضافي لتجنب الحظر عند إرسال دفعة كبيرة
+                    time.sleep(random.uniform(5, 10))
                 
-            if not is_quiet_now(self.cfg['quiet_enabled'], self.cfg['q_sh'], self.cfg['q_sm'], self.cfg['q_eh'], self.cfg['q_em']):
-                for kw in self.cfg['keywords']:
+                # تفريغ الطابور بعد الإرسال
+                self.queued_ads = []
+                if self.queue_file.exists():
+                    with open(self.queue_file, 'w') as f: json.dump(self.queued_ads, f)
+            
+            # 2. عملية البحث (تعمل سواء وقت هدوء أو لا، الفرق في طريقة الإرسال/التخزين)
+            for kw in self.cfg['keywords']:
+                if self.stop_evt.is_set(): break
+                
+                for page in range(1, 4):
                     if self.stop_evt.is_set(): break
                     
-                    for page in range(1, 4):
-                        if self.stop_evt.is_set(): break
+                    if kw:
+                        url = f"{HARAJ_BASE}/search/{quote(kw, safe='')}/page/{page}" if page > 1 else f"{HARAJ_BASE}/search/{quote(kw, safe='')}/"
+                    else:
+                        url = f"{HARAJ_BASE}/page/{page}" if page > 1 else f"{HARAJ_BASE}/"
                         
-                        if kw:
-                            url = f"{HARAJ_BASE}/search/{quote(kw, safe='')}/page/{page}" if page > 1 else f"{HARAJ_BASE}/search/{quote(kw, safe='')}/"
-                        else:
-                            url = f"{HARAJ_BASE}/page/{page}" if page > 1 else f"{HARAJ_BASE}/"
-                            
-                        try:
-                            html = self.req_session.get(url, headers=HARAJ_HEADERS, timeout=15, verify=False).content
-                            for title, ad_url in extract_ads(html, HARAJ_BASE):
-                                ad_id = re.search(r"/(\d+)(?:/|$)", ad_url).group(1)
-                                if ad_id not in self.seen_ids:
-                                    ad_html = self.req_session.get(ad_url, headers=HARAJ_HEADERS, timeout=15, verify=False).content
-                                    soup = BeautifulSoup(ad_html, "html.parser")
-                                    full_text = soup.get_text(" ", strip=True)
+                    try:
+                        html = self.req_session.get(url, headers=HARAJ_HEADERS, timeout=15, verify=False).content
+                        for title, ad_url in extract_ads(html, HARAJ_BASE):
+                            ad_id = re.search(r"/(\d+)(?:/|$)", ad_url).group(1)
+                            if ad_id not in self.seen_ids:
+                                ad_html = self.req_session.get(ad_url, headers=HARAJ_HEADERS, timeout=15, verify=False).content
+                                soup = BeautifulSoup(ad_html, "html.parser")
+                                full_text = soup.get_text(" ", strip=True)
+                                
+                                if is_target_city(full_text, self.cfg['cities'], self.cfg['city_filter_enabled']) and \
+                                   matches_keyword_precise(full_text, kw, self.cfg['excluded_words'], self.cfg['exclude_enabled']):
                                     
-                                    if is_target_city(full_text, self.cfg['cities'], self.cfg['city_filter_enabled']) and \
-                                       matches_keyword_precise(full_text, kw, self.cfg['excluded_words'], self.cfg['exclude_enabled']):
-                                        
+                                    # إضافة الإعلان لقائمة المرئيات
+                                    self.seen_ids.add(ad_id)
+                                    with open(self.seen_file, 'w') as f: json.dump(list(self.seen_ids), f)
+                                    
+                                    if currently_quiet:
+                                        # تخزين في الطابور بدلاً من الإرسال المباشر
+                                        self.queued_ads.append({'kw': kw, 'title': title, 'url': ad_url})
+                                        with open(self.queue_file, 'w') as f: json.dump(self.queued_ads, f)
+                                    else:
+                                        # إرسال مباشر إذا لم يكن وقت هدوء
                                         delay = random.uniform(30, 60)
                                         time.sleep(delay)
-                                        
                                         msg = f"إعلان جديد ({kw}):\n{title}\n{ad_url}"
-                                        if send_whatsapp(self.req_session, current_token, self.cfg['recipients'], msg):
-                                            self.seen_ids.add(ad_id)
-                                            with open(self.seen_file, 'w') as f: json.dump(list(self.seen_ids), f)
-                                            
-                                            with app.app_context():
-                                                log_sub = Subscription.query.get(self.cfg['id'])
-                                                if log_sub:
-                                                    log_sub.sent_count += 1
-                                                    new_log = AdLog(user_id=self.cfg['user_id'], title=title, url=ad_url, keyword_matched=kw)
-                                                    db.session.add(new_log)
-                                                    db.session.commit()
-                        except:
-                            pass
-                        time.sleep(random.uniform(3, 7))
+                                        send_whatsapp(self.req_session, current_token, self.cfg['recipients'], msg)
+                                        
+                                    # في الحالتين يحفظ الإعلان في أرشيف الموقع
+                                    with app.app_context():
+                                        log_sub = Subscription.query.get(self.cfg['id'])
+                                        if log_sub:
+                                            log_sub.sent_count += 1
+                                            new_log = AdLog(user_id=self.cfg['user_id'], title=title, url=ad_url, keyword_matched=kw)
+                                            db.session.add(new_log)
+                                            db.session.commit()
+                    except:
+                        pass
+                    time.sleep(random.uniform(3, 7))
             
             sleep_seconds = self.cfg['sleep_minutes'] * 60
             for _ in range(sleep_seconds):
@@ -319,14 +353,12 @@ def start_thread_for_sub(sub):
 
 @app.route('/')
 def index():
-    # عداد الزوار الخفي للإدارة (يعد الزوار الجدد في الجلسة فقط)
     if 'visited_today' not in session:
         session['visited_today'] = True
         notify = AdminNotifySettings.query.first()
         if notify:
             notify.daily_visitors += 1
             db.session.commit()
-            
     return render_template('index.html')
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -384,7 +416,6 @@ def verify():
             db.session.add(new_user)
             db.session.commit()
             
-            # إرسال تنبيه للإدارة بوجود تسجيل جديد
             notify = AdminNotifySettings.query.first()
             if notify and notify.admin_phone and new_user.role != 'admin':
                 admin_token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
@@ -605,7 +636,6 @@ def admin_settings():
         settings.whatsapp_token = request.form.get('whatsapp_token')
         settings.trial_days = int(request.form.get('trial_days', 2))
         
-        # حفظ رقم الإدارة الجديد
         if notify:
             notify.admin_phone = request.form.get('admin_phone', '')
             
@@ -767,7 +797,6 @@ with app.app_context():
     if not SystemSettings.query.first():
         db.session.add(SystemSettings())
         db.session.commit()
-    # إنشاء جدول الإشعارات في حال ما كان موجود
     if not AdminNotifySettings.query.first():
         db.session.add(AdminNotifySettings())
         db.session.commit()
