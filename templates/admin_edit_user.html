@@ -3,68 +3,158 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تعديل بيانات العميل - الإدارة</title>
+    <title>تعديل العميل - راصد حراج</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Bootstrap RTL -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { background-color: #ecf0f1; font-family: 'Segoe UI', Tahoma, sans-serif; padding: 40px 0;}
-        .card { border-radius: 15px; border: none; box-shadow: 0 5px 20px rgba(0,0,0,0.08); }
+        :root {
+            --primary: #1abc9c;
+            --primary-dark: #16a085;
+            --secondary: #34495e;
+            --light-bg: #f8fafc;
+            --card-shadow: 0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.02);
+            --border-radius: 16px;
+        }
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #f0f5f9;
+            color: #2c3e50;
+            padding: 30px 0;
+        }
+        .navbar-custom {
+            background: linear-gradient(135deg, #2c3e50 0%, #1e2b38 100%);
+            padding: 0.8rem 1rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+        .navbar-custom .navbar-brand {
+            font-weight: 700;
+            font-size: 1.5rem;
+            color: white;
+        }
+        .navbar-custom .navbar-brand i {
+            color: var(--primary);
+            margin-left: 8px;
+        }
+        .glass-card {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(4px);
+            border-radius: var(--border-radius);
+            border: 1px solid rgba(255,255,255,0.5);
+            box-shadow: var(--card-shadow);
+            padding: 2rem;
+        }
+        .section-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--secondary);
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 0.5rem;
+            margin-bottom: 1.5rem;
+            display: inline-block;
+        }
+        .form-control, .input-group-text {
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            padding: 0.6rem 1rem;
+        }
+        .form-control:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(26,188,156,0.2);
+        }
+        .btn-primary-custom {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border: none;
+            border-radius: 12px;
+            padding: 0.8rem;
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: white;
+            transition: 0.3s;
+            box-shadow: 0 4px 10px rgba(26,188,156,0.3);
+        }
+        .btn-primary-custom:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(26,188,156,0.4);
+        }
+        .btn-secondary-custom {
+            background: #edf2f7;
+            border: 1px solid #cbd5e0;
+            border-radius: 12px;
+            font-weight: 600;
+            color: #2d3748;
+            padding: 0.8rem;
+        }
     </style>
 </head>
 <body>
-    <div class="container" style="max-width: 600px;">
-        <div class="card p-4">
-            <h4 class="mb-4 text-center fw-bold text-primary"><i class="fas fa-user-edit"></i> تعديل بيانات العميل: {{ user.username }}</h4>
+    <nav class="navbar navbar-custom">
+        <div class="container">
+            <a class="navbar-brand" href="/admin_dashboard">
+                <i class="fas fa-arrow-right"></i> العودة للوحة الإدارة
+            </a>
+            <span class="text-light fw-bold"><i class="fas fa-user-edit"></i> تعديل العميل: {{ user.username }}</span>
+        </div>
+    </nav>
+
+    <div class="container" style="max-width: 700px;">
+        <div class="glass-card">
+            <h4 class="section-title">
+                <i class="fas fa-user-edit ms-2" style="color: var(--primary);"></i> تعديل بيانات العميل
+            </h4>
 
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     {% for category, message in messages %}
-                        <div class="alert alert-{{ category }} shadow-sm">{{ message }}</div>
+                        <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm rounded-4 py-3" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
                     {% endfor %}
                 {% endif %}
             {% endwith %}
 
             <form action="/admin_edit_user/{{ user.id }}" method="POST">
-                
                 <div class="mb-3">
-                    <label class="form-label fw-bold">اسم المستخدم</label>
+                    <label class="form-label fw-bold small">اسم المستخدم</label>
                     <input type="text" name="username" class="form-control" value="{{ user.username }}" required>
                 </div>
-                
                 <div class="mb-3">
-                    <label class="form-label fw-bold">رقم الجوال (للواتساب)</label>
-                    <input type="text" name="phone" class="form-control" value="{{ user.phone }}" dir="ltr" required>
+                    <label class="form-label fw-bold small">رقم الجوال (واتساب)</label>
+                    <input type="text" name="phone" class="form-control" dir="ltr" value="{{ user.phone }}" required>
                 </div>
-                
                 <div class="mb-3">
-                    <label class="form-label fw-bold text-danger">تاريخ انتهاء الاشتراك</label>
+                    <label class="form-label fw-bold small text-danger">تاريخ انتهاء الاشتراك</label>
                     <input type="date" name="account_expiration" class="form-control" value="{{ user.account_expiration.strftime('%Y-%m-%d') if user.account_expiration else '' }}">
-                    <small class="text-muted">اتركه فارغاً ليصبح الحساب مفتوحاً.</small>
+                    <small class="text-muted">اتركه فارغاً لحساب مفتوح</small>
                 </div>
-                
-                <div class="mb-4 pb-3 border-bottom">
-                    <label class="form-label fw-bold text-warning"><i class="fas fa-key"></i> تغيير كلمة المرور (اختياري)</label>
-                    <input type="text" name="password" class="form-control" placeholder="اتركه فارغاً إذا لا تريد تغييرها">
+                <div class="mb-4">
+                    <label class="form-label fw-bold small text-warning"><i class="fas fa-key"></i> تغيير كلمة المرور (اختياري)</label>
+                    <input type="text" name="password" class="form-control" placeholder="اتركه فارغاً إذا لا تريد التغيير">
                 </div>
 
                 {% if user.subscription %}
-                <div class="mb-4 p-4 bg-light rounded border border-warning shadow-sm text-center">
-                    <label class="form-label fw-bold text-success fs-5"><i class="fas fa-stopwatch"></i> باقة العميل (سرعة الفحص)</label>
-                    <div class="input-group mt-2" style="max-width: 300px; margin: 0 auto;">
-                        <input type="number" name="sleep_minutes" class="form-control text-center fw-bold fs-4" value="{{ user.subscription.sleep_minutes }}" min="1" required>
-                        <span class="input-group-text fw-bold">دقيقة</span>
-                    </div>
-                    <small class="text-muted d-block mt-3">التعديل هنا سيتم تطبيقه فوراً على رادار العميل بالخلفية بدون أن يشعر.</small>
+                <div class="mb-4 p-3 bg-light rounded-3 border">
+                    <label class="form-label fw-bold text-success"><i class="fas fa-stopwatch"></i> سرعة الفحص (بالدقائق)</label>
+                    <input type="number" name="sleep_minutes" class="form-control text-center fw-bold" value="{{ user.subscription.sleep_minutes }}" min="1" required>
+                    <small class="text-muted">سيتم تطبيق التغيير فوراً على رادار العميل.</small>
                 </div>
                 {% else %}
-                <div class="alert alert-secondary text-center small mb-4 shadow-sm">
-                    <i class="fas fa-info-circle fa-2x d-block mb-2 text-muted"></i> 
-                    هذا العميل لم يقم بإعداد راداره من لوحته حتى الآن، لذلك لا يمكن تعديل سرعة الفحص حالياً.
+                <div class="alert alert-secondary text-center small">
+                    <i class="fas fa-info-circle"></i> العميل لم يقم بإعداد رادار بعد.
                 </div>
                 {% endif %}
 
-                <button type="submit" class="btn btn-primary w-100 fw-bold py-3 fs-5 shadow-sm"><i class="fas fa-save"></i> حفظ جميع التعديلات</button>
-                <a href="/admin_dashboard" class="btn btn-white border w-100 mt-3 fw-bold py-2 text-muted">إلغاء وعودة للإدارة</a>
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary-custom">
+                        <i class="fas fa-save"></i> حفظ التعديلات
+                    </button>
+                    <a href="/admin_dashboard" class="btn btn-secondary-custom text-center">إلغاء</a>
+                </div>
             </form>
         </div>
     </div>
