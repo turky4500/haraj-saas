@@ -12,7 +12,7 @@ from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
-app.secret_key = "haraj_super_secret_key_v19_stats"
+app.secret_key = "haraj_super_secret_key_v19_full_fixed"
 
 app.jinja_env.globals.update(now=datetime.datetime.now)
 
@@ -52,7 +52,7 @@ ACTIVE_THREADS = {}
 def get_ksa_time():
     return datetime.datetime.utcnow() + datetime.timedelta(hours=3)
 
-# ================= نظام الإحصائيات المستقل (عشان ما نخرب قاعدة البيانات) =================
+# ================= نظام الإحصائيات المستقل =================
 stats_lock = threading.Lock()
 
 def get_daily_stats():
@@ -138,7 +138,7 @@ class SystemSettings(db.Model):
 class AdminNotifySettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     admin_phone = db.Column(db.String(20), default="")
-    daily_visitors = db.Column(db.Integer, default=0) # لم يعد يستخدم فعلياً لكن أبقيناه لحماية القاعدة
+    daily_visitors = db.Column(db.Integer, default=0) 
     last_report_date = db.Column(db.Date, default=datetime.date.today)
 
 class User(UserMixin, db.Model):
@@ -432,7 +432,7 @@ def verify():
             db.session.add(new_user)
             db.session.commit()
             
-            update_daily_stat('registrations') # تحديث إحصائية التسجيل
+            update_daily_stat('registrations') 
             
             notify = AdminNotifySettings.query.first()
             if notify and notify.admin_phone and new_user.role != 'admin':
@@ -447,6 +447,40 @@ def verify():
             return redirect(url_for('user_dashboard'))
         flash('كود التحقق غير صحيح!', 'danger')
     return render_template('verify.html')
+
+@app.route('/forgot_password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        phone = request.form.get('phone')
+        user = User.query.filter_by(phone=phone).first()
+        if user:
+            otp = str(random.randint(1000, 9999))
+            session['reset_phone'] = phone
+            session['reset_otp'] = otp
+            
+            settings = SystemSettings.query.first()
+            current_token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
+            reset_msg = f"أهلاً بك 🛡️\n\nكود استعادة كلمة المرور لحسابك هو: *{otp}*"
+            send_whatsapp(create_session(), current_token, phone, reset_msg)
+            
+            return redirect(url_for('reset_password'))
+        flash('رقم الجوال غير مسجل بالنظام!', 'danger')
+    return render_template('forgot_password.html')
+
+@app.route('/reset_password', methods=['GET', 'POST'])
+def reset_password():
+    if 'reset_phone' not in session: return redirect(url_for('forgot_password'))
+    if request.method == 'POST':
+        if request.form.get('otp') == session.get('reset_otp'):
+            user = User.query.filter_by(phone=session['reset_phone']).first()
+            user.password = generate_password_hash(request.form.get('new_password'), method='pbkdf2:sha256')
+            db.session.commit()
+            session.pop('reset_phone', None)
+            session.pop('reset_otp', None)
+            flash('تم تغيير كلمة المرور بنجاح! يمكنك الدخول الآن.', 'success')
+            return redirect(url_for('login'))
+        flash('كود التحقق غير صحيح!', 'danger')
+    return render_template('reset_password.html')
 
 @app.route('/logout')
 @login_required
@@ -568,7 +602,6 @@ def admin_dashboard():
     subs = Subscription.query.all()
     return render_template('admin.html', users=users, subs=subs, active_threads=ACTIVE_THREADS)
 
-# 🚨 المسار الجديد للإحصائيات 🚨
 @app.route('/admin_statistics')
 @login_required
 def admin_statistics():
@@ -590,21 +623,99 @@ def admin_settings():
         settings.trial_days = int(request.form.get('trial_days', 2))
         if notify: notify.admin_phone = request.form.get('admin_phone', '')
         db.session.commit()
-        flash('تم الحفظ!', 'success')
+        flash('تم حفظ الإعدادات بنجاح!', 'success')
         return redirect(url_for('admin_settings'))
     return render_template('admin_settings.html', settings=settings, notify=notify)
 
 @app.route('/admin_add_user', methods=['GET', 'POST'])
 @login_required
 def admin_add_user():
-    # كود الإضافة لم يتغير وموجود لديك
+    if current_user.role != 'admin': return redirect(url_for('user_dashboard'))
+    
+    if request.method == 'POST':
+        username = request.form.get('username')
+        phone = request.form.get('phone')
+        password = request.form.get('password')
+        exp_date_str = request.form.get('account_expiration')
+
+        sub_name = request.form.get('name')
+        keywords = request.form.get('keywords')
+        cities = request.form.get('cities', '')
+        city_filter_enabled = 'city_filter_enabled' in request.form
+        excluded_words = request.form.get('excluded_words', '')
+        exclude_enabled = 'exclude_enabled' in request.form
+        quiet_enabled = 'quiet_enabled' in request.form
+        q_sh = int(request.form.get('q_sh', 1))
+        q_eh = int(request.form.get('q_eh', 6))
+
+        if User.query.filter_by(username=username).first() or User.query.filter_by(phone=phone).first():
+            flash('اسم المستخدم أو رقم الجوال مسجل مسبقاً!', 'danger')
+            return redirect(url_for('admin_add_user'))
+
+        exp_date = datetime.datetime.strptime(exp_date_str, '%Y-%m-%d') if exp_date_str else None
+
+        new_user = User(
+            username=username, phone=phone,
+            password=generate_password_hash(password, method='pbkdf2:sha256'),
+            account_expiration=exp_date
+        )
+        db.session.add(new_user)
+        db.session.commit()
+
+        settings = SystemSettings.query.first()
+        current_token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
+        exp_text = exp_date.strftime('%Y-%m-%d') if exp_date else "مفتوح"
+        welcome_msg = f"مرحباً بك في راصد حراج! 🎯\nتم إنشاء حسابك وتفعيل الرادار بنجاح من قبل الإدارة.\n\nتاريخ الانتهاء: {exp_text}\n\nنتمنى لك صيدات موفقة! 🚀"
+        send_whatsapp(create_session(), current_token, phone, welcome_msg)
+
+        if keywords:
+            end_ts = exp_date.isoformat() if exp_date else ""
+            new_sub = Subscription(
+                user_id=new_user.id, name=sub_name or "اشتراك جديد", keywords=keywords, recipients=phone,
+                cities=cities, city_filter_enabled=city_filter_enabled,
+                excluded_words=excluded_words, exclude_enabled=exclude_enabled,
+                quiet_enabled=quiet_enabled, quiet_start_hour=q_sh, quiet_start_minute=0, quiet_end_hour=q_eh, quiet_end_minute=0,
+                sleep_minutes=15, end_ts=end_ts
+            )
+            db.session.add(new_sub)
+            db.session.commit()
+            
+            if not exp_date or exp_date > datetime.datetime.now():
+                start_thread_for_sub(new_sub)
+
+        flash('تم إضافة العميل وإعداد راداره بنجاح! 🚀', 'success')
+        return redirect(url_for('admin_dashboard'))
+
     return render_template('admin_add_user.html')
 
 @app.route('/admin_edit_user/<int:user_id>', methods=['GET', 'POST'])
 @login_required
 def admin_edit_user(user_id):
-    # كود التعديل لم يتغير
-    return render_template('admin_edit_user.html', user=User.query.get_or_404(user_id))
+    if current_user.role != 'admin': return redirect(url_for('user_dashboard'))
+    user = User.query.get_or_404(user_id)
+    
+    if request.method == 'POST':
+        user.username = request.form.get('username')
+        user.phone = request.form.get('phone')
+        new_pass = request.form.get('password')
+        exp_date_str = request.form.get('account_expiration')
+        
+        if new_pass:
+            user.password = generate_password_hash(new_pass, method='pbkdf2:sha256')
+            
+        if exp_date_str:
+            user.account_expiration = datetime.datetime.strptime(exp_date_str, '%Y-%m-%d')
+        else:
+            user.account_expiration = None 
+        
+        if user.subscription:
+            user.subscription.recipients = user.phone
+            user.subscription.end_ts = user.account_expiration.isoformat() if user.account_expiration else ""
+            
+        db.session.commit()
+        flash(f'تم تعديل بيانات العميل {user.username} بنجاح.', 'success')
+        return redirect(url_for('admin_dashboard'))
+    return render_template('admin_edit_user.html', user=user)
 
 @app.route('/toggle_user/<int:user_id>')
 @login_required
@@ -624,7 +735,23 @@ def toggle_user(user_id):
 @app.route('/admin_toggle_sub/<int:sub_id>')
 @login_required
 def admin_toggle_sub(sub_id):
-    # كود إيقاف الاشتراك
+    if current_user.role != 'admin': return redirect(url_for('index'))
+    sub = Subscription.query.get_or_404(sub_id)
+    if sub.status == 'active':
+        sub.status = 'paused'
+        if sub.id in ACTIVE_THREADS:
+            ACTIVE_THREADS[sub.id].stop()
+            del ACTIVE_THREADS[sub.id]
+        flash('تم إيقاف اشتراك العميل بنجاح.', 'warning')
+    else:
+        user_owner = User.query.get(sub.user_id)
+        if user_owner.account_expiration and datetime.datetime.now() > user_owner.account_expiration:
+            flash('لا يمكن استئناف اشتراك العميل لأن حسابه منتهي الصلاحية!', 'danger')
+        else:
+            sub.status = 'active'
+            start_thread_for_sub(sub)
+            flash('تم استئناف اشتراك العميل بنجاح.', 'success')
+    db.session.commit()
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/impersonate/<int:user_id>')
