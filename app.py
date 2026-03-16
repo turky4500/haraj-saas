@@ -46,6 +46,9 @@ SUBS_BASE_DIR = APP_BASE_DIR / "subs"
 SUBS_BASE_DIR.mkdir(exist_ok=True)
 REMINDERS_FILE = SUBS_BASE_DIR / "reminders_sent.json"
 
+# --- إضافة مسار ملف الإحصائيات (جديد) ---
+STATS_FILE = SUBS_BASE_DIR / "daily_stats.json"
+
 HARAJ_BASE = "https://haraj.com.sa"
 HARAJ_HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Accept-Language": "ar-SA"}
 ACTIVE_THREADS = {} 
@@ -53,6 +56,30 @@ ACTIVE_THREADS = {}
 # ================= ضبط توقيت السعودية (KSA) =================
 def get_ksa_time():
     return datetime.datetime.utcnow() + datetime.timedelta(hours=3)
+
+# ================= نظام الإحصائيات المستقل (جديد - لا يمس القاعدة) =================
+stats_lock = threading.Lock()
+
+def get_daily_stats():
+    now_date = get_ksa_time().strftime('%Y-%m-%d')
+    default_stats = {"date": now_date, "visitors": 0, "bot_visits": 0, "registrations": 0, "messages_sent": 0}
+    if STATS_FILE.exists():
+        try:
+            with open(STATS_FILE, 'r') as f:
+                stats = json.load(f)
+            if stats.get("date") != now_date: return default_stats
+            return stats
+        except: return default_stats
+    return default_stats
+
+def update_daily_stat(key, count=1):
+    with stats_lock:
+        stats = get_daily_stats()
+        stats[key] = stats.get(key, 0) + count
+        try:
+            with open(STATS_FILE, 'w') as f: json.dump(stats, f)
+        except: pass
+# ==============================================================================
 
 # ================= مهام الخلفية (تنظيف الأرشيف + التنبيهات والإحصائيات) =================
 def cleanup_old_logs():
@@ -83,9 +110,10 @@ def daily_background_tasks():
                 notify = AdminNotifySettings.query.first()
                 if notify and notify.admin_phone:
                     if now.hour >= 23 and notify.last_report_date < now.date():
-                        msg = f"📊 تقرير نهاية اليوم لمنصة (راصد حراج):\n\n👥 عدد الزوار الجدد اليوم: {notify.daily_visitors} زائر.\n\nيعطيك العافية 🚀"
+                        # سحب الإحصائيات الدقيقة من الملف
+                        ds = get_daily_stats()
+                        msg = f"📊 تقرير نهاية اليوم لمنصة (راصد حراج):\n\n👥 زوار بشريين: {ds['visitors']}\n🤖 زيارات الروبوت: {ds['bot_visits']}\n🆕 تسجيلات جديدة: {ds['registrations']}\n💬 رسائل أُرسلت: {ds['messages_sent']}\n\nيعطيك العافية 🚀"
                         send_whatsapp(create_session(), token, notify.admin_phone, msg)
-                        notify.daily_visitors = 0
                         notify.last_report_date = now.date()
                         db.session.commit()
 
@@ -230,7 +258,10 @@ def send_whatsapp(req_session, token, to_msisdn, text):
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     try:
         r = req_session.post(url, json={"to": to_msisdn, "message": text}, headers=headers, timeout=20, verify=False)
-        return 200 <= r.status_code < 300
+        if 200 <= r.status_code < 300:
+            update_daily_stat('messages_sent') # تحديث العداد
+            return True
+        return False
     except:
         return False
 
@@ -363,12 +394,14 @@ def start_thread_for_sub(sub):
 
 @app.route('/')
 def index():
-    # طرد روبوت جوجل من الإحصائيات الوهمية
+    # طرد روبوت جوجل من الإحصائيات الوهمية وتحديث الإحصائيات الحقيقية
     if request.headers.get('X-Keep-Alive-Bot'):
+        update_daily_stat('bot_visits')
         return "Bot OK", 200
 
     if 'visited_today' not in session:
         session['visited_today'] = True
+        update_daily_stat('visitors')
         notify = AdminNotifySettings.query.first()
         if notify:
             notify.daily_visitors += 1
@@ -429,6 +462,8 @@ def verify():
 
             db.session.add(new_user)
             db.session.commit()
+            
+            update_daily_stat('registrations') # تحديث العداد
             
             notify = AdminNotifySettings.query.first()
             if notify and notify.admin_phone and new_user.role != 'admin':
@@ -638,6 +673,17 @@ def admin_dashboard():
                            active_threads=ACTIVE_THREADS,
                            total_users=total_users, active_users=active_users, inactive_users=inactive_users,
                            chart_labels=chart_labels, chart_data=chart_data)
+
+# 🚨 مسار صفحة الإحصائيات (الجديد) اللي يفتح إذا ضغطت الدونات 🚨
+@app.route('/admin_statistics')
+@login_required
+def admin_statistics():
+    if current_user.role != 'admin': return redirect(url_for('user_dashboard'))
+    daily_stats = get_daily_stats()
+    total_users = User.query.count()
+    active_subs = Subscription.query.filter_by(status='active').count()
+    total_ads_logged = AdLog.query.count()
+    return render_template('admin_statistics.html', daily_stats=daily_stats, total_users=total_users, active_subs=active_subs, total_ads_logged=total_ads_logged)
 
 @app.route('/admin_settings', methods=['GET', 'POST'])
 @login_required
