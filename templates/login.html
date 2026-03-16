@@ -2,44 +2,142 @@
 <html dir="rtl" lang="ar">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>تسجيل الدخول - راصد حراج</title>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Bootstrap RTL -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { font-family: 'Cairo', sans-serif; background: linear-gradient(180deg, #e6f7f4 0%, #f8f9fa 100%); display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-        .auth-card { background: white; padding: 2.5rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); width: 100%; max-width: 400px; position: relative; overflow: hidden; }
-        .form-control { border-radius: 12px; padding: 12px; background-color: #f8f9fa; border: 1px solid #e9ecef; }
-        .form-control:focus { border-color: #1abc9c; box-shadow: 0 0 0 0.25rem rgba(26, 188, 156, 0.25); }
-        .btn-primary { background-color: #2c3e50; border: none; border-radius: 12px; padding: 12px; font-weight: 700; font-size: 1.1rem; }
-        .btn-primary:hover { background-color: #1a252f; }
-        
-        #loader-overlay {
-            display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(255, 255, 255, 0.9); z-index: 10;
-            flex-direction: column; align-items: center; justify-content: center; text-align: center;
+        :root {
+            --primary: #1abc9c;
+            --primary-dark: #16a085;
+            --secondary: #34495e;
         }
-        .spinner { border: 4px solid rgba(44, 62, 80, 0.2); border-top: 4px solid #2c3e50; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: linear-gradient(135deg, #f0f5f9 0%, #e6f7f4 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .auth-card {
+            background: rgba(255,255,255,0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 30px;
+            padding: 2.5rem;
+            box-shadow: 0 20px 40px -10px rgba(26,188,156,0.2);
+            border: 1px solid rgba(255,255,255,0.5);
+            width: 100%;
+            max-width: 450px;
+        }
+        .auth-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .auth-header i {
+            font-size: 3.5rem;
+            color: var(--primary);
+            margin-bottom: 1rem;
+        }
+        .auth-header h3 {
+            font-weight: 700;
+            color: #2c3e50;
+        }
+        .auth-header p {
+            color: #5d6d7e;
+        }
+        .form-control {
+            border-radius: 50px;
+            padding: 0.75rem 1.5rem;
+            border: 1px solid #e2e8f0;
+            background: white;
+        }
+        .form-control:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(26,188,156,0.2);
+        }
+        .btn-login {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border: none;
+            border-radius: 50px;
+            padding: 0.75rem;
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: white;
+            width: 100%;
+            transition: 0.3s;
+            box-shadow: 0 8px 20px rgba(26,188,156,0.3);
+        }
+        .btn-login:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 30px rgba(26,188,156,0.4);
+        }
+        .forgot-link {
+            color: #e74c3c;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        .forgot-link:hover {
+            text-decoration: underline;
+        }
+        .register-link {
+            color: var(--primary);
+            font-weight: 700;
+            text-decoration: none;
+        }
+        .dark-mode-toggle {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: transparent;
+            border: 2px solid var(--primary);
+            color: var(--primary);
+            border-radius: 30px;
+            padding: 0.4rem 1.5rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        body.dark-mode {
+            background: linear-gradient(135deg, #121212 0%, #1e2b38 100%);
+        }
+        body.dark-mode .auth-card {
+            background: rgba(31,41,55,0.9);
+            border-color: #374151;
+        }
+        body.dark-mode .auth-header h3 {
+            color: white;
+        }
+        body.dark-mode .auth-header p {
+            color: #b0c4de;
+        }
     </style>
 </head>
 <body>
+    <button id="darkModeToggle" class="dark-mode-toggle">
+        <i class="fas fa-moon"></i> ليلي
+    </button>
+
     <div class="auth-card">
-        <div id="loader-overlay">
-            <div class="spinner mb-3"></div>
-            <h5 class="fw-bold" style="color: #2c3e50;">جاري الدخول...</h5>
+        <div class="auth-header">
+            <i class="fas fa-sign-in-alt"></i>
+            <h3>تسجيل الدخول</h3>
+            <p>أهلاً بعودتك، أدخل بياناتك للوصول للوحة التحكم</p>
         </div>
 
-        <div class="text-center mb-4">
-            <i class="fas fa-sign-in-alt fa-3x mb-3" style="color: #2c3e50;"></i>
-            <h3 class="fw-bold" style="color: #2c3e50;">تسجيل الدخول</h3>
-            <p class="text-muted small">مرحباً بعودتك لرادارك الخاص</p>
-        </div>
-
+        <!-- رسائل الفلاش -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} rounded-3 small fw-bold">{{ message }}</div>
+                    <div class="alert alert-{{ category }} alert-dismissible fade show rounded-pill small" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
@@ -47,26 +145,41 @@
         <form method="POST" action="/login" id="loginForm">
             <div class="mb-3">
                 <label class="form-label fw-bold small text-muted">اسم المستخدم</label>
-                <input type="text" name="username" class="form-control" required>
+                <input type="text" name="username" class="form-control" required placeholder="أدخل اسم المستخدم">
             </div>
             <div class="mb-2">
                 <label class="form-label fw-bold small text-muted">كلمة المرور</label>
-                <input type="password" name="password" class="form-control" required>
+                <input type="password" name="password" class="form-control" required placeholder="••••••••">
             </div>
             <div class="text-end mb-4">
-                <a href="/forgot_password" class="text-decoration-none small text-danger fw-bold">نسيت كلمة المرور؟</a>
+                <a href="/forgot_password" class="forgot-link">نسيت كلمة المرور؟</a>
             </div>
-            <button type="submit" class="btn btn-primary w-100 mb-3 shadow-sm">دخول للمنصة</button>
+            <button type="submit" class="btn-login mb-3">
+                <i class="fas fa-arrow-left ms-2"></i> دخول
+            </button>
         </form>
-        <div class="text-center mt-3">
-            <span class="text-muted">ليس لديك حساب؟</span> 
-            <a href="/register" class="text-decoration-none fw-bold" style="color: #1abc9c;">تجربة مجانية</a>
+        <div class="text-center">
+            <span class="text-muted">ليس لديك حساب؟</span>
+            <a href="/register" class="register-link">سجل الآن مجاناً</a>
         </div>
     </div>
 
     <script>
-        document.getElementById('loginForm').addEventListener('submit', function() {
-            document.getElementById('loader-overlay').style.display = 'flex';
+        const toggleBtn = document.getElementById('darkModeToggle');
+        const body = document.body;
+        if(localStorage.getItem('darkMode') === 'enabled') {
+            body.classList.add('dark-mode');
+            toggleBtn.innerHTML = '<i class="fas fa-sun"></i> نهاري';
+        }
+        toggleBtn.addEventListener('click', () => {
+            body.classList.toggle('dark-mode');
+            if(body.classList.contains('dark-mode')) {
+                localStorage.setItem('darkMode', 'enabled');
+                toggleBtn.innerHTML = '<i class="fas fa-sun"></i> نهاري';
+            } else {
+                localStorage.setItem('darkMode', 'disabled');
+                toggleBtn.innerHTML = '<i class="fas fa-moon"></i> ليلي';
+            }
         });
     </script>
 </body>
