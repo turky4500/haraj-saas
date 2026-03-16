@@ -600,7 +600,9 @@ def admin_dashboard():
     if current_user.role != 'admin': return redirect(url_for('user_dashboard'))
     users = User.query.all()
     subs = Subscription.query.all()
-    return render_template('admin.html', users=users, subs=subs, active_threads=ACTIVE_THREADS)
+    # 🚨 رجعنا أوامر استدعاء الأرشيف عشان يظهر بالصفحة الرئيسية 🚨
+    global_logs = AdLog.query.order_by(AdLog.timestamp.desc()).limit(200).all()
+    return render_template('admin.html', users=users, subs=subs, logs=global_logs, active_threads=ACTIVE_THREADS)
 
 @app.route('/admin_statistics')
 @login_required
