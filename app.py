@@ -637,7 +637,27 @@ def delete_sub(sub_id):
         db.session.commit()
         flash('تم حذف الاشتراك نهائياً 🗑️', 'info')
     return redirect(request.referrer)
-
+@app.route('/admin_update_sleep/<int:sub_id>', methods=['POST'])
+@login_required
+def admin_update_sleep(sub_id):
+    if current_user.role != 'admin': return redirect(url_for('index'))
+    sub = Subscription.query.get_or_404(sub_id)
+    new_sleep = request.form.get('sleep_minutes', type=int)
+    
+    if new_sleep and new_sleep > 0:
+        sub.sleep_minutes = new_sleep
+        db.session.commit()
+        
+        # إعادة تشغيل الرادار فوراً لتطبيق المدة الجديدة إذا كان شغال
+        if sub.status == 'active':
+            if sub.id in ACTIVE_THREADS:
+                ACTIVE_THREADS[sub.id].stop()
+                del ACTIVE_THREADS[sub.id]
+            start_thread_for_sub(sub)
+            
+        flash('تم تحديث مدة الفحص (الدورة) للعميل بنجاح.', 'success')
+        
+    return redirect(request.referrer)
 # ================= مسارات الإدارة =================
 @app.route('/admin_dashboard')
 @login_required
