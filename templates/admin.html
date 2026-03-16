@@ -4,159 +4,389 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>لوحة الإدارة - راصد حراج</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Bootstrap RTL -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { background-color: #ecf0f1; font-family: 'Segoe UI', Tahoma, sans-serif;}
-        .navbar { background-color: #27ae60; }
-        .card { border-radius: 12px; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px;}
-        .log-table { max-height: 400px; overflow-y: auto; }
-        .stat-card { color: white; border-radius: 10px; padding: 20px; text-align: center; }
+        :root {
+            --primary: #1abc9c;
+            --primary-dark: #16a085;
+            --secondary: #34495e;
+            --accent: #f39c12;
+            --light-bg: #f8fafc;
+            --card-shadow: 0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.02);
+            --hover-shadow: 0 20px 30px -10px rgba(26,188,156,0.15);
+            --border-radius: 16px;
+        }
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #f0f5f9;
+            color: #2c3e50;
+        }
+        .navbar-custom {
+            background: linear-gradient(135deg, #2c3e50 0%, #1e2b38 100%);
+            padding: 0.8rem 1rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .navbar-custom .navbar-brand {
+            font-weight: 700;
+            font-size: 1.5rem;
+            color: white;
+        }
+        .navbar-custom .navbar-brand i {
+            color: var(--primary);
+            margin-left: 8px;
+        }
+        .stat-card {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            text-align: center;
+            box-shadow: var(--card-shadow);
+            transition: 0.3s;
+            border-bottom: 4px solid var(--primary);
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--hover-shadow);
+        }
+        .stat-icon {
+            font-size: 2.5rem;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #2c3e50;
+        }
+        .stat-label {
+            font-size: 1rem;
+            color: #7f8c8d;
+            font-weight: 600;
+        }
+        .glass-card {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(4px);
+            border-radius: var(--border-radius);
+            border: 1px solid rgba(255,255,255,0.5);
+            box-shadow: var(--card-shadow);
+            padding: 1.8rem;
+            margin-bottom: 1.5rem;
+        }
+        .section-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--secondary);
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 0.5rem;
+            margin-bottom: 1.5rem;
+            display: inline-block;
+        }
+        .table-custom {
+            background: white;
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+        }
+        .table-custom thead {
+            background-color: #2c3e50;
+            color: white;
+            font-weight: 700;
+        }
+        .table-custom th, .table-custom td {
+            padding: 1rem 0.8rem;
+            vertical-align: middle;
+            border-bottom: 1px solid #ecf0f1;
+        }
+        .badge-active {
+            background: #d4edda;
+            color: #155724;
+            padding: 0.4rem 0.8rem;
+            border-radius: 30px;
+            font-weight: 600;
+        }
+        .badge-inactive {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 0.4rem 0.8rem;
+            border-radius: 30px;
+            font-weight: 600;
+        }
+        .btn-sm-custom {
+            border-radius: 20px;
+            padding: 0.3rem 1rem;
+            font-weight: 600;
+            font-size: 0.8rem;
+        }
+        .log-table {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        /* Dark mode (احتفاظ بالخاصية) */
+        body.dark-mode {
+            background-color: #121212;
+            color: #e5e7eb;
+        }
+        body.dark-mode .glass-card,
+        body.dark-mode .stat-card,
+        body.dark-mode .table-custom {
+            background: #1f2937;
+            color: #e5e7eb;
+            border-color: #374151;
+        }
+        body.dark-mode .table-custom thead {
+            background-color: #2d3748;
+        }
+        body.dark-mode .stat-value {
+            color: #f3f4f6;
+        }
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-dark mb-4">
-        <div class="container">
-            <a class="navbar-brand" href="#"><i class="fas fa-tools"></i> لوحة الإدارة الكبرى | راصد حراج</a>
-            <span class="text-light ms-auto me-3">
-                <a href="/admin_settings" class="btn btn-light btn-sm fw-bold me-2"><i class="fas fa-cog"></i> إعدادات النظام</a>
-                <a href="/logout" class="btn btn-outline-light btn-sm"><i class="fas fa-sign-out-alt"></i> تسجيل خروج</a>
-            </span>
+    <!-- شريط التنقل -->
+    <nav class="navbar navbar-custom mb-4">
+        <div class="container d-flex align-items-center">
+            <button id="darkModeToggle" class="btn btn-outline-light me-3" style="border-radius: 30px;">
+                <i class="fas fa-moon"></i>
+            </button>
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-tools"></i> لوحة الإدارة | راصد حراج
+            </a>
+            <div class="ms-auto d-flex align-items-center gap-2">
+                <a href="/admin_settings" class="btn btn-outline-light btn-sm">
+                    <i class="fas fa-cog"></i> إعدادات
+                </a>
+                <a href="/admin_statistics" class="btn btn-outline-light btn-sm">
+                    <i class="fas fa-chart-pie"></i> إحصائيات
+                </a>
+                <a href="/logout" class="btn btn-outline-danger btn-sm">
+                    <i class="fas fa-sign-out-alt"></i> خروج
+                </a>
+            </div>
         </div>
     </nav>
 
     <div class="container">
+        <!-- رسائل الفلاش -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show">{{ message }}</div>
+                    <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm rounded-4 py-3" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
 
-        <div class="row mb-4">
-            <div class="col-md-4">
-                <div class="card p-3 shadow-sm text-center" onclick="window.location.href='/admin_statistics'" style="cursor: pointer;" title="اضغط هنا لفتح صفحة الإحصائيات">
-                    <h5 class="text-muted"><i class="fas fa-users"></i> العملاء (نشط / موقوف)</h5>
-                    <canvas id="usersChart" style="max-height: 200px;"></canvas>
+        <!-- بطاقات الإحصائيات السريعة -->
+        <div class="row g-4 mb-4">
+            <div class="col-md-3 col-6">
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-users"></i></div>
+                    <div class="stat-value">{{ total_users }}</div>
+                    <div class="stat-label">إجمالي العملاء</div>
                 </div>
             </div>
-            <div class="col-md-8">
-                <div class="card p-3 shadow-sm text-center">
-                    <h5 class="text-muted"><i class="fas fa-chart-line"></i> عدد الإعلانات المرسلة (آخر 7 أيام)</h5>
-                    <canvas id="adsChart" style="max-height: 200px;"></canvas>
+            <div class="col-md-3 col-6">
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-check-circle" style="color: #2ecc71;"></i></div>
+                    <div class="stat-value">{{ active_users }}</div>
+                    <div class="stat-label">نشط</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-ban" style="color: #e74c3c;"></i></div>
+                    <div class="stat-value">{{ inactive_users }}</div>
+                    <div class="stat-label">موقوف</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-satellite" style="color: #f39c12;"></i></div>
+                    <div class="stat-value">{{ active_threads|length }}</div>
+                    <div class="stat-label">رادارات نشطة</div>
                 </div>
             </div>
         </div>
 
-        <div class="row">
-            <div class="col-md-12 mb-4">
-                <div class="card p-4">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h5 class="mb-0 fw-bold"><i class="fas fa-users-cog text-primary"></i> إدارة العملاء والاشتراكات</h5>
-                        <a href="/admin_add_user" class="btn btn-success fw-bold shadow-sm"><i class="fas fa-user-plus"></i> إضافة عميل جديد</a>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="table table-bordered align-middle text-center table-hover">
-                            <thead class="table-dark">
-                                <tr>
-                                    <th>العميل</th>
-                                    <th>رقم الجوال</th>
-                                    <th>تاريخ الانتهاء</th>
-                                    <th>الاشتراك / الإرساليات</th>
-                                    <th>حالة الحساب</th>
-                                    <th>إجراءات الدعم الفني</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for user in users %}
-                                <tr>
-                                    <td>
-                                        <strong>{{ user.username }}</strong>
-                                        {% if user.role == 'admin' %}<span class="badge bg-warning text-dark d-block mt-1">مدير</span>{% endif %}
-                                    </td>
-                                    <td dir="ltr">{{ user.phone }}</td>
-                                    <td dir="ltr" class="text-danger fw-bold">
-                                        {{ user.account_expiration.strftime('%Y-%m-%d') if user.account_expiration else 'مفتوح' }}
-                                    </td>
-                                    <td>
-                                        {% if user.subscription %}
-                                            <span class="badge bg-info text-dark d-block mb-1">رسائل: {{ user.subscription.sent_count }}</span>
-                                            <a href="/admin_toggle_sub/{{ user.subscription.id }}" class="btn btn-sm {% if user.subscription.status == 'active' %}btn-outline-warning{% else %}btn-outline-success{% endif %} w-100 mb-1">
-                                                {% if user.subscription.status == 'active' %}<i class="fas fa-pause"></i> إيقاف الاشتراك{% else %}<i class="fas fa-play"></i> تشغيل الاشتراك{% endif %}
-                                            </a>
-                                            <form action="/admin_update_sleep/{{ user.subscription.id }}" method="POST" class="d-flex gap-1">
-                                                <input type="number" name="sleep_minutes" class="form-control form-control-sm text-center" value="{{ user.subscription.sleep_minutes }}" min="1" required title="مدة الفحص بالدقائق">
-                                                <button type="submit" class="btn btn-sm btn-secondary" title="حفظ المدة"><i class="fas fa-save"></i></button>
-                                            </form>
-                                        {% else %}
-                                            <span class="text-muted small">لا يوجد اشتراك</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if user.is_active_account %}
-                                            <span class="badge bg-success">فعال</span>
-                                        {% else %}
-                                            <span class="badge bg-danger">موقوف</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if user.id != current_user.id %}
-                                            <div class="d-flex flex-column gap-1">
-                                                <a href="/admin_edit_user/{{ user.id }}" class="btn btn-sm btn-primary"><i class="fas fa-edit"></i> تعديل/تمديد</a>
-                                                <a href="/impersonate/{{ user.id }}" class="btn btn-sm btn-dark"><i class="fas fa-sign-in-alt"></i> دخول بحسابه</a>
-                                                <a href="/toggle_user/{{ user.id }}" class="btn btn-sm {% if user.is_active_account %}btn-danger{% else %}btn-success{% endif %}">
-                                                    {% if user.is_active_account %}<i class="fas fa-ban"></i> إيقاف الحساب كلياً{% else %}<i class="fas fa-check"></i> تفعيل الحساب{% endif %}
-                                                </a>
-                                            </div>
-                                        {% else %}
-                                            <span class="text-muted">حسابك الشخصي</span>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
+        <!-- الرسم البياني للإعلانات -->
+        <div class="row g-4 mb-4">
+            <div class="col-md-6">
+                <div class="glass-card">
+                    <h5 class="section-title">
+                        <i class="fas fa-chart-line ms-2" style="color: var(--primary);"></i> توزيع العملاء
+                    </h5>
+                    <canvas id="usersChart" style="max-height: 250px;"></canvas>
                 </div>
             </div>
-
-            <div class="col-md-12">
-                <div class="card p-4 log-table">
-                    <h5 class="mb-4 text-secondary"><i class="fas fa-archive"></i> الأرشيف الشامل (تقارير الرصد لجميع العملاء)</h5>
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped align-middle">
-                            <thead class="table-secondary">
-                                <tr>
-                                    <th>الوقت</th>
-                                    <th>العميل</th>
-                                    <th>الكلمة المرصودة</th>
-                                    <th>عنوان الإعلان ورابطه</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for log in logs %}
-                                <tr>
-                                    <td class="text-muted small" dir="ltr">{{ log.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
-                                    <td><strong>{{ log.owner.username }}</strong></td>
-                                    <td><span class="badge bg-info text-dark">{{ log.keyword_matched }}</span></td>
-                                    <td><a href="{{ log.url }}" target="_blank" class="text-decoration-none text-dark">{{ log.title }}</a></td>
-                                </tr>
-                                {% else %}
-                                <tr>
-                                    <td colspan="4" class="text-center text-muted py-3">لا توجد عمليات رصد حتى الآن.</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
+            <div class="col-md-6">
+                <div class="glass-card">
+                    <h5 class="section-title">
+                        <i class="fas fa-chart-bar ms-2" style="color: var(--primary);"></i> الإعلانات المرسلة (آخر 7 أيام)
+                    </h5>
+                    <canvas id="adsChart" style="max-height: 250px;"></canvas>
                 </div>
+            </div>
+        </div>
+
+        <!-- جدول العملاء والاشتراكات -->
+        <div class="glass-card">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="section-title mb-0">
+                    <i class="fas fa-users-cog ms-2"></i> إدارة العملاء والاشتراكات
+                </h5>
+                <a href="/admin_add_user" class="btn btn-success fw-bold shadow-sm rounded-pill px-4">
+                    <i class="fas fa-user-plus"></i> إضافة عميل جديد
+                </a>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-custom align-middle">
+                    <thead>
+                        <tr>
+                            <th>العميل</th>
+                            <th>رقم الجوال</th>
+                            <th>تاريخ الانتهاء</th>
+                            <th>الاشتراك / الإرساليات</th>
+                            <th>حالة الحساب</th>
+                            <th>إجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        <tr>
+                            <td>
+                                <strong>{{ user.username }}</strong>
+                                {% if user.role == 'admin' %}
+                                    <span class="badge bg-warning text-dark d-inline-block me-1">مدير</span>
+                                {% endif %}
+                            </td>
+                            <td dir="ltr">{{ user.phone }}</td>
+                            <td>
+                                {% if user.account_expiration %}
+                                    <span class="text-danger fw-bold">{{ user.account_expiration.strftime('%Y-%m-%d') }}</span>
+                                {% else %}
+                                    <span class="text-success fw-bold">مفتوح</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if user.subscription %}
+                                    <div class="d-flex flex-column gap-1">
+                                        <span class="badge bg-info text-dark px-3 py-1">رسائل: {{ user.subscription.sent_count }}</span>
+                                        <div class="d-flex gap-1">
+                                            <a href="/admin_toggle_sub/{{ user.subscription.id }}" class="btn btn-sm btn-outline-warning btn-sm-custom">
+                                                {% if user.subscription.status == 'active' %}
+                                                    <i class="fas fa-pause"></i> إيقاف
+                                                {% else %}
+                                                    <i class="fas fa-play"></i> تشغيل
+                                                {% endif %}
+                                            </a>
+                                            <form action="/admin_update_sleep/{{ user.subscription.id }}" method="POST" class="d-flex gap-1">
+                                                <input type="number" name="sleep_minutes" class="form-control form-control-sm text-center" value="{{ user.subscription.sleep_minutes }}" min="1" style="width: 70px;">
+                                                <button type="submit" class="btn btn-sm btn-secondary" title="حفظ"><i class="fas fa-save"></i></button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted small">لا يوجد اشتراك</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if user.is_active_account %}
+                                    <span class="badge-active">فعال</span>
+                                {% else %}
+                                    <span class="badge-inactive">موقوف</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if user.id != current_user.id %}
+                                    <div class="d-flex flex-column gap-1">
+                                        <a href="/admin_edit_user/{{ user.id }}" class="btn btn-sm btn-primary btn-sm-custom">
+                                            <i class="fas fa-edit"></i> تعديل
+                                        </a>
+                                        <a href="/impersonate/{{ user.id }}" class="btn btn-sm btn-dark btn-sm-custom">
+                                            <i class="fas fa-sign-in-alt"></i> دخول
+                                        </a>
+                                        <a href="/toggle_user/{{ user.id }}" class="btn btn-sm {% if user.is_active_account %}btn-danger{% else %}btn-success{% endif %} btn-sm-custom">
+                                            {% if user.is_active_account %}
+                                                <i class="fas fa-ban"></i> إيقاف
+                                            {% else %}
+                                                <i class="fas fa-check"></i> تفعيل
+                                            {% endif %}
+                                        </a>
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted">حسابك</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- أرشيف الإعلانات الشامل -->
+        <div class="glass-card log-table">
+            <h5 class="section-title">
+                <i class="fas fa-archive ms-2"></i> الأرشيف الشامل
+            </h5>
+            <div class="table-responsive">
+                <table class="table table-custom table-sm">
+                    <thead>
+                        <tr>
+                            <th>الوقت</th>
+                            <th>العميل</th>
+                            <th>الكلمة</th>
+                            <th>عنوان الإعلان</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in logs %}
+                        <tr>
+                            <td class="small text-muted" dir="ltr">{{ log.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td><strong>{{ log.owner.username }}</strong></td>
+                            <td><span class="badge bg-info text-dark px-2 py-1">{{ log.keyword_matched }}</span></td>
+                            <td><a href="{{ log.url }}" target="_blank" class="text-decoration-none text-primary">{{ log.title|truncate(40) }}</a></td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-4">لا توجد عمليات رصد حتى الآن.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 
     <script>
+        // Dark mode
+        const toggleBtn = document.getElementById('darkModeToggle');
+        const body = document.body;
+        if(localStorage.getItem('darkMode') === 'enabled') {
+            body.classList.add('dark-mode');
+            toggleBtn.innerHTML = '<i class="fas fa-sun text-warning"></i>';
+        }
+        toggleBtn.addEventListener('click', () => {
+            body.classList.toggle('dark-mode');
+            if(body.classList.contains('dark-mode')) {
+                localStorage.setItem('darkMode', 'enabled');
+                toggleBtn.innerHTML = '<i class="fas fa-sun text-warning"></i>';
+            } else {
+                localStorage.setItem('darkMode', 'disabled');
+                toggleBtn.innerHTML = '<i class="fas fa-moon"></i>';
+            }
+        });
+
+        // رسم المخططات
         const ctxUsers = document.getElementById('usersChart').getContext('2d');
         new Chart(ctxUsers, {
             type: 'doughnut',
@@ -165,10 +395,14 @@
                 datasets: [{
                     data: [{{ active_users }}, {{ inactive_users }}],
                     backgroundColor: ['#2ecc71', '#e74c3c'],
-                    hoverOffset: 4
+                    borderWidth: 0,
+                    hoverOffset: 5
                 }]
             },
-            options: { plugins: { legend: { position: 'bottom' } } }
+            options: {
+                responsive: true,
+                plugins: { legend: { position: 'bottom', labels: { font: { family: 'Cairo' } } } }
+            }
         });
 
         const ctxAds = document.getElementById('adsChart').getContext('2d');
@@ -179,13 +413,14 @@
                 datasets: [{
                     label: 'إعلانات مرسلة',
                     data: {{ chart_data | tojson }},
-                    borderColor: '#3498db',
-                    backgroundColor: 'rgba(52, 152, 219, 0.2)',
+                    borderColor: '#1abc9c',
+                    backgroundColor: 'rgba(26,188,156,0.1)',
                     fill: true,
-                    tension: 0.3
+                    tension: 0.3,
+                    pointBackgroundColor: '#16a085'
                 }]
             },
-            options: { 
+            options: {
                 scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
                 plugins: { legend: { display: false } }
             }
