@@ -3,159 +3,293 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>راصد حراج | رادارك الشخصي</title>
+    <title>راصد حراج - رادارك الشخصي</title>
+    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <!-- Bootstrap RTL -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* متغيرات الألوان للوضع العادي والليلي */
         :root {
-            --bg-color: linear-gradient(180deg, #e6f7f4 0%, #f8f9fa 100%);
-            --text-color: #2c3e50;
-            --card-bg: #ffffff;
-            --muted-text: #6c757d;
-            --border-color: rgba(0,0,0,0.05);
+            --primary: #1abc9c;
+            --primary-dark: #16a085;
+            --secondary: #34495e;
+            --light-bg: #f8fafc;
+            --card-shadow: 0 10px 30px -10px rgba(0,0,0,0.1);
+            --border-radius: 24px;
+        }
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: linear-gradient(145deg, #f0f5f9 0%, #e6f7f4 100%);
+            color: #2c3e50;
+            min-height: 100vh;
+        }
+        .navbar-custom {
+            background: transparent;
+            padding: 1.5rem 0;
+        }
+        .btn-outline-primary-custom {
+            border: 2px solid var(--primary);
+            color: var(--primary);
+            border-radius: 40px;
+            padding: 0.5rem 2rem;
+            font-weight: 700;
+            background: transparent;
+            transition: 0.3s;
+        }
+        .btn-outline-primary-custom:hover {
+            background: var(--primary);
+            color: white;
+        }
+        .btn-primary-custom {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border: none;
+            border-radius: 40px;
+            padding: 0.8rem 2.5rem;
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: white;
+            box-shadow: 0 8px 20px rgba(26,188,156,0.3);
+            transition: 0.3s;
+        }
+        .btn-primary-custom:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 30px rgba(26,188,156,0.4);
+        }
+        .hero-section {
+            text-align: center;
+            padding: 3rem 0 4rem;
+        }
+        .hero-icon {
+            font-size: 6rem;
+            color: var(--primary);
+            animation: float 3s ease-in-out infinite;
+        }
+        @keyframes float {
+            0% { transform: translateY(0); }
+            50% { transform: translateY(-15px); }
+            100% { transform: translateY(0); }
+        }
+        .hero-title {
+            font-weight: 800;
+            font-size: 3rem;
+            margin: 1rem 0 0.5rem;
+            color: #2c3e50;
+        }
+        .hero-subtitle {
+            font-size: 1.3rem;
+            color: #5d6d7e;
+            max-width: 700px;
+            margin: 0 auto 2rem;
+        }
+        .feature-card {
+            background: rgba(255,255,255,0.8);
+            backdrop-filter: blur(8px);
+            border-radius: var(--border-radius);
+            padding: 2rem 1.5rem;
+            text-align: center;
+            box-shadow: var(--card-shadow);
+            border: 1px solid rgba(255,255,255,0.5);
+            transition: 0.3s;
+            height: 100%;
+        }
+        .feature-card:hover {
+            transform: translateY(-10px);
+            background: white;
+        }
+        .feature-icon {
+            width: 80px;
+            height: 80px;
+            background: rgba(26,188,156,0.1);
+            border-radius: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+            font-size: 2.5rem;
+            color: var(--primary);
+        }
+        .faq-section {
+            background: rgba(255,255,255,0.5);
+            backdrop-filter: blur(4px);
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            margin: 3rem 0;
+        }
+        .accordion-item {
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+        .accordion-button {
+            background: transparent;
+            font-weight: 700;
+            color: #2c3e50;
+            padding: 1.2rem 0;
+        }
+        .accordion-button:not(.collapsed) {
+            color: var(--primary);
+            background: transparent;
+            box-shadow: none;
+        }
+        .accordion-button:focus {
+            box-shadow: none;
+        }
+        .footer {
+            text-align: center;
+            padding: 2rem 0;
+            color: #5d6d7e;
         }
         body.dark-mode {
-            --bg-color: #121212;
-            --text-color: #e0e0e0;
-            --card-bg: #1e1e1e;
-            --muted-text: #a0a0a0;
-            --border-color: rgba(255,255,255,0.05);
+            background: linear-gradient(145deg, #121212 0%, #1e2b38 100%);
+            color: #e5e7eb;
         }
-
-        body { 
-            font-family: 'Cairo', sans-serif; 
-            background: var(--bg-color); 
-            color: var(--text-color);
-            min-height: 100vh;
-            transition: background 0.3s, color 0.3s;
+        body.dark-mode .hero-title {
+            color: white;
         }
-        
-        .header-logo { color: #1abc9c; font-size: 4rem; animation: pulse 2s infinite; }
-        @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.8; } 100% { transform: scale(1); opacity: 1; } }
-        
-        .btn-main { background-color: #1abc9c; color: white; border-radius: 50px; padding: 12px 40px; font-size: 1.2rem; font-weight: 700; border: none; box-shadow: 0 4px 15px rgba(26, 188, 156, 0.3); transition: all 0.3s; }
-        .btn-main:hover { background-color: #16a085; transform: translateY(-2px); color: white; }
-        
-        .feature-card { background: var(--card-bg); border-radius: 20px; padding: 30px 20px; border: 1px solid var(--border-color); box-shadow: 0 10px 30px rgba(0,0,0,0.03); margin-bottom: 20px; transition: transform 0.3s; color: var(--text-color); }
-        .feature-card:hover { transform: translateY(-5px); }
-        .icon-wrapper { background-color: rgba(26, 188, 156, 0.1); color: #1abc9c; width: 70px; height: 70px; border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto 20px auto; }
-        
-        /* تنسيقات الأسئلة الشائعة لدعم الوضع الليلي */
-        .accordion-item { background-color: var(--card-bg); border-color: var(--border-color); }
-        .faq-button { background-color: var(--card-bg) !important; font-weight: 700; color: var(--text-color) !important; transition: 0.3s; }
-        .faq-button:not(.collapsed) { color: #1abc9c !important; box-shadow: none; }
-        .accordion-button::after { filter: grayscale(1); } /* لتوضيح السهم في الوضع الليلي */
-        .text-muted { color: var(--muted-text) !important; }
-        
-        .dark-toggle { width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--card-bg); color: var(--text-color); cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border: 1px solid var(--border-color); transition: 0.3s; }
-        .dark-toggle:hover { transform: scale(1.05); }
+        body.dark-mode .hero-subtitle {
+            color: #b0c4de;
+        }
+        body.dark-mode .feature-card {
+            background: rgba(31,41,55,0.8);
+            border-color: #374151;
+        }
+        body.dark-mode .faq-section {
+            background: rgba(31,41,55,0.5);
+        }
+        body.dark-mode .accordion-button {
+            color: #e5e7eb;
+        }
+        .dark-toggle {
+            background: transparent;
+            border: 2px solid var(--primary);
+            color: var(--primary);
+            border-radius: 30px;
+            padding: 0.5rem 1.5rem;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
+    <div class="container">
+        <!-- شريط التنقل -->
+        <nav class="navbar navbar-custom">
+            <div class="container-fluid px-0">
+                <button id="darkModeToggle" class="btn dark-toggle">
+                    <i class="fas fa-moon"></i> الوضع الليلي
+                </button>
+                <div>
+                    <a href="/login" class="btn btn-outline-primary-custom me-2">دخول</a>
+                    <a href="/register" class="btn btn-primary-custom">تجربة مجانية</a>
+                </div>
+            </div>
+        </nav>
 
-    <div class="container pt-4 d-flex justify-content-between align-items-center">
-        <div>
-            <a href="/login" class="btn btn-outline-secondary fw-bold rounded-pill px-3 me-2" style="background-color: var(--card-bg); color: var(--text-color); border-color: var(--border-color);">تسجيل الدخول</a>
-            <a href="/register" class="btn btn-main px-4 py-2" style="font-size: 1rem; box-shadow: none;">حساب جديد</a>
+        <!-- قسم الترحيب -->
+        <div class="hero-section">
+            <div class="hero-icon">
+                <i class="fas fa-satellite-dish"></i>
+            </div>
+            <h1 class="hero-title">راصد حراج</h1>
+            <p class="hero-subtitle">
+                رادارك الشخصي الذكي لمراقبة إعلانات حراج 24/7، يرسلها لك فوراً على الواتساب
+            </p>
+            <a href="/register" class="btn btn-primary-custom">
+                <i class="fas fa-rocket ms-2"></i> ابدأ الآن مجاناً
+            </a>
         </div>
-        <button id="darkModeToggle" class="dark-toggle fs-5">
-            <i class="fas fa-moon"></i>
-        </button>
-    </div>
 
-    <div class="container text-center pt-4 pb-4">
-        <div class="mt-2 mb-3">
-            <i class="fas fa-satellite-dish header-logo"></i>
-        </div>
-        <h1 class="fw-bold mb-3" style="color: var(--text-color);">راصد حراج</h1>
-        <p class="lead mb-4 mx-auto" style="max-width: 600px; color: var(--muted-text);">
-            رادارك الشخصي اللي يراقب الإعلانات 24 ساعة، وتصيد لك العروض قبل الكل ويرسلها مباشرة للواتساب!
-        </p>
-        <a href="/register" class="btn btn-main mb-5"><i class="fas fa-rocket ms-2"></i> تفعيل الرادار الآن</a>
-    </div>
-
-    <div class="container pb-5">
-        <div class="row justify-content-center">
+        <!-- المميزات -->
+        <div class="row g-4">
             <div class="col-md-4">
-                <div class="feature-card text-center">
-                    <div class="icon-wrapper"><i class="fas fa-bolt"></i></div>
-                    <h4 class="fw-bold mb-3">سرعة خيالية</h4>
-                    <p class="mb-0" style="color: var(--muted-text);">أول ما يتم نشر الإعلان في حراج يوصلك فيه رسالة فورية برابط الإعلان.</p>
+                <div class="feature-card">
+                    <div class="feature-icon"><i class="fas fa-bolt"></i></div>
+                    <h4 class="fw-bold mb-3">سرعة فورية</h4>
+                    <p class="mb-0">بمجرد نشر الإعلان في حراج، يصلك رابط الإعلان على الواتساب فوراً.</p>
                 </div>
             </div>
             <div class="col-md-4">
-                <div class="feature-card text-center">
-                    <div class="icon-wrapper"><i class="fas fa-filter"></i></div>
+                <div class="feature-card">
+                    <div class="feature-icon"><i class="fas fa-filter"></i></div>
                     <h4 class="fw-bold mb-3">فلترة ذكية</h4>
-                    <p class="mb-0" style="color: var(--muted-text);">استبعد الكلمات اللي ما تبيها، وحدد مدينتك عشان توصلك الصيدات الصح.</p>
+                    <p class="mb-0">حدد الكلمات المطلوبة، استبعد ما لا تريد، واختر المدينة المستهدفة.</p>
                 </div>
             </div>
             <div class="col-md-4">
-                <div class="feature-card text-center">
-                    <div class="icon-wrapper"><i class="fas fa-bed"></i></div>
-                    <h4 class="fw-bold mb-3">أنت نايم وحنا نراقب</h4>
-                    <p class="mb-0" style="color: var(--muted-text);">نظامنا ما يوقف، يغنيك عن تحديث الصفحة ومطاردة الإعلانات بنفسك.</p>
+                <div class="feature-card">
+                    <div class="feature-icon"><i class="fas fa-bed"></i></div>
+                    <h4 class="fw-bold mb-3">لا يفوتك شيء</h4>
+                    <p class="mb-0">نظامنا يعمل 24 ساعة، حتى أثناء نومك، ويخزن الإعلانات لك.</p>
                 </div>
             </div>
         </div>
-    </div>
 
-    <div class="container pb-5" style="max-width: 800px;">
-        <h3 class="text-center fw-bold mb-4" style="color: var(--text-color);"><i class="far fa-lightbulb text-warning"></i> أسئلة شائعة</h3>
-        <div class="accordion shadow-sm" style="border-radius: 15px; overflow: hidden;" id="faq">
-            <div class="accordion-item border-0 border-bottom">
-                <h2 class="accordion-header">
-                    <button class="accordion-button faq-button" type="button" data-bs-toggle="collapse" data-bs-target="#q1">هل يوجد اشتراك مجاني للتجربة؟</button>
-                </h2>
-                <div id="q1" class="accordion-collapse collapse show" data-bs-parent="#faq">
-                    <div class="accordion-body" style="color: var(--muted-text);">نعم، بمجرد التسجيل ستحصل على فترة تجربة مجانية لتتأكد من سرعة وقوة الرادار قبل الاشتراك.</div>
+        <!-- الأسئلة الشائعة -->
+        <div class="faq-section">
+            <h3 class="text-center fw-bold mb-4"><i class="far fa-lightbulb text-warning ms-2"></i> أسئلة شائعة</h3>
+            <div class="accordion" id="faqAccordion">
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">
+                            هل توجد فترة تجريبية مجانية؟
+                        </button>
+                    </h2>
+                    <div id="faq1" class="accordion-collapse collapse show" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            نعم، فور تسجيلك تحصل على فترة تجريبية مجانية لتجربة الخدمة والاطمئنان على جودة الرصد.
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div class="accordion-item border-0 border-bottom">
-                <h2 class="accordion-header">
-                    <button class="accordion-button faq-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#q2">كيف يعمل النظام بالضبط؟</button>
-                </h2>
-                <div id="q2" class="accordion-collapse collapse" data-bs-parent="#faq">
-                    <div class="accordion-body" style="color: var(--muted-text);">فقط أضف كلمات البحث المطلوبة (مثال: شاص 2024)، وسنقوم بفحص حراج كل بضع دقائق، وفور نزول إعلان مطابق يصلك للواتساب.</div>
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">
+                            كيف يتم إرسال الإعلانات؟
+                        </button>
+                    </h2>
+                    <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            عند رصد إعلان جديد يطابق كلمات بحثك، يتم إرسال رسالة واتساب تحتوي رابط الإعلان مباشرة إلى رقم جوالك المسجل.
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div class="accordion-item border-0">
-                <h2 class="accordion-header">
-                    <button class="accordion-button faq-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#q3">كيف أدخل لحسابي؟</button>
-                </h2>
-                <div id="q3" class="accordion-collapse collapse" data-bs-parent="#faq">
-                    <div class="accordion-body" style="color: var(--muted-text);">يمكنك تسجيل الدخول من خلال الأزرار العلوية للتحكم باشتراكاتك وتعديل إعدادات الرصد الخاصة بك بكل سهولة.</div>
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq3">
+                            هل يمكنني إيقاف الرصد مؤقتاً؟
+                        </button>
+                    </h2>
+                    <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            نعم، يمكنك من لوحة التحكم إيقاف الرصد مؤقتاً أو تشغيله متى شئت، وكذلك تعديل كلمات البحث في أي وقت.
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <footer class="text-center py-4" style="color: var(--muted-text); font-size: 0.9rem;">
-        جميع الحقوق محفوظة &copy; 2026 | منصة راصد حراج
-    </footer>
+        <!-- تذييل -->
+        <div class="footer">
+            جميع الحقوق محفوظة &copy; 2026 | منصة راصد حراج
+        </div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         const toggleBtn = document.getElementById('darkModeToggle');
         const body = document.body;
-        
-        // التحقق من حالة الوضع الليلي المحفوظة مسبقاً
         if(localStorage.getItem('darkMode') === 'enabled') {
             body.classList.add('dark-mode');
-            toggleBtn.innerHTML = '<i class="fas fa-sun text-warning"></i>';
+            toggleBtn.innerHTML = '<i class="fas fa-sun"></i> الوضع النهاري';
         }
-
-        // تفعيل وإلغاء الوضع الليلي
         toggleBtn.addEventListener('click', () => {
             body.classList.toggle('dark-mode');
             if(body.classList.contains('dark-mode')) {
                 localStorage.setItem('darkMode', 'enabled');
-                toggleBtn.innerHTML = '<i class="fas fa-sun text-warning"></i>';
+                toggleBtn.innerHTML = '<i class="fas fa-sun"></i> الوضع النهاري';
             } else {
                 localStorage.setItem('darkMode', 'disabled');
-                toggleBtn.innerHTML = '<i class="fas fa-moon"></i>';
+                toggleBtn.innerHTML = '<i class="fas fa-moon"></i> الوضع الليلي';
             }
         });
     </script>
