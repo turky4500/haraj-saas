@@ -12,7 +12,7 @@ from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
-app.secret_key = "haraj_super_secret_key_v18_speed"
+app.secret_key = "haraj_super_secret_key_v18_final_launch"
 
 app.jinja_env.globals.update(now=datetime.datetime.now)
 
@@ -26,6 +26,12 @@ if db_url:
     app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 else:
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(BASE_DIR, 'haraj.db')
+
+# 🚨 التعديل السحري لحل مشكلة الخطأ 500 (منع نوم قاعدة البيانات) 🚨
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    "pool_pre_ping": True,
+    "pool_recycle": 280,
+}
 # ===============================================================
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -38,22 +44,17 @@ login_manager.login_view = 'login'
 APP_BASE_DIR = Path(__file__).resolve().parent
 SUBS_BASE_DIR = APP_BASE_DIR / "subs"
 SUBS_BASE_DIR.mkdir(exist_ok=True)
+REMINDERS_FILE = SUBS_BASE_DIR / "reminders_sent.json"
 
 HARAJ_BASE = "https://haraj.com.sa"
 HARAJ_HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Accept-Language": "ar-SA"}
 ACTIVE_THREADS = {} 
 
+# ================= ضبط توقيت السعودية (KSA) =================
 def get_ksa_time():
     return datetime.datetime.utcnow() + datetime.timedelta(hours=3)
 
-# ================= باتش منع السكون والتنظيف والإحصائيات =================
-def keep_alive_patch():
-    while True:
-        try:
-            requests.get("https://haraj-saas.onrender.com/", timeout=10)
-        except: pass
-        time.sleep(600) 
-
+# ================= مهام الخلفية (تنظيف الأرشيف + التنبيهات والإحصائيات) =================
 def cleanup_old_logs():
     while True:
         time.sleep(3600)
@@ -69,29 +70,48 @@ def cleanup_old_logs():
             except:
                 pass
 
-def daily_admin_report():
+def daily_background_tasks():
     while True:
-        time.sleep(1800)
+        time.sleep(1800) # يفحص كل نص ساعة
         with app.app_context():
             try:
+                now = get_ksa_time()
+                settings = SystemSettings.query.first()
+                token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
+
+                # 1. إرسال إحصائية الزوار للإدارة (الساعة 11 بالليل)
                 notify = AdminNotifySettings.query.first()
                 if notify and notify.admin_phone:
-                    now = get_ksa_time()
                     if now.hour >= 23 and notify.last_report_date < now.date():
-                        settings = SystemSettings.query.first()
-                        token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
-                        
                         msg = f"📊 تقرير نهاية اليوم لمنصة (راصد حراج):\n\n👥 عدد الزوار الجدد اليوم: {notify.daily_visitors} زائر.\n\nيعطيك العافية 🚀"
                         send_whatsapp(create_session(), token, notify.admin_phone, msg)
-                        
                         notify.daily_visitors = 0
                         notify.last_report_date = now.date()
                         db.session.commit()
+
+                # 2. رسائل التذكير بالتجديد للعملاء (تُرسل الساعة 4 عصراً)
+                if now.hour >= 16:
+                    if REMINDERS_FILE.exists():
+                        with open(REMINDERS_FILE, 'r') as f: sent_reminders = json.load(f)
+                    else:
+                        sent_reminders = {}
+
+                    users = User.query.filter(User.account_expiration.isnot(None)).all()
+                    for u in users:
+                        exp_date_str = u.account_expiration.strftime('%Y-%m-%d')
+                        # إذا كان الاشتراك ينتهي غداً
+                        if u.account_expiration.date() == now.date() + datetime.timedelta(days=1):
+                            uid_str = str(u.id)
+                            # التأكد من عدم إرسال الرسالة مرتين لنفس اليوم
+                            if sent_reminders.get(uid_str) != exp_date_str:
+                                msg = "مرحباً بك ⏳\nنذكرك بأن اشتراكك في (راصد حراج) ينتهي غداً.\nلضمان استمرار رصد صيداتك الموفقة بدون انقطاع، نرجو التواصل معنا لتجديد الاشتراك. 🌹"
+                                if send_whatsapp(create_session(), token, u.phone, msg):
+                                    sent_reminders[uid_str] = exp_date_str
+                                    with open(REMINDERS_FILE, 'w') as f: json.dump(sent_reminders, f)
             except: pass
 
-threading.Thread(target=keep_alive_patch, daemon=True).start()
 threading.Thread(target=cleanup_old_logs, daemon=True).start()
-threading.Thread(target=daily_admin_report, daemon=True).start()
+threading.Thread(target=daily_background_tasks, daemon=True).start()
 
 # ================= النماذج (قواعد البيانات) =================
 class SystemSettings(db.Model):
@@ -148,7 +168,7 @@ class AdLog(db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# ================= دوال مساعدة =================
+# ================= دوال مساعدة وخوارزمية البحث الدقيقة =================
 _AR_DIACRITICS_RE = re.compile(r"[\u064B-\u0652\u0670\u0640]")
 _AR_NORM_MAP = str.maketrans({"أ": "ا", "إ": "ا", "آ": "ا", "ؤ": "و", "ئ": "ي", "ى": "ي", "ة": "ه"})
 
@@ -242,18 +262,19 @@ class MonitorThread(threading.Thread):
                 settings = SystemSettings.query.first()
                 current_token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
 
+                # تحديث قوي لرسالة الانتهاء والشكر
                 if not user or not user.is_active_account or not sub or sub.status != 'active' or (user.account_expiration and user.account_expiration < datetime.datetime.now()):
                     if sub and sub.status == 'active': 
                         sub.status = 'paused'
                         db.session.commit()
-                        exp_msg = "⚠️ عذراً، انتهى اشتراكك في راصد حراج.\nتم إيقاف الرصد مؤقتاً، نرجو التواصل معنا لتجديد الاشتراك واستئناف الرصد. 🌹"
+                        exp_msg = "انتهى اشتراكك في (راصد حراج) 🛑\n\nسعدنا جداً بخدمتك ونتمنى أن نكون قد وفقنا في صيد أفضل الإعلانات لك وتوفير وقتك.\nنطمح لرؤيتك مجدداً، وتذكر أن رادارك محفوظ وجاهز للاستئناف في أي وقت بمجرد تجديد الاشتراك.\n\nشكراً لثقتك بنا 🌹"
                         send_whatsapp(self.req_session, current_token, self.cfg['recipients'], exp_msg)
                     break 
             
             currently_quiet = is_quiet_now(self.cfg['quiet_enabled'], self.cfg['q_sh'], self.cfg['q_sm'], self.cfg['q_eh'], self.cfg['q_em'])
 
             if not currently_quiet and self.queued_ads:
-                wake_msg = "🌅 انتهت فترة الهدوء!\nإليك الإعلانات التي تم رصدها وتخزينها أثناء نومك:"
+                wake_msg = "🌅 انتهت فترة الهدوء!\nإليك الإعلانات التي تم رصدها وتخزينها أثناء فترة توقف الإشعارات:"
                 send_whatsapp(self.req_session, current_token, self.cfg['recipients'], wake_msg)
                 time.sleep(3)
                 for ad in self.queued_ads:
@@ -312,7 +333,6 @@ class MonitorThread(threading.Thread):
                         pass
                     time.sleep(random.uniform(3, 7))
             
-            # هنا التعديل: السيرفر ينام حسب الدقائق المخصصة لكل عميل
             sleep_seconds = self.cfg['sleep_minutes'] * 60
             for _ in range(sleep_seconds):
                 if self.stop_evt.is_set(): break
@@ -333,8 +353,7 @@ def start_thread_for_sub(sub):
         'quiet_enabled': sub.quiet_enabled,
         'q_sh': sub.quiet_start_hour, 'q_sm': sub.quiet_start_minute,
         'q_eh': sub.quiet_end_hour, 'q_em': sub.quiet_end_minute,
-        'sleep_minutes': sub.sleep_minutes, # يتم التمرير من قاعدة البيانات
-        'end_ts': sub.end_ts
+        'sleep_minutes': sub.sleep_minutes, 'end_ts': sub.end_ts
     }
     t = MonitorThread(cfg)
     ACTIVE_THREADS[sub.id] = t
@@ -344,6 +363,10 @@ def start_thread_for_sub(sub):
 
 @app.route('/')
 def index():
+    # طرد روبوت جوجل من الإحصائيات الوهمية
+    if request.headers.get('X-Keep-Alive-Bot'):
+        return "Bot OK", 200
+
     if 'visited_today' not in session:
         session['visited_today'] = True
         notify = AdminNotifySettings.query.first()
@@ -656,9 +679,6 @@ def admin_add_user():
         quiet_enabled = 'quiet_enabled' in request.form
         q_sh = int(request.form.get('q_sh', 1))
         q_eh = int(request.form.get('q_eh', 6))
-        
-        # التعديل الجديد: التقاط سرعة الفحص من الإدارة
-        sleep_minutes = int(request.form.get('sleep_minutes', 15))
 
         if User.query.filter_by(username=username).first() or User.query.filter_by(phone=phone).first():
             flash('اسم المستخدم أو رقم الجوال مسجل مسبقاً!', 'danger')
@@ -687,8 +707,7 @@ def admin_add_user():
                 cities=cities, city_filter_enabled=city_filter_enabled,
                 excluded_words=excluded_words, exclude_enabled=exclude_enabled,
                 quiet_enabled=quiet_enabled, quiet_start_hour=q_sh, quiet_start_minute=0, quiet_end_hour=q_eh, quiet_end_minute=0,
-                sleep_minutes=sleep_minutes, # يتم الحفظ هنا
-                end_ts=end_ts
+                sleep_minutes=15, end_ts=end_ts
             )
             db.session.add(new_sub)
             db.session.commit()
@@ -712,7 +731,6 @@ def admin_edit_user(user_id):
         user.phone = request.form.get('phone')
         new_pass = request.form.get('password')
         exp_date_str = request.form.get('account_expiration')
-        sleep_mins = request.form.get('sleep_minutes') # التعديل الجديد
         
         if new_pass:
             user.password = generate_password_hash(new_pass, method='pbkdf2:sha256')
@@ -725,16 +743,6 @@ def admin_edit_user(user_id):
         if user.subscription:
             user.subscription.recipients = user.phone
             user.subscription.end_ts = user.account_expiration.isoformat() if user.account_expiration else ""
-            
-            # تحديث سرعة الفحص وإعادة تشغيل الخيط برمجياً لتطبيق السرعة الجديدة
-            if sleep_mins:
-                old_sleep = user.subscription.sleep_minutes
-                user.subscription.sleep_minutes = int(sleep_mins)
-                if old_sleep != int(sleep_mins) and user.subscription.status == 'active':
-                    if user.subscription.id in ACTIVE_THREADS:
-                        ACTIVE_THREADS[user.subscription.id].stop()
-                        del ACTIVE_THREADS[user.subscription.id]
-                    start_thread_for_sub(user.subscription)
             
         db.session.commit()
         flash(f'تم تعديل بيانات العميل {user.username} بنجاح.', 'success')
