@@ -3,29 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لوحة الإدارة الكبرى - راصد حراج</title>
+    <title>لوحة الإدارة - راصد حراج</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        :root { --bg-color: #ecf0f1; --text-color: #2c3e50; --card-bg: #ffffff; --nav-bg: #2c3e50; --border-color: rgba(0,0,0,0.1); }
-        body.dark-mode { --bg-color: #121212; --text-color: #e0e0e0; --card-bg: #1e1e1e; --nav-bg: #000000; --border-color: rgba(255,255,255,0.1); }
-        body { background-color: var(--bg-color); font-family: 'Segoe UI', Tahoma, sans-serif; color: var(--text-color); transition: 0.3s; }
-        .navbar { background-color: var(--nav-bg); }
-        .card { background-color: var(--card-bg); border-radius: 10px; border: 1px solid var(--border-color); box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        :root { --bg-color: #f4f6f9; --text-color: #333; --card-bg: #fff; --border-color: #dee2e6; }
+        body.dark-mode { --bg-color: #121212; --text-color: #e0e0e0; --card-bg: #1e1e1e; --border-color: #333; }
+        body { background-color: var(--bg-color); font-family: Tahoma, sans-serif; color: var(--text-color); transition: 0.3s; }
+        .card { background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         .table { color: var(--text-color); }
-        .table-hover tbody tr:hover { background-color: rgba(0,0,0,0.05); }
+        .table-hover tbody tr:hover { background-color: rgba(0,0,0,0.03); }
         body.dark-mode .table-hover tbody tr:hover { background-color: rgba(255,255,255,0.05); }
-        .list-group-item { background-color: var(--card-bg); color: var(--text-color); border-color: var(--border-color); transition: 0.2s; }
-        .list-group-item:hover { background-color: rgba(0,0,0,0.02); }
-        body.dark-mode .list-group-item:hover { background-color: rgba(255,255,255,0.05); }
-        .list-group-item.active { background-color: #27ae60; border-color: #27ae60; color: white; }
+        .list-group-item { background-color: var(--card-bg); color: var(--text-color); border-color: var(--border-color); }
+        .list-group-item.active { background-color: #0d6efd; border-color: #0d6efd; color: white; }
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-dark mb-4 shadow-sm">
-        <div class="container d-flex justify-content-between align-items-center">
-            <a class="navbar-brand fw-bold fs-4" href="#"><i class="fas fa-crown text-warning"></i> الإدارة المركزية | راصد حراج</a>
-            <button class="btn btn-outline-light" onclick="toggleDarkMode()"><i class="fas fa-moon"></i></button>
+    <nav class="navbar navbar-dark bg-dark mb-4">
+        <div class="container d-flex justify-content-between">
+            <a class="navbar-brand fw-bold" href="#"><i class="fas fa-tools text-warning"></i> لوحة تحكم الإدارة</a>
+            <button class="btn btn-outline-light btn-sm" onclick="toggleDarkMode()"><i class="fas fa-moon"></i> داكن/فاتح</button>
         </div>
     </nav>
 
@@ -33,88 +30,76 @@
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} shadow-sm fw-bold"><i class="fas fa-info-circle"></i> {{ message }}</div>
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
 
         <div class="row">
             <div class="col-md-3 mb-4">
-                <div class="list-group shadow-sm mb-3 rounded-3 overflow-hidden">
-                    <a href="/admin_dashboard" class="list-group-item list-group-item-action active fw-bold py-3">
-                        <i class="fas fa-users-cog"></i> إدارة العملاء والرادارات
+                <div class="list-group shadow-sm">
+                    <a href="/admin_dashboard" class="list-group-item list-group-item-action active fw-bold">
+                        <i class="fas fa-home"></i> الرئيسية (العملاء والأرشيف)
                     </a>
                     
-                    <a href="/admin_statistics" class="list-group-item list-group-item-action fw-bold text-primary py-3">
-                        <i class="fas fa-chart-line fs-5"></i> إحصائيات المنصة (نبض النظام)
+                    <a href="/admin_statistics" class="list-group-item list-group-item-action fw-bold text-primary">
+                        <i class="fas fa-chart-line"></i> إحصائيات المنصة (مستقلة)
                     </a>
                     
-                    <a href="/admin_add_user" class="list-group-item list-group-item-action fw-bold py-3">
-                        <i class="fas fa-user-plus text-success"></i> إضافة عميل جديد
+                    <a href="/admin_add_user" class="list-group-item list-group-item-action fw-bold">
+                        <i class="fas fa-user-plus text-success"></i> إضافة عميل
                     </a>
-                    <a href="/admin_settings" class="list-group-item list-group-item-action fw-bold py-3">
-                        <i class="fas fa-sliders-h text-secondary"></i> إعدادات النظام الكبرى
+                    <a href="/admin_settings" class="list-group-item list-group-item-action fw-bold">
+                        <i class="fas fa-cog text-secondary"></i> إعدادات النظام
                     </a>
-                    <a href="/logout" class="list-group-item list-group-item-action fw-bold text-danger py-3">
-                        <i class="fas fa-sign-out-alt"></i> تسجيل الخروج
+                    <a href="/logout" class="list-group-item list-group-item-action fw-bold text-danger">
+                        <i class="fas fa-sign-out-alt"></i> خروج
                     </a>
                 </div>
             </div>
 
             <div class="col-md-9">
-                <div class="card mb-4 border-top-0 border-end-0 border-bottom-0 border-start border-success border-5">
-                    <div class="card-header bg-transparent fw-bold fs-5 border-bottom">
-                        <i class="fas fa-users text-success"></i> قاعدة بيانات العملاء
-                    </div>
+                <div class="card mb-4">
+                    <div class="card-header fw-bold bg-light"><i class="fas fa-users text-primary"></i> إدارة العملاء المسجلين</div>
                     <div class="card-body table-responsive">
-                        <table class="table table-hover align-middle text-center mb-0">
-                            <thead class="table-light">
+                        <table class="table table-hover text-center">
+                            <thead class="table-secondary">
                                 <tr>
                                     <th>م</th>
                                     <th>الاسم</th>
                                     <th>الجوال</th>
                                     <th>الصلاحية</th>
                                     <th>تاريخ الانتهاء</th>
-                                    <th>حالة الحساب</th>
-                                    <th>الإجراءات</th>
+                                    <th>الحالة</th>
+                                    <th>إجراءات</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for user in users %}
                                 <tr>
-                                    <td class="fw-bold">{{ user.id }}</td>
+                                    <td>{{ user.id }}</td>
                                     <td>{{ user.username }}</td>
-                                    <td dir="ltr" class="text-muted">{{ user.phone }}</td>
+                                    <td dir="ltr">{{ user.phone }}</td>
                                     <td>
-                                        {% if user.role == 'admin' %}
-                                            <span class="badge bg-danger rounded-pill">إدارة</span>
-                                        {% else %}
-                                            <span class="badge bg-secondary rounded-pill">عميل</span>
-                                        {% endif %}
+                                        {% if user.role == 'admin' %} <span class="badge bg-danger">مدير</span>
+                                        {% else %} <span class="badge bg-secondary">عميل</span> {% endif %}
                                     </td>
-                                    <td dir="ltr" class="fw-bold">
+                                    <td dir="ltr">
                                         {% if user.account_expiration %}
-                                            {% if user.account_expiration < now() %}
-                                                <span class="text-danger"><i class="fas fa-times-circle"></i> {{ user.account_expiration.strftime('%Y-%m-%d') }}</span>
-                                            {% else %}
-                                                <span class="text-success"><i class="fas fa-check-circle"></i> {{ user.account_expiration.strftime('%Y-%m-%d') }}</span>
-                                            {% endif %}
-                                        {% else %}
-                                            <span class="text-primary">مفتوح (مدى الحياة)</span>
-                                        {% endif %}
+                                            <span class="{% if user.account_expiration < now() %}text-danger{% else %}text-success{% endif %}">
+                                                {{ user.account_expiration.strftime('%Y-%m-%d') }}
+                                            </span>
+                                        {% else %} مفتوح {% endif %}
                                     </td>
                                     <td>
-                                        {% if user.is_active_account %}
-                                            <span class="badge bg-success">نشط</span>
-                                        {% else %}
-                                            <span class="badge bg-danger">موقوف</span>
-                                        {% endif %}
+                                        {% if user.is_active_account %} <span class="badge bg-success">نشط</span>
+                                        {% else %} <span class="badge bg-danger">موقوف</span> {% endif %}
                                     </td>
                                     <td>
                                         {% if user.id != current_user.id %}
-                                            <a href="/impersonate/{{ user.id }}" class="btn btn-sm btn-outline-info" title="دخول كعميل"><i class="fas fa-eye"></i></a>
-                                            <a href="/admin_edit_user/{{ user.id }}" class="btn btn-sm btn-outline-primary" title="تعديل البيانات"><i class="fas fa-pen"></i></a>
-                                            <a href="/toggle_user/{{ user.id }}" class="btn btn-sm {% if user.is_active_account %}btn-outline-danger{% else %}btn-outline-success{% endif %}" title="إيقاف/تفعيل">
+                                            <a href="/impersonate/{{ user.id }}" class="btn btn-sm btn-info text-white"><i class="fas fa-eye"></i></a>
+                                            <a href="/admin_edit_user/{{ user.id }}" class="btn btn-sm btn-primary"><i class="fas fa-edit"></i></a>
+                                            <a href="/toggle_user/{{ user.id }}" class="btn btn-sm {% if user.is_active_account %}btn-danger{% else %}btn-success{% endif %}">
                                                 <i class="fas {% if user.is_active_account %}fa-ban{% else %}fa-check{% endif %}"></i>
                                             </a>
                                         {% endif %}
@@ -126,48 +111,65 @@
                     </div>
                 </div>
 
-                <div class="card mb-4 border-top-0 border-end-0 border-bottom-0 border-start border-primary border-5">
-                    <div class="card-header bg-transparent fw-bold fs-5 border-bottom">
-                        <i class="fas fa-satellite-dish text-primary"></i> رادارات العملاء النشطة
-                    </div>
+                <div class="card mb-4">
+                    <div class="card-header fw-bold bg-light"><i class="fas fa-satellite-dish text-success"></i> حالة رادارات العملاء</div>
                     <div class="card-body table-responsive">
-                        <table class="table table-hover align-middle text-center mb-0">
-                            <thead class="table-light">
+                        <table class="table table-hover text-center">
+                            <thead class="table-secondary">
                                 <tr>
-                                    <th>المالك</th>
-                                    <th>اسم الرادار</th>
+                                    <th>العميل</th>
                                     <th>الكلمات المستهدفة</th>
                                     <th>الصيدات</th>
-                                    <th>محرك البحث</th>
-                                    <th>إجراء إداري</th>
+                                    <th>حالة الرادار</th>
+                                    <th>إيقاف/تشغيل</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for sub in subs %}
                                 <tr>
-                                    <td class="fw-bold">{{ sub.owner.username }}</td>
-                                    <td>{{ sub.name }}</td>
+                                    <td>{{ sub.owner.username }}</td>
+                                    <td>{{ sub.keywords }}</td>
+                                    <td><span class="badge bg-info text-dark">{{ sub.sent_count }}</span></td>
                                     <td>
-                                        {% for kw in sub.keywords.split(',') %}
-                                            <span class="badge bg-light text-dark border mb-1">{{ kw }}</span>
-                                        {% endfor %}
-                                    </td>
-                                    <td><span class="badge bg-info text-dark">{{ sub.sent_count }} تنبيه</span></td>
-                                    <td>
-                                        {% if sub.id in active_threads %}
-                                            <span class="badge bg-success"><i class="fas fa-cog fa-spin"></i> يبحث الآن</span>
-                                        {% else %}
-                                            <span class="badge bg-danger">متوقف</span>
-                                        {% endif %}
+                                        {% if sub.id in active_threads %} <span class="badge bg-success">يعمل</span>
+                                        {% else %} <span class="badge bg-danger">متوقف</span> {% endif %}
                                     </td>
                                     <td>
-                                        <a href="/admin_toggle_sub/{{ sub.id }}" class="btn btn-sm {% if sub.status == 'active' %}btn-warning{% else %}btn-success{% endif %} shadow-sm">
+                                        <a href="/admin_toggle_sub/{{ sub.id }}" class="btn btn-sm {% if sub.status == 'active' %}btn-warning{% else %}btn-success{% endif %}">
                                             <i class="fas {% if sub.status == 'active' %}fa-pause{% else %}fa-play{% endif %}"></i>
                                         </a>
-                                        <a href="/delete_sub/{{ sub.id }}" class="btn btn-sm btn-danger shadow-sm" onclick="return confirm('إجراء نهائي: هل أنت متأكد من حذف هذا الرادار؟');">
+                                        <a href="/delete_sub/{{ sub.id }}" class="btn btn-sm btn-danger" onclick="return confirm('تأكيد الحذف؟');">
                                             <i class="fas fa-trash"></i>
                                         </a>
                                     </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header fw-bold bg-light"><i class="fas fa-history text-danger"></i> أرشيف الصيدات (آخر 200 إعلان)</div>
+                    <div class="card-body table-responsive">
+                        <table class="table table-hover table-sm text-center">
+                            <thead class="table-secondary">
+                                <tr>
+                                    <th>العميل</th>
+                                    <th>الكلمة</th>
+                                    <th>عنوان الإعلان</th>
+                                    <th>الوقت</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for log in logs %}
+                                <tr>
+                                    <td>{{ log.owner.username }}</td>
+                                    <td><span class="badge bg-secondary">{{ log.keyword_matched }}</span></td>
+                                    <td class="text-start">
+                                        <a href="{{ log.url }}" target="_blank" class="text-decoration-none fw-bold">{{ log.title }}</a>
+                                    </td>
+                                    <td dir="ltr" class="text-muted small">{{ log.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -182,17 +184,9 @@
     <script>
         function toggleDarkMode() {
             document.body.classList.toggle('dark-mode');
-            if (document.body.classList.contains('dark-mode')) {
-                localStorage.setItem('darkMode', 'enabled');
-            } else {
-                localStorage.setItem('darkMode', 'disabled');
-            }
+            localStorage.setItem('darkMode', document.body.classList.contains('dark-mode') ? 'enabled' : 'disabled');
         }
-        // حفظ الوضع الليلي
-        if(localStorage.getItem('darkMode') === 'enabled') {
-            document.body.classList.add('dark-mode');
-        }
+        if(localStorage.getItem('darkMode') === 'enabled') { document.body.classList.add('dark-mode'); }
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
