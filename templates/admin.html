@@ -3,120 +3,120 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لوحة الإدارة - راصد حراج</title>
+    <title>لوحة الإدارة الكبرى - راصد حراج</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root { --bg-color: #ecf0f1; --text-color: #2c3e50; --card-bg: #ffffff; --nav-bg: #27ae60; --border-color: rgba(0,0,0,0.1); }
-        body.dark-mode { --bg-color: #121212; --text-color: #e0e0e0; --card-bg: #1e1e1e; --nav-bg: #145c32; --border-color: rgba(255,255,255,0.1); }
+        :root { --bg-color: #ecf0f1; --text-color: #2c3e50; --card-bg: #ffffff; --nav-bg: #2c3e50; --border-color: rgba(0,0,0,0.1); }
+        body.dark-mode { --bg-color: #121212; --text-color: #e0e0e0; --card-bg: #1e1e1e; --nav-bg: #000000; --border-color: rgba(255,255,255,0.1); }
         body { background-color: var(--bg-color); font-family: 'Segoe UI', Tahoma, sans-serif; color: var(--text-color); transition: 0.3s; }
         .navbar { background-color: var(--nav-bg); }
-        .card { background-color: var(--card-bg); border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; transition: 0.3s; }
-        .log-table { max-height: 400px; overflow-y: auto; }
-        table { color: var(--text-color) !important; border-color: var(--border-color) !important; }
-        .table-dark { --bs-table-bg: #212529; --bs-table-color: #fff; }
-        .dark-toggle { background: transparent; border: none; color: white; font-size: 1.2rem; cursor: pointer; transition: 0.3s; }
-        .dark-toggle:hover { transform: scale(1.1); }
-        .text-muted { color: #6c757d !important; }
-        body.dark-mode .text-muted { color: #adb5bd !important; }
+        .card { background-color: var(--card-bg); border-radius: 10px; border: 1px solid var(--border-color); box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .table { color: var(--text-color); }
+        .table-hover tbody tr:hover { background-color: rgba(0,0,0,0.05); }
+        body.dark-mode .table-hover tbody tr:hover { background-color: rgba(255,255,255,0.05); }
+        .list-group-item { background-color: var(--card-bg); color: var(--text-color); border-color: var(--border-color); transition: 0.2s; }
+        .list-group-item:hover { background-color: rgba(0,0,0,0.02); }
+        body.dark-mode .list-group-item:hover { background-color: rgba(255,255,255,0.05); }
+        .list-group-item.active { background-color: #27ae60; border-color: #27ae60; color: white; }
     </style>
 </head>
 <body>
     <nav class="navbar navbar-dark mb-4 shadow-sm">
-        <div class="container d-flex align-items-center">
-            <button id="darkModeToggle" class="dark-toggle me-3"><i class="fas fa-moon"></i></button>
-            <a class="navbar-brand fw-bold" href="#"><i class="fas fa-tools"></i> الإدارة | راصد حراج</a>
-            <span class="text-light ms-auto me-3">
-                <a href="/admin_settings" class="btn btn-light btn-sm fw-bold me-2"><i class="fas fa-cog"></i> إعدادات</a>
-                <a href="/logout" class="btn btn-outline-light btn-sm"><i class="fas fa-sign-out-alt"></i> خروج</a>
-            </span>
+        <div class="container d-flex justify-content-between align-items-center">
+            <a class="navbar-brand fw-bold fs-4" href="#"><i class="fas fa-crown text-warning"></i> الإدارة المركزية | راصد حراج</a>
+            <button class="btn btn-outline-light" onclick="toggleDarkMode()"><i class="fas fa-moon"></i></button>
         </div>
     </nav>
 
-    <div class="container">
+    <div class="container-fluid px-4">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm">{{ message }}</div>
+                    <div class="alert alert-{{ category }} shadow-sm fw-bold"><i class="fas fa-info-circle"></i> {{ message }}</div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
 
-        <div class="row mb-4">
-            <div class="col-md-4">
-                <div class="card p-3 text-center shadow-sm">
-                    <h5 class="fw-bold mb-3"><i class="fas fa-users text-primary"></i> إحصائية العملاء</h5>
-                    <canvas id="usersChart" style="max-height: 200px;"></canvas>
-                </div>
-            </div>
-            <div class="col-md-8">
-                <div class="card p-3 text-center shadow-sm">
-                    <h5 class="fw-bold mb-3"><i class="fas fa-chart-line text-success"></i> الإعلانات المرسلة (آخر 7 أيام)</h5>
-                    <canvas id="adsChart" style="max-height: 200px;"></canvas>
-                </div>
-            </div>
-        </div>
-
         <div class="row">
-            <div class="col-md-12 mb-4">
-                <div class="card p-4 shadow-sm">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h5 class="mb-0 fw-bold"><i class="fas fa-users-cog text-warning"></i> إدارة العملاء والاشتراكات</h5>
-                        <a href="/admin_add_user" class="btn btn-success fw-bold shadow-sm"><i class="fas fa-user-plus"></i> إضافة عميل جديد</a>
+            <div class="col-md-3 mb-4">
+                <div class="list-group shadow-sm mb-3 rounded-3 overflow-hidden">
+                    <a href="/admin_dashboard" class="list-group-item list-group-item-action active fw-bold py-3">
+                        <i class="fas fa-users-cog"></i> إدارة العملاء والرادارات
+                    </a>
+                    
+                    <a href="/admin_statistics" class="list-group-item list-group-item-action fw-bold text-primary py-3">
+                        <i class="fas fa-chart-line fs-5"></i> إحصائيات المنصة (نبض النظام)
+                    </a>
+                    
+                    <a href="/admin_add_user" class="list-group-item list-group-item-action fw-bold py-3">
+                        <i class="fas fa-user-plus text-success"></i> إضافة عميل جديد
+                    </a>
+                    <a href="/admin_settings" class="list-group-item list-group-item-action fw-bold py-3">
+                        <i class="fas fa-sliders-h text-secondary"></i> إعدادات النظام الكبرى
+                    </a>
+                    <a href="/logout" class="list-group-item list-group-item-action fw-bold text-danger py-3">
+                        <i class="fas fa-sign-out-alt"></i> تسجيل الخروج
+                    </a>
+                </div>
+            </div>
+
+            <div class="col-md-9">
+                <div class="card mb-4 border-top-0 border-end-0 border-bottom-0 border-start border-success border-5">
+                    <div class="card-header bg-transparent fw-bold fs-5 border-bottom">
+                        <i class="fas fa-users text-success"></i> قاعدة بيانات العملاء
                     </div>
-                    <div class="table-responsive">
-                        <table class="table align-middle text-center table-bordered">
-                            <thead class="table-dark">
+                    <div class="card-body table-responsive">
+                        <table class="table table-hover align-middle text-center mb-0">
+                            <thead class="table-light">
                                 <tr>
-                                    <th>العميل</th>
-                                    <th>رقم الجوال</th>
+                                    <th>م</th>
+                                    <th>الاسم</th>
+                                    <th>الجوال</th>
+                                    <th>الصلاحية</th>
                                     <th>تاريخ الانتهاء</th>
-                                    <th>الاشتراك / الإرساليات / سرعة الفحص</th>
                                     <th>حالة الحساب</th>
-                                    <th>إجراءات الدعم الفني</th>
+                                    <th>الإجراءات</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for user in users %}
                                 <tr>
+                                    <td class="fw-bold">{{ user.id }}</td>
+                                    <td>{{ user.username }}</td>
+                                    <td dir="ltr" class="text-muted">{{ user.phone }}</td>
                                     <td>
-                                        <strong>{{ user.username }}</strong>
-                                        {% if user.role == 'admin' %}<span class="badge bg-warning text-dark d-block mt-1">مدير</span>{% endif %}
-                                    </td>
-                                    <td dir="ltr" class="fw-bold">{{ user.phone }}</td>
-                                    <td dir="ltr" class="text-danger fw-bold">{{ user.account_expiration.strftime('%Y-%m-%d') if user.account_expiration else 'مفتوح' }}</td>
-                                    <td>
-                                        {% if user.subscription %}
-                                            <span class="badge bg-info text-dark d-block mb-1 fs-6">رسائل: {{ user.subscription.sent_count }}</span>
-                                            <span class="badge bg-secondary d-block mb-2 fs-6"><i class="fas fa-stopwatch"></i> فحص كل: {{ user.subscription.sleep_minutes }} دقيقة</span>
-                                            <a href="/admin_toggle_sub/{{ user.subscription.id }}" class="btn btn-sm {% if user.subscription.status == 'active' %}btn-outline-warning{% else %}btn-outline-success{% endif %} w-100 fw-bold">
-                                                {% if user.subscription.status == 'active' %}<i class="fas fa-pause"></i> إيقاف الرصد{% else %}<i class="fas fa-play"></i> تشغيل الرصد{% endif %}
-                                            </a>
+                                        {% if user.role == 'admin' %}
+                                            <span class="badge bg-danger rounded-pill">إدارة</span>
                                         {% else %}
-                                            <span class="text-muted small">لا يوجد اشتراك</span>
+                                            <span class="badge bg-secondary rounded-pill">عميل</span>
+                                        {% endif %}
+                                    </td>
+                                    <td dir="ltr" class="fw-bold">
+                                        {% if user.account_expiration %}
+                                            {% if user.account_expiration < now() %}
+                                                <span class="text-danger"><i class="fas fa-times-circle"></i> {{ user.account_expiration.strftime('%Y-%m-%d') }}</span>
+                                            {% else %}
+                                                <span class="text-success"><i class="fas fa-check-circle"></i> {{ user.account_expiration.strftime('%Y-%m-%d') }}</span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-primary">مفتوح (مدى الحياة)</span>
                                         {% endif %}
                                     </td>
                                     <td>
                                         {% if user.is_active_account %}
-                                            <span class="badge bg-success fs-6">حساب فعال</span>
+                                            <span class="badge bg-success">نشط</span>
                                         {% else %}
-                                            <span class="badge bg-danger fs-6">حساب موقوف</span>
+                                            <span class="badge bg-danger">موقوف</span>
                                         {% endif %}
                                     </td>
                                     <td>
                                         {% if user.id != current_user.id %}
-                                            <div class="d-flex flex-column gap-2">
-                                                <div class="btn-group shadow-sm">
-                                                    <a href="/admin_edit_user/{{ user.id }}" class="btn btn-sm btn-primary fw-bold"><i class="fas fa-edit"></i> تعديل</a>
-                                                    <a href="/impersonate/{{ user.id }}" class="btn btn-sm btn-dark fw-bold"><i class="fas fa-sign-in-alt"></i> دخول</a>
-                                                </div>
-                                                <a href="/toggle_user/{{ user.id }}" class="btn btn-sm {% if user.is_active_account %}btn-danger{% else %}btn-success{% endif %} fw-bold shadow-sm">
-                                                    {% if user.is_active_account %}<i class="fas fa-ban"></i> إيقاف الحساب نهائياً{% else %}<i class="fas fa-check-circle"></i> تفعيل الحساب{% endif %}
-                                                </a>
-                                            </div>
-                                        {% else %}
-                                            <span class="text-muted fw-bold">حسابك الشخصي</span>
+                                            <a href="/impersonate/{{ user.id }}" class="btn btn-sm btn-outline-info" title="دخول كعميل"><i class="fas fa-eye"></i></a>
+                                            <a href="/admin_edit_user/{{ user.id }}" class="btn btn-sm btn-outline-primary" title="تعديل البيانات"><i class="fas fa-pen"></i></a>
+                                            <a href="/toggle_user/{{ user.id }}" class="btn btn-sm {% if user.is_active_account %}btn-outline-danger{% else %}btn-outline-success{% endif %}" title="إيقاف/تفعيل">
+                                                <i class="fas {% if user.is_active_account %}fa-ban{% else %}fa-check{% endif %}"></i>
+                                            </a>
                                         {% endif %}
                                     </td>
                                 </tr>
@@ -125,83 +125,74 @@
                         </table>
                     </div>
                 </div>
-            </div>
 
-            <div class="col-md-12">
-                <div class="card p-4 log-table shadow-sm">
-                    <h5 class="mb-4 fw-bold text-secondary"><i class="fas fa-archive"></i> الأرشيف الشامل (تقارير الرصد لجميع العملاء)</h5>
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped align-middle">
-                            <thead class="table-secondary">
+                <div class="card mb-4 border-top-0 border-end-0 border-bottom-0 border-start border-primary border-5">
+                    <div class="card-header bg-transparent fw-bold fs-5 border-bottom">
+                        <i class="fas fa-satellite-dish text-primary"></i> رادارات العملاء النشطة
+                    </div>
+                    <div class="card-body table-responsive">
+                        <table class="table table-hover align-middle text-center mb-0">
+                            <thead class="table-light">
                                 <tr>
-                                    <th>الوقت</th>
-                                    <th>العميل</th>
-                                    <th>الكلمة المرصودة</th>
-                                    <th>عنوان الإعلان ورابطه</th>
+                                    <th>المالك</th>
+                                    <th>اسم الرادار</th>
+                                    <th>الكلمات المستهدفة</th>
+                                    <th>الصيدات</th>
+                                    <th>محرك البحث</th>
+                                    <th>إجراء إداري</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for log in logs %}
+                                {% for sub in subs %}
                                 <tr>
-                                    <td class="text-muted small" dir="ltr">{{ log.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
-                                    <td><span class="badge bg-dark">{{ log.owner.username }}</span></td>
-                                    <td><span class="badge bg-info text-dark border"><i class="fas fa-search"></i> {{ log.keyword_matched }}</span></td>
-                                    <td><a href="{{ log.url }}" target="_blank" class="text-decoration-none fw-bold" style="color: #3498db;">{{ log.title }}</a></td>
-                                </tr>
-                                {% else %}
-                                <tr>
-                                    <td colspan="4" class="text-center text-muted py-4"><i class="fas fa-box-open fa-2x mb-2 d-block opacity-50"></i>لا توجد عمليات رصد حتى الآن.</td>
+                                    <td class="fw-bold">{{ sub.owner.username }}</td>
+                                    <td>{{ sub.name }}</td>
+                                    <td>
+                                        {% for kw in sub.keywords.split(',') %}
+                                            <span class="badge bg-light text-dark border mb-1">{{ kw }}</span>
+                                        {% endfor %}
+                                    </td>
+                                    <td><span class="badge bg-info text-dark">{{ sub.sent_count }} تنبيه</span></td>
+                                    <td>
+                                        {% if sub.id in active_threads %}
+                                            <span class="badge bg-success"><i class="fas fa-cog fa-spin"></i> يبحث الآن</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">متوقف</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="/admin_toggle_sub/{{ sub.id }}" class="btn btn-sm {% if sub.status == 'active' %}btn-warning{% else %}btn-success{% endif %} shadow-sm">
+                                            <i class="fas {% if sub.status == 'active' %}fa-pause{% else %}fa-play{% endif %}"></i>
+                                        </a>
+                                        <a href="/delete_sub/{{ sub.id }}" class="btn btn-sm btn-danger shadow-sm" onclick="return confirm('إجراء نهائي: هل أنت متأكد من حذف هذا الرادار؟');">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
+                                    </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
                 </div>
+
             </div>
         </div>
     </div>
-
+    
     <script>
-        const toggleBtn = document.getElementById('darkModeToggle');
-        const body = document.body;
-        if(localStorage.getItem('darkMode') === 'enabled') {
-            body.classList.add('dark-mode');
-            toggleBtn.innerHTML = '<i class="fas fa-sun text-warning"></i>';
-            Chart.defaults.color = '#e0e0e0';
-        }
-        toggleBtn.addEventListener('click', () => {
-            body.classList.toggle('dark-mode');
-            if(body.classList.contains('dark-mode')) {
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark-mode');
+            if (document.body.classList.contains('dark-mode')) {
                 localStorage.setItem('darkMode', 'enabled');
-                toggleBtn.innerHTML = '<i class="fas fa-sun text-warning"></i>';
-                Chart.defaults.color = '#e0e0e0';
             } else {
                 localStorage.setItem('darkMode', 'disabled');
-                toggleBtn.innerHTML = '<i class="fas fa-moon"></i>';
-                Chart.defaults.color = '#2c3e50';
             }
-            window.location.reload(); 
-        });
-
-        const ctxUsers = document.getElementById('usersChart').getContext('2d');
-        new Chart(ctxUsers, { 
-            type: 'doughnut', 
-            data: { 
-                labels: ['نشط', 'موقوف'], 
-                datasets: [{ data: [{{ active_users }}, {{ inactive_users }}], backgroundColor: ['#2ecc71', '#e74c3c'], borderWidth: 0 }] 
-            }, 
-            options: { plugins: { legend: { position: 'bottom' } }, cutout: '70%' } 
-        });
-        
-        const ctxAds = document.getElementById('adsChart').getContext('2d');
-        new Chart(ctxAds, { 
-            type: 'line', 
-            data: { 
-                labels: {{ chart_labels | tojson }}, 
-                datasets: [{ label: 'إعلانات مرسلة', data: {{ chart_data | tojson }}, borderColor: '#3498db', backgroundColor: 'rgba(52, 152, 219, 0.2)', fill: true, tension: 0.4 }] 
-            }, 
-            options: { scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }, plugins: { legend: { display: false } } } 
-        });
+        }
+        // حفظ الوضع الليلي
+        if(localStorage.getItem('darkMode') === 'enabled') {
+            document.body.classList.add('dark-mode');
+        }
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
