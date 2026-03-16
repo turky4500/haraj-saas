@@ -83,9 +83,13 @@
                                     <td>
                                         {% if user.subscription %}
                                             <span class="badge bg-info text-dark d-block mb-1">رسائل: {{ user.subscription.sent_count }}</span>
-                                            <a href="/admin_toggle_sub/{{ user.subscription.id }}" class="btn btn-sm {% if user.subscription.status == 'active' %}btn-outline-warning{% else %}btn-outline-success{% endif %} w-100">
+                                            <a href="/admin_toggle_sub/{{ user.subscription.id }}" class="btn btn-sm {% if user.subscription.status == 'active' %}btn-outline-warning{% else %}btn-outline-success{% endif %} w-100 mb-1">
                                                 {% if user.subscription.status == 'active' %}<i class="fas fa-pause"></i> إيقاف الاشتراك{% else %}<i class="fas fa-play"></i> تشغيل الاشتراك{% endif %}
                                             </a>
+                                            <form action="/admin_update_sleep/{{ user.subscription.id }}" method="POST" class="d-flex gap-1">
+                                                <input type="number" name="sleep_minutes" class="form-control form-control-sm text-center" value="{{ user.subscription.sleep_minutes }}" min="1" required title="مدة الفحص بالدقائق">
+                                                <button type="submit" class="btn btn-sm btn-secondary" title="حفظ المدة"><i class="fas fa-save"></i></button>
+                                            </form>
                                         {% else %}
                                             <span class="text-muted small">لا يوجد اشتراك</span>
                                         {% endif %}
