@@ -54,8 +54,9 @@ SUBS_BASE_DIR = APP_BASE_DIR / "subs"
 SUBS_BASE_DIR.mkdir(exist_ok=True)
 REMINDERS_FILE = SUBS_BASE_DIR / "reminders_sent.json"
 
-# --- إضافة مسار ملف الإحصائيات ---
+# --- ملفات الإحصائيات والسجلات ---
 STATS_FILE = SUBS_BASE_DIR / "daily_stats.json"
+WHATSAPP_LOG_FILE = SUBS_BASE_DIR / "whatsapp_logs.json"
 
 HARAJ_BASE = "https://haraj.com.sa"
 HARAJ_HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Accept-Language": "ar-SA"}
@@ -87,6 +88,40 @@ def update_daily_stat(key, count=1):
         try:
             with open(STATS_FILE, 'w') as f: json.dump(stats, f)
         except: pass
+# ==============================================================================
+
+# ================= نظام تسجيل محاولات الواتساب =================
+whatsapp_logs_lock = threading.Lock()
+
+def log_whatsapp_attempt(to_number, success, response_data, message_text=""):
+    """تسجيل كل محاولة إرسال واتساب في ملف منفصل"""
+    with whatsapp_logs_lock:
+        logs = []
+        if WHATSAPP_LOG_FILE.exists():
+            try:
+                with open(WHATSAPP_LOG_FILE, 'r') as f:
+                    logs = json.load(f)
+            except:
+                logs = []
+        
+        # إضافة السجل الجديد
+        logs.append({
+            "timestamp": datetime.datetime.now().isoformat(),
+            "to": to_number,
+            "success": success,
+            "response": response_data,
+            "message_preview": message_text[:50] + "..." if len(message_text) > 50 else message_text
+        })
+        
+        # الاحتفاظ بآخر 1000 سجل فقط
+        if len(logs) > 1000:
+            logs = logs[-1000:]
+        
+        try:
+            with open(WHATSAPP_LOG_FILE, 'w') as f:
+                json.dump(logs, f, indent=2, ensure_ascii=False)
+        except:
+            pass
 # ==============================================================================
 
 # ================= مهام الخلفية =================
@@ -259,12 +294,14 @@ def extract_ads(html_bytes, base_url):
             ads.append((a.get_text(strip=True) or "إعلان", urljoin(base_url, href)))
     return list(dict.fromkeys(ads))
 
-# ================= دالة إرسال الواتساب المعدلة (مع تسجيل الردود في logs) =================
+# ================= دالة إرسال الواتساب مع تسجيل المحاولات =================
 def send_whatsapp(req_session, token, to_msisdn, text):
     url = "https://whatsapp.tkwin.com.sa/api/v1/send"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     
     logger.info(f"📤 محاولة إرسال واتساب إلى {to_msisdn} - نص الرسالة: {text[:50]}...")
+    
+    response_data = {"status_code": None, "text": "", "json": None}
     
     try:
         response = req_session.post(
@@ -275,17 +312,18 @@ def send_whatsapp(req_session, token, to_msisdn, text):
             verify=False
         )
         
-        logger.info(f"📥 رد المزود - Status Code: {response.status_code}")
-        logger.info(f"📥 نص الرد: {response.text}")
+        response_data["status_code"] = response.status_code
+        response_data["text"] = response.text
         
         try:
             result = response.json()
+            response_data["json"] = result
             logger.info(f"📥 JSON الرد: {result}")
         except:
             result = {"raw_text": response.text}
+            logger.info(f"📥 نص الرد: {response.text}")
         
         success = False
-        
         if response.status_code == 200:
             if isinstance(result, dict):
                 if result.get("success") is True:
@@ -301,6 +339,9 @@ def send_whatsapp(req_session, token, to_msisdn, text):
             else:
                 success = True
         
+        # تسجيل المحاولة في ملف JSON
+        log_whatsapp_attempt(to_msisdn, success, response_data, text)
+        
         if success:
             update_daily_stat('messages_sent')
             logger.info(f"✅ تم إرسال الرسالة بنجاح إلى {to_msisdn}")
@@ -311,16 +352,30 @@ def send_whatsapp(req_session, token, to_msisdn, text):
             
     except Exception as e:
         logger.error(f"❌ استثناء في إرسال واتساب إلى {to_msisdn}: {str(e)}")
+        response_data["error"] = str(e)
+        log_whatsapp_attempt(to_msisdn, False, response_data, text)
         return False
 # ==============================================================================
 
-# ================= صفحة بسيطة لمراقبة الحالة (اختيارية) =================
-@app.route('/admin/check_whatsapp')
+# ================= صفحة سجل الواتساب المنفصلة =================
+@app.route('/admin/whatsapp_logs')
 @login_required
-def admin_check_whatsapp():
+def admin_whatsapp_logs():
     if current_user.role != 'admin':
         return "غير مصرح", 403
-    return "لمعرفة حالة الإرسال، يرجى مراجعة سجلات Render (Logs)."
+    
+    logs = []
+    if WHATSAPP_LOG_FILE.exists():
+        try:
+            with open(WHATSAPP_LOG_FILE, 'r') as f:
+                logs = json.load(f)
+        except:
+            logs = []
+    
+    # عكس الترتيب لعرض الأحدث أولاً
+    logs.reverse()
+    
+    return render_template('whatsapp_logs.html', logs=logs)
 
 # ================= خيط المراقبة =================
 class MonitorThread(threading.Thread):
@@ -420,12 +475,11 @@ class MonitorThread(threading.Thread):
                                         log_sub = Subscription.query.get(self.cfg['id'])
                                         if log_sub:
                                             log_sub.sent_count += 1
-                                            # ✅ هنا التعديل المهم: نستخدم kw وليس title
                                             new_log = AdLog(
                                                 user_id=self.cfg['user_id'], 
                                                 title=title, 
                                                 url=ad_url, 
-                                                keyword_matched=kw  # تأكد أنها kw
+                                                keyword_matched=kw
                                             )
                                             db.session.add(new_log)
                                             db.session.commit()
@@ -496,11 +550,23 @@ def login():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
+        username = request.form.get('username')
         phone = request.form.get('phone')
+        password = request.form.get('password')
+        
+        # ========== التحقق من عدم وجود مستخدم مكرر ==========
+        existing_user = User.query.filter(
+            (User.username == username) | (User.phone == phone)
+        ).first()
+        if existing_user:
+            flash('اسم المستخدم أو رقم الجوال مسجل مسبقاً!', 'danger')
+            return redirect(url_for('register'))
+        # =================================================
+        
         otp = str(random.randint(1000, 9999))
         session['temp_user'] = {
-            'username': request.form.get('username'), 'phone': phone,
-            'password': generate_password_hash(request.form.get('password'), method='pbkdf2:sha256')
+            'username': username, 'phone': phone,
+            'password': generate_password_hash(password, method='pbkdf2:sha256')
         }
         session['otp'] = otp
         
@@ -641,6 +707,17 @@ def user_dashboard():
             if sub.id in ACTIVE_THREADS:
                 ACTIVE_THREADS[sub.id].stop()
                 del ACTIVE_THREADS[sub.id]
+            
+            # ========== مسح ملف الانتظار (queue) لتجنب إرسال إعلانات قديمة ==========
+            queue_file = SUBS_BASE_DIR / f"queue_{sub.id}.json"
+            if queue_file.exists():
+                queue_file.unlink()  # حذف الملف
+            # (اختياري) مسح ملف seen إذا أردت البدء من جديد
+            # seen_file = SUBS_BASE_DIR / f"seen_{sub.id}.json"
+            # if seen_file.exists():
+            #     seen_file.unlink()
+            # ======================================================================
+            
             sub.name = name; sub.keywords = keywords; sub.cities = cities
             sub.city_filter_enabled = city_filter_enabled; sub.excluded_words = excluded_words
             sub.exclude_enabled = exclude_enabled; sub.quiet_enabled = quiet_enabled
