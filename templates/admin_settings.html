@@ -81,6 +81,19 @@
             transform: translateY(-2px);
             box-shadow: 0 8px 20px rgba(26,188,156,0.4);
         }
+        .btn-info-custom {
+            background: #17a2b8;
+            border: none;
+            border-radius: 12px;
+            padding: 0.5rem 1rem;
+            font-weight: 600;
+            color: white;
+            transition: 0.3s;
+        }
+        .btn-info-custom:hover {
+            background: #138496;
+            transform: translateY(-2px);
+        }
         body.dark-mode {
             background-color: #121212;
             color: #e5e7eb;
@@ -103,9 +116,14 @@
 
     <div class="container" style="max-width: 600px;">
         <div class="glass-card">
-            <h4 class="section-title">
-                <i class="fas fa-sliders-h ms-2" style="color: var(--primary);"></i> إعدادات المنصة
-            </h4>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="section-title mb-0">
+                    <i class="fas fa-sliders-h ms-2" style="color: var(--primary);"></i> إعدادات المنصة
+                </h4>
+                <a href="/admin/whatsapp_logs" class="btn btn-info-custom">
+                    <i class="fab fa-whatsapp"></i> سجل الإرسال
+                </a>
+            </div>
 
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
