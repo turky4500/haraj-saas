@@ -344,6 +344,14 @@ class MonitorThread(threading.Thread):
                                     self.seen_ids.add(ad_id)
                                     with open(self.seen_file, 'w') as f: json.dump(list(self.seen_ids), f)
                                     
+                                    # ========== التحقق من عدم إرسال الإعلان مسبقاً ==========
+                                    with app.app_context():
+                                        existing = AdLog.query.filter_by(user_id=self.cfg['user_id'], url=ad_url).first()
+                                        if existing:
+                                            # هذا الإعلان موجود مسبقاً في قاعدة البيانات → نتخطى الإرسال
+                                            continue
+                                    # ====================================================
+                                    
                                     if currently_quiet:
                                         self.queued_ads.append({'kw': kw, 'title': title, 'url': ad_url})
                                         with open(self.queue_file, 'w') as f: json.dump(self.queued_ads, f)
