@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>إحصائيات المنصة - راصد حراج</title>
+    <title>إعدادات النظام - راصد حراج</title>
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Bootstrap RTL -->
@@ -47,7 +47,6 @@
             border: 1px solid rgba(255,255,255,0.5);
             box-shadow: var(--card-shadow);
             padding: 2rem;
-            margin-bottom: 1.5rem;
         }
         .section-title {
             font-size: 1.2rem;
@@ -58,45 +57,37 @@
             margin-bottom: 1.5rem;
             display: inline-block;
         }
-        .stat-card {
-            background: white;
-            border-radius: var(--border-radius);
-            padding: 1.5rem;
-            text-align: center;
-            box-shadow: var(--card-shadow);
-            transition: 0.3s;
-            border-bottom: 4px solid var(--primary);
+        .form-control, .input-group-text {
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            padding: 0.6rem 1rem;
         }
-        .stat-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 20px 30px -10px rgba(26,188,156,0.15);
+        .form-control:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(26,188,156,0.2);
         }
-        .stat-icon {
-            font-size: 2.5rem;
-            color: var(--primary);
-            margin-bottom: 0.5rem;
-        }
-        .stat-value {
-            font-size: 2rem;
+        .btn-primary-custom {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border: none;
+            border-radius: 12px;
+            padding: 0.8rem;
             font-weight: 700;
-            color: #2c3e50;
+            font-size: 1.1rem;
+            color: white;
+            transition: 0.3s;
+            box-shadow: 0 4px 10px rgba(26,188,156,0.3);
         }
-        .stat-label {
-            font-size: 1rem;
-            color: #7f8c8d;
-            font-weight: 600;
+        .btn-primary-custom:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(26,188,156,0.4);
         }
         body.dark-mode {
             background-color: #121212;
             color: #e5e7eb;
         }
-        body.dark-mode .glass-card,
-        body.dark-mode .stat-card {
+        body.dark-mode .glass-card {
             background: #1f2937;
             border-color: #374151;
-        }
-        body.dark-mode .stat-value {
-            color: #f3f4f6;
         }
     </style>
 </head>
@@ -106,80 +97,60 @@
             <a class="navbar-brand" href="/admin_dashboard">
                 <i class="fas fa-arrow-right"></i> العودة للوحة الإدارة
             </a>
-            <span class="text-light fw-bold"><i class="fas fa-chart-pie"></i> إحصائيات المنصة</span>
+            <span class="text-light fw-bold"><i class="fas fa-cog"></i> إعدادات النظام</span>
         </div>
     </nav>
 
-    <div class="container">
-        <!-- إحصائيات اليوم -->
+    <div class="container" style="max-width: 600px;">
         <div class="glass-card">
             <h4 class="section-title">
-                <i class="fas fa-calendar-day ms-2" style="color: var(--primary);"></i> إحصائيات اليوم ({{ daily_stats.date }})
+                <i class="fas fa-sliders-h ms-2" style="color: var(--primary);"></i> إعدادات المنصة
             </h4>
-            <div class="row g-4">
-                <div class="col-6 col-md-3">
-                    <div class="stat-card">
-                        <i class="fas fa-users stat-icon" style="color: #3498db;"></i>
-                        <div class="stat-value">{{ daily_stats.visitors }}</div>
-                        <div class="stat-label">الزوار البشريين</div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="stat-card">
-                        <i class="fas fa-user-plus stat-icon" style="color: #2ecc71;"></i>
-                        <div class="stat-value">{{ daily_stats.registrations }}</div>
-                        <div class="stat-label">تسجيلات جديدة</div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="stat-card">
-                        <i class="fab fa-whatsapp stat-icon" style="color: #27ae60;"></i>
-                        <div class="stat-value">{{ daily_stats.messages_sent }}</div>
-                        <div class="stat-label">رسائل مرسلة</div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="stat-card">
-                        <i class="fas fa-robot stat-icon" style="color: #f39c12;"></i>
-                        <div class="stat-value">{{ daily_stats.bot_visits }}</div>
-                        <div class="stat-label">زيارات الحارس</div>
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- إحصائيات عامة -->
-        <div class="glass-card">
-            <h4 class="section-title">
-                <i class="fas fa-chart-bar ms-2" style="color: var(--primary);"></i> إحصائيات عامة
-            </h4>
-            <div class="row g-4">
-                <div class="col-md-4">
-                    <div class="stat-card">
-                        <i class="fas fa-address-book stat-icon" style="color: #9b59b6;"></i>
-                        <div class="stat-value">{{ total_users }}</div>
-                        <div class="stat-label">إجمالي العملاء</div>
-                    </div>
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm rounded-4 py-3" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <form action="/admin_settings" method="POST">
+                <!-- توكن الواتساب -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold"><i class="fab fa-whatsapp text-success ms-1"></i> توكن الواتساب</label>
+                    <input type="text" name="whatsapp_token" class="form-control" dir="ltr" value="{{ settings.whatsapp_token if settings else '' }}" required>
+                    <small class="text-muted">مفتاح API الخاص بخدمة إرسال الواتساب.</small>
                 </div>
-                <div class="col-md-4">
-                    <div class="stat-card">
-                        <i class="fas fa-satellite-dish stat-icon" style="color: #e67e22;"></i>
-                        <div class="stat-value">{{ active_subs }}</div>
-                        <div class="stat-label">رادارات نشطة</div>
-                    </div>
+
+                <!-- أيام التجربة -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold"><i class="fas fa-gift text-warning ms-1"></i> أيام التجربة المجانية</label>
+                    <input type="number" name="trial_days" class="form-control text-center" value="{{ settings.trial_days if settings else 2 }}" min="0" required>
+                    <small class="text-muted">عدد أيام التجربة للعميل الجديد.</small>
                 </div>
-                <div class="col-md-4">
-                    <div class="stat-card">
-                        <i class="fas fa-bullseye stat-icon" style="color: #e74c3c;"></i>
-                        <div class="stat-value">{{ total_ads_logged }}</div>
-                        <div class="stat-label">إجمالي الإعلانات</div>
-                    </div>
+
+                <!-- رقم جوال الإدارة -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold"><i class="fas fa-mobile-alt text-primary ms-1"></i> رقم جوال الإدارة (للإشعارات)</label>
+                    <input type="text" name="admin_phone" class="form-control" dir="ltr" placeholder="9665xxxxxxxx" value="{{ notify.admin_phone if notify else '' }}">
+                    <small class="text-muted">سيتم إرسال إشعارات تسجيل العملاء والتقارير اليومية لهذا الرقم.</small>
                 </div>
-            </div>
+
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary-custom">
+                        <i class="fas fa-save"></i> حفظ الإعدادات
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 
     <script>
+        // دعم الوضع الليلي إذا كان مفعلاً من قبل
         if(localStorage.getItem('darkMode') === 'enabled') {
             document.body.classList.add('dark-mode');
         }
