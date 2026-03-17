@@ -11,6 +11,9 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
 import logging
+import urllib3
+from urllib3.exceptions import InsecureRequestWarning
+urllib3.disable_warnings(InsecureRequestWarning)  # إخفاء تحذيرات SSL
 
 app = Flask(__name__)
 app.secret_key = "haraj_super_secret_key_v18_final_launch"
@@ -51,7 +54,7 @@ SUBS_BASE_DIR = APP_BASE_DIR / "subs"
 SUBS_BASE_DIR.mkdir(exist_ok=True)
 REMINDERS_FILE = SUBS_BASE_DIR / "reminders_sent.json"
 
-# --- إضافة مسار ملف الإحصائيات (جديد) ---
+# --- إضافة مسار ملف الإحصائيات ---
 STATS_FILE = SUBS_BASE_DIR / "daily_stats.json"
 
 HARAJ_BASE = "https://haraj.com.sa"
@@ -62,7 +65,7 @@ ACTIVE_THREADS = {}
 def get_ksa_time():
     return datetime.datetime.utcnow() + datetime.timedelta(hours=3)
 
-# ================= نظام الإحصائيات المستقل (جديد - لا يمس القاعدة) =================
+# ================= نظام الإحصائيات المستقل =================
 stats_lock = threading.Lock()
 
 def get_daily_stats():
@@ -86,7 +89,7 @@ def update_daily_stat(key, count=1):
         except: pass
 # ==============================================================================
 
-# ================= مهام الخلفية (تنظيف الأرشيف + التنبيهات والإحصائيات) =================
+# ================= مهام الخلفية =================
 def cleanup_old_logs():
     while True:
         time.sleep(3600)
@@ -115,7 +118,6 @@ def daily_background_tasks():
                 notify = AdminNotifySettings.query.first()
                 if notify and notify.admin_phone:
                     if now.hour >= 23 and notify.last_report_date < now.date():
-                        # سحب الإحصائيات الدقيقة من الملف
                         ds = get_daily_stats()
                         msg = f"📊 تقرير نهاية اليوم لمنصة (راصد حراج):\n\n👥 زوار بشريين: {ds['visitors']}\n🤖 زيارات الروبوت: {ds['bot_visits']}\n🆕 تسجيلات جديدة: {ds['registrations']}\n💬 رسائل أُرسلت: {ds['messages_sent']}\n\nيعطيك العافية 🚀"
                         send_whatsapp(create_session(), token, notify.admin_phone, msg)
@@ -132,10 +134,8 @@ def daily_background_tasks():
                     users = User.query.filter(User.account_expiration.isnot(None)).all()
                     for u in users:
                         exp_date_str = u.account_expiration.strftime('%Y-%m-%d')
-                        # إذا كان الاشتراك ينتهي غداً
                         if u.account_expiration.date() == now.date() + datetime.timedelta(days=1):
                             uid_str = str(u.id)
-                            # التأكد من عدم إرسال الرسالة مرتين لنفس اليوم
                             if sent_reminders.get(uid_str) != exp_date_str:
                                 msg = "مرحباً بك ⏳\nنذكرك بأن اشتراكك في (راصد حراج) ينتهي غداً.\nلضمان استمرار رصد صيداتك الموفقة بدون انقطاع، نرجو التواصل معنا لتجديد الاشتراك. 🌹"
                                 if send_whatsapp(create_session(), token, u.phone, msg):
@@ -259,7 +259,7 @@ def extract_ads(html_bytes, base_url):
             ads.append((a.get_text(strip=True) or "إعلان", urljoin(base_url, href)))
     return list(dict.fromkeys(ads))
 
-# ================= دالة إرسال الواتساب المعدلة (مع تسجيل الردود في logs فقط) =================
+# ================= دالة إرسال الواتساب المعدلة (مع تسجيل الردود في logs) =================
 def send_whatsapp(req_session, token, to_msisdn, text):
     url = "https://whatsapp.tkwin.com.sa/api/v1/send"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
@@ -267,31 +267,26 @@ def send_whatsapp(req_session, token, to_msisdn, text):
     logger.info(f"📤 محاولة إرسال واتساب إلى {to_msisdn} - نص الرسالة: {text[:50]}...")
     
     try:
-        # إرسال الطلب وجلب الرد
         response = req_session.post(
             url, 
             json={"to": to_msisdn, "message": text}, 
             headers=headers, 
             timeout=20, 
-            verify=False  # يمكنك إزالة verify=False إذا أردت
+            verify=False
         )
         
-        # تسجيل معلومات الاستجابة الأساسية
         logger.info(f"📥 رد المزود - Status Code: {response.status_code}")
         logger.info(f"📥 نص الرد: {response.text}")
         
-        # محاولة تحويل الرد إلى JSON للتسجيل بشكل أفضل
         try:
             result = response.json()
             logger.info(f"📥 JSON الرد: {result}")
         except:
             result = {"raw_text": response.text}
         
-        # التحقق من نجاح الإرسال حسب هيكل رد المزود
         success = False
         
         if response.status_code == 200:
-            # إذا كان الرد يحتوي على مؤشر نجاح صريح
             if isinstance(result, dict):
                 if result.get("success") is True:
                     success = True
@@ -302,7 +297,6 @@ def send_whatsapp(req_session, token, to_msisdn, text):
                 elif result.get("error") is None and "message_id" in str(result):
                     success = True
                 else:
-                    # إذا لم نجد مؤشر نجاح ولكن الكود 200، نعتبرها ناجحة
                     success = True
             else:
                 success = True
@@ -356,7 +350,6 @@ class MonitorThread(threading.Thread):
                 settings = SystemSettings.query.first()
                 current_token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
 
-                # تحديث قوي لرسالة الانتهاء والشكر
                 if not user or not user.is_active_account or not sub or sub.status != 'active' or (user.account_expiration and user.account_expiration < datetime.datetime.now()):
                     if sub and sub.status == 'active': 
                         sub.status = 'paused'
@@ -411,7 +404,6 @@ class MonitorThread(threading.Thread):
                                     with app.app_context():
                                         existing = AdLog.query.filter_by(user_id=self.cfg['user_id'], url=ad_url).first()
                                         if existing:
-                                            # هذا الإعلان موجود مسبقاً في قاعدة البيانات → نتخطى الإرسال
                                             continue
                                     # ====================================================
                                     
@@ -428,7 +420,13 @@ class MonitorThread(threading.Thread):
                                         log_sub = Subscription.query.get(self.cfg['id'])
                                         if log_sub:
                                             log_sub.sent_count += 1
-                                            new_log = AdLog(user_id=self.cfg['user_id'], title=title, url=ad_url, keyword_matched=kw)
+                                            # ✅ هنا التعديل المهم: نستخدم kw وليس title
+                                            new_log = AdLog(
+                                                user_id=self.cfg['user_id'], 
+                                                title=title, 
+                                                url=ad_url, 
+                                                keyword_matched=kw  # تأكد أنها kw
+                                            )
                                             db.session.add(new_log)
                                             db.session.commit()
                     except Exception as e:
@@ -466,7 +464,6 @@ def start_thread_for_sub(sub):
 
 @app.route('/')
 def index():
-    # طرد روبوت جوجل من الإحصائيات الوهمية وتحديث الإحصائيات الحقيقية
     if request.headers.get('X-Keep-Alive-Bot'):
         update_daily_stat('bot_visits')
         return "Bot OK", 200
@@ -535,7 +532,7 @@ def verify():
             db.session.add(new_user)
             db.session.commit()
             
-            update_daily_stat('registrations') # تحديث العداد
+            update_daily_stat('registrations')
             
             notify = AdminNotifySettings.query.first()
             if notify and notify.admin_phone and new_user.role != 'admin':
@@ -721,7 +718,6 @@ def admin_update_sleep(sub_id):
         sub.sleep_minutes = new_sleep
         db.session.commit()
         
-        # إعادة تشغيل الرادار فوراً لتطبيق المدة الجديدة إذا كان شغال
         if sub.status == 'active':
             if sub.id in ACTIVE_THREADS:
                 ACTIVE_THREADS[sub.id].stop()
@@ -957,7 +953,6 @@ with app.app_context():
 # ========== بدء خيوط الرصد للاشتراكات النشطة (لضمان عملها مع Gunicorn) ==========
 with app.app_context():
     for sub in Subscription.query.filter_by(status='active').all():
-        # التأكد من أن المستخدم نشط والاشتراك لم ينتهِ
         if sub.owner.is_active_account and (not sub.owner.account_expiration or sub.owner.account_expiration > datetime.datetime.now()):
             start_thread_for_sub(sub)
 # =================================================================================
