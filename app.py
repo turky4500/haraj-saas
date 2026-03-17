@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -10,9 +10,14 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
+import logging
 
 app = Flask(__name__)
 app.secret_key = "haraj_super_secret_key_v18_final_launch"
+
+# إعداد التسجيل (logging) لمشاهدة الردود في سجلات Render
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app.jinja_env.globals.update(now=datetime.datetime.now)
 
@@ -49,6 +54,9 @@ REMINDERS_FILE = SUBS_BASE_DIR / "reminders_sent.json"
 # --- إضافة مسار ملف الإحصائيات (جديد) ---
 STATS_FILE = SUBS_BASE_DIR / "daily_stats.json"
 
+# --- ملف لتسجيل محاولات إرسال الواتساب ---
+WHATSAPP_LOG_FILE = SUBS_BASE_DIR / "whatsapp_logs.json"
+
 HARAJ_BASE = "https://haraj.com.sa"
 HARAJ_HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Accept-Language": "ar-SA"}
 ACTIVE_THREADS = {} 
@@ -79,6 +87,40 @@ def update_daily_stat(key, count=1):
         try:
             with open(STATS_FILE, 'w') as f: json.dump(stats, f)
         except: pass
+# ==============================================================================
+
+# ================= نظام تسجيل محاولات الواتساب =================
+whatsapp_logs_lock = threading.Lock()
+
+def log_whatsapp_attempt(to_number, success, response_data, message_text=""):
+    """تسجيل كل محاولة إرسال واتساب في ملف منفصل"""
+    with whatsapp_logs_lock:
+        logs = []
+        if WHATSAPP_LOG_FILE.exists():
+            try:
+                with open(WHATSAPP_LOG_FILE, 'r') as f:
+                    logs = json.load(f)
+            except:
+                logs = []
+        
+        # إضافة السجل الجديد
+        logs.append({
+            "timestamp": datetime.datetime.now().isoformat(),
+            "to": to_number,
+            "success": success,
+            "response": response_data,
+            "message_preview": message_text[:50] + "..." if len(message_text) > 50 else message_text
+        })
+        
+        # الاحتفاظ بآخر 1000 سجل فقط
+        if len(logs) > 1000:
+            logs = logs[-1000:]
+        
+        try:
+            with open(WHATSAPP_LOG_FILE, 'w') as f:
+                json.dump(logs, f, indent=2)
+        except:
+            pass
 # ==============================================================================
 
 # ================= مهام الخلفية (تنظيف الأرشيف + التنبيهات والإحصائيات) =================
@@ -136,7 +178,8 @@ def daily_background_tasks():
                                 if send_whatsapp(create_session(), token, u.phone, msg):
                                     sent_reminders[uid_str] = exp_date_str
                                     with open(REMINDERS_FILE, 'w') as f: json.dump(sent_reminders, f)
-            except: pass
+            except Exception as e:
+                logger.error(f"خطأ في المهام الخلفية: {str(e)}")
 
 threading.Thread(target=cleanup_old_logs, daemon=True).start()
 threading.Thread(target=daily_background_tasks, daemon=True).start()
@@ -253,17 +296,96 @@ def extract_ads(html_bytes, base_url):
             ads.append((a.get_text(strip=True) or "إعلان", urljoin(base_url, href)))
     return list(dict.fromkeys(ads))
 
+# ================= دالة إرسال الواتساب المعدلة (مع تسجيل الردود) =================
 def send_whatsapp(req_session, token, to_msisdn, text):
     url = "https://whatsapp.tkwin.com.sa/api/v1/send"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    
+    # بيانات افتراضية للرد
+    response_data = {"status_code": None, "text": "", "json": None}
+    
     try:
-        r = req_session.post(url, json={"to": to_msisdn, "message": text}, headers=headers, timeout=20, verify=False)
-        if 200 <= r.status_code < 300:
-            update_daily_stat('messages_sent') # تحديث العداد
+        # إرسال الطلب وجلب الرد
+        logger.info(f"محاولة إرسال واتساب إلى {to_msisdn}")
+        response = req_session.post(
+            url, 
+            json={"to": to_msisdn, "message": text}, 
+            headers=headers, 
+            timeout=20, 
+            verify=False  # يمكنك إزالة verify=False إذا أردت
+        )
+        
+        # تسجيل معلومات الاستجابة الأساسية
+        response_data["status_code"] = response.status_code
+        response_data["text"] = response.text
+        
+        # محاولة تحويل الرد إلى JSON
+        try:
+            result = response.json()
+            response_data["json"] = result
+            logger.info(f"WhatsApp Response JSON: {result}")
+        except:
+            result = {"raw_text": response.text}
+            logger.info(f"WhatsApp Response Text: {response.text}")
+        
+        # التحقق من نجاح الإرسال حسب هيكل رد المزود
+        success = False
+        
+        if response.status_code == 200:
+            # إذا كان الرد يحتوي على مؤشر نجاح صريح
+            if isinstance(result, dict):
+                if result.get("success") is True:
+                    success = True
+                elif result.get("status") == "sent":
+                    success = True
+                elif result.get("message_id"):
+                    success = True
+                elif result.get("error") is None and "message_id" in str(result):
+                    success = True
+                else:
+                    # إذا لم نجد مؤشر نجاح ولكن الكود 200، نعتبرها ناجحة
+                    success = True
+            else:
+                success = True
+        
+        # تسجيل المحاولة في الملف
+        log_whatsapp_attempt(to_msisdn, success, response_data, text)
+        
+        if success:
+            update_daily_stat('messages_sent')
+            logger.info(f"✅ تم إرسال الرسالة بنجاح إلى {to_msisdn}")
             return True
+        else:
+            logger.error(f"❌ فشل إرسال الرسالة إلى {to_msisdn}: {response.status_code} - {response.text}")
+            return False
+            
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"استثناء في إرسال واتساب إلى {to_msisdn}: {error_msg}")
+        response_data["error"] = error_msg
+        log_whatsapp_attempt(to_msisdn, False, response_data, text)
         return False
-    except:
-        return False
+# ==============================================================================
+
+# ================= صفحة لعرض سجل محاولات الواتساب =================
+@app.route('/admin/whatsapp_logs')
+@login_required
+def admin_whatsapp_logs():
+    if current_user.role != 'admin':
+        return "غير مصرح", 403
+    
+    logs = []
+    if WHATSAPP_LOG_FILE.exists():
+        try:
+            with open(WHATSAPP_LOG_FILE, 'r') as f:
+                logs = json.load(f)
+        except:
+            logs = []
+    
+    # عكس الترتيب لعرض الأحدث أولاً
+    logs.reverse()
+    
+    return render_template('whatsapp_logs.html', logs=logs)
 
 # ================= خيط المراقبة =================
 class MonitorThread(threading.Thread):
@@ -368,7 +490,8 @@ class MonitorThread(threading.Thread):
                                             new_log = AdLog(user_id=self.cfg['user_id'], title=title, url=ad_url, keyword_matched=kw)
                                             db.session.add(new_log)
                                             db.session.commit()
-                    except:
+                    except Exception as e:
+                        logger.error(f"خطأ في رصد الإعلانات للاشتراك {self.cfg['id']}: {str(e)}")
                         pass
                     time.sleep(random.uniform(3, 7))
             
