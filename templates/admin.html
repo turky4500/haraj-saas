@@ -128,7 +128,7 @@
             max-height: 400px;
             overflow-y: auto;
         }
-        /* Dark mode (احتفاظ بالخاصية) */
+        /* Dark mode */
         body.dark-mode {
             background-color: #121212;
             color: #e5e7eb;
@@ -164,6 +164,9 @@
                 </a>
                 <a href="/admin_statistics" class="btn btn-outline-light btn-sm">
                     <i class="fas fa-chart-pie"></i> إحصائيات
+                </a>
+                <a href="/admin/whatsapp_logs" class="btn btn-outline-light btn-sm">
+                    <i class="fab fa-whatsapp"></i> سجل الإرسال
                 </a>
                 <a href="/logout" class="btn btn-outline-danger btn-sm">
                     <i class="fas fa-sign-out-alt"></i> خروج
@@ -321,6 +324,10 @@
                                                 <i class="fas fa-check"></i> تفعيل
                                             {% endif %}
                                         </a>
+                                        <!-- زر حذف المستخدم (مع تأكيد) -->
+                                        <a href="#" onclick="confirmDelete('{{ user.username }}', '{{ user.id }}')" class="btn btn-sm btn-outline-danger btn-sm-custom">
+                                            <i class="fas fa-trash-alt"></i> حذف نهائي
+                                        </a>
                                     </div>
                                 {% else %}
                                     <span class="text-muted">حسابك</span>
@@ -368,6 +375,13 @@
     </div>
 
     <script>
+        // دالة تأكيد الحذف
+        function confirmDelete(username, userId) {
+            if (confirm(`هل أنت متأكد من حذف المستخدم "${username}" نهائياً؟\nسيتم حذف جميع بياناته (الاشتراكات، السجلات) ولا يمكن التراجع عن هذا الإجراء.`)) {
+                window.location.href = `/admin_delete_user/${userId}`;
+            }
+        }
+
         // Dark mode
         const toggleBtn = document.getElementById('darkModeToggle');
         const body = document.body;
