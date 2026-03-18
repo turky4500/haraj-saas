@@ -13,7 +13,7 @@ from bs4 import BeautifulSoup
 import logging
 import urllib3
 from urllib3.exceptions import InsecureRequestWarning
-urllib3.disable_warnings(InsecureRequestWarning)  # إخفاء تحذيرات SSL
+urllib3.disable_warnings(InsecureRequestWarning)
 
 app = Flask(__name__)
 app.secret_key = "haraj_super_secret_key_v18_final_launch"
@@ -712,10 +712,6 @@ def user_dashboard():
             queue_file = SUBS_BASE_DIR / f"queue_{sub.id}.json"
             if queue_file.exists():
                 queue_file.unlink()  # حذف الملف
-            # (اختياري) مسح ملف seen إذا أردت البدء من جديد
-            # seen_file = SUBS_BASE_DIR / f"seen_{sub.id}.json"
-            # if seen_file.exists():
-            #     seen_file.unlink()
             # ======================================================================
             
             sub.name = name; sub.keywords = keywords; sub.cities = cities
@@ -1017,6 +1013,55 @@ def revert_impersonate():
         session.pop('admin_impersonating', None)
         flash('تمت العودة لحساب الإدارة بنجاح.', 'success')
     return redirect(url_for('admin_dashboard'))
+
+# ================= مسار حذف المستخدم بالكامل =================
+@app.route('/admin_delete_user/<int:user_id>')
+@login_required
+def admin_delete_user(user_id):
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    
+    user = User.query.get_or_404(user_id)
+    
+    # لا تسمح للمدير بحذف نفسه
+    if user.id == current_user.id:
+        flash('لا يمكنك حذف حسابك الخاص!', 'danger')
+        return redirect(url_for('admin_dashboard'))
+    
+    try:
+        # 1. إيقاف الخيط إذا كان نشطاً
+        if user.subscription and user.subscription.id in ACTIVE_THREADS:
+            ACTIVE_THREADS[user.subscription.id].stop()
+            del ACTIVE_THREADS[user.subscription.id]
+        
+        # 2. حذف ملفات seen و queue الخاصة بالاشتراك (إذا وجدت)
+        if user.subscription:
+            sub_id = user.subscription.id
+            seen_file = SUBS_BASE_DIR / f"seen_{sub_id}.json"
+            queue_file = SUBS_BASE_DIR / f"queue_{sub_id}.json"
+            if seen_file.exists():
+                seen_file.unlink()
+            if queue_file.exists():
+                queue_file.unlink()
+        
+        # 3. حذف جميع سجلات AdLog لهذا المستخدم
+        AdLog.query.filter_by(user_id=user.id).delete()
+        
+        # 4. حذف الاشتراك إن وجد
+        if user.subscription:
+            db.session.delete(user.subscription)
+        
+        # 5. حذف المستخدم نفسه
+        db.session.delete(user)
+        db.session.commit()
+        
+        flash(f'تم حذف المستخدم {user.username} وجميع بياناته بنجاح.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'حدث خطأ أثناء الحذف: {str(e)}', 'danger')
+    
+    return redirect(url_for('admin_dashboard'))
+# =============================================================
 
 with app.app_context():
     db.create_all()
