@@ -18,6 +18,34 @@ urllib3.disable_warnings(InsecureRequestWarning)
 app = Flask(__name__)
 app.secret_key = "haraj_super_secret_key_v18_final_launch"
 
+# ================= دالة تنسيق الوقت بتوقيت السعودية وصيغة 12 ساعة =================
+def format_time_ksa(dt, format_type='full'):
+    """
+    تحويل الوقت من UTC إلى توقيت السعودية (UTC+3) وعرضه بصيغة 12 ساعة مع صباح/مساء
+    format_type:
+        'full' -> 2025-03-20 02:30 مساءً
+        'short' -> 02:30 مساءً
+        'date' -> 2025-03-20
+        'time' -> 02:30 مساءً (مثل short)
+    """
+    if dt is None:
+        return ''
+    # إضافة 3 ساعات للتوقيت المحلي (السعودية)
+    ksa_time = dt + datetime.timedelta(hours=3)
+    
+    if format_type == 'full':
+        return ksa_time.strftime('%Y-%m-%d %I:%M %p').replace('AM', 'صباحاً').replace('PM', 'مساءً')
+    elif format_type == 'short' or format_type == 'time':
+        return ksa_time.strftime('%I:%M %p').replace('AM', 'صباحاً').replace('PM', 'مساءً')
+    elif format_type == 'date':
+        return ksa_time.strftime('%Y-%m-%d')
+    else:
+        return str(ksa_time)
+
+# إتاحة الدالة في جميع القوالب
+app.jinja_env.globals.update(format_time_ksa=format_time_ksa)
+# =================================================================================
+
 # إعداد التسجيل (logging) لمشاهدة الردود في سجلات Render
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -35,13 +63,10 @@ if db_url:
 else:
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(BASE_DIR, 'haraj.db')
 
-# 🚨 التعديل السحري لحل مشكلة الخطأ 500 (منع نوم قاعدة البيانات) 🚨
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     "pool_pre_ping": True,
     "pool_recycle": 280,
 }
-# ===============================================================
-
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -53,8 +78,6 @@ APP_BASE_DIR = Path(__file__).resolve().parent
 SUBS_BASE_DIR = APP_BASE_DIR / "subs"
 SUBS_BASE_DIR.mkdir(exist_ok=True)
 REMINDERS_FILE = SUBS_BASE_DIR / "reminders_sent.json"
-
-# --- ملفات الإحصائيات والسجلات ---
 STATS_FILE = SUBS_BASE_DIR / "daily_stats.json"
 WHATSAPP_LOG_FILE = SUBS_BASE_DIR / "whatsapp_logs.json"
 
@@ -62,11 +85,9 @@ HARAJ_BASE = "https://haraj.com.sa"
 HARAJ_HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Accept-Language": "ar-SA"}
 ACTIVE_THREADS = {} 
 
-# ================= ضبط توقيت السعودية (KSA) =================
 def get_ksa_time():
     return datetime.datetime.utcnow() + datetime.timedelta(hours=3)
 
-# ================= نظام الإحصائيات المستقل =================
 stats_lock = threading.Lock()
 
 def get_daily_stats():
@@ -88,13 +109,10 @@ def update_daily_stat(key, count=1):
         try:
             with open(STATS_FILE, 'w') as f: json.dump(stats, f)
         except: pass
-# ==============================================================================
 
-# ================= نظام تسجيل محاولات الواتساب =================
 whatsapp_logs_lock = threading.Lock()
 
 def log_whatsapp_attempt(to_number, success, response_data, message_text=""):
-    """تسجيل كل محاولة إرسال واتساب في ملف منفصل"""
     with whatsapp_logs_lock:
         logs = []
         if WHATSAPP_LOG_FILE.exists():
@@ -103,8 +121,6 @@ def log_whatsapp_attempt(to_number, success, response_data, message_text=""):
                     logs = json.load(f)
             except:
                 logs = []
-        
-        # إضافة السجل الجديد
         logs.append({
             "timestamp": datetime.datetime.now().isoformat(),
             "to": to_number,
@@ -112,19 +128,14 @@ def log_whatsapp_attempt(to_number, success, response_data, message_text=""):
             "response": response_data,
             "message_preview": message_text[:50] + "..." if len(message_text) > 50 else message_text
         })
-        
-        # الاحتفاظ بآخر 1000 سجل فقط
         if len(logs) > 1000:
             logs = logs[-1000:]
-        
         try:
             with open(WHATSAPP_LOG_FILE, 'w') as f:
                 json.dump(logs, f, indent=2, ensure_ascii=False)
         except:
             pass
-# ==============================================================================
 
-# ================= مهام الخلفية =================
 def cleanup_old_logs():
     while True:
         time.sleep(3600)
@@ -142,14 +153,12 @@ def cleanup_old_logs():
 
 def daily_background_tasks():
     while True:
-        time.sleep(1800) # يفحص كل نص ساعة
+        time.sleep(1800)
         with app.app_context():
             try:
                 now = get_ksa_time()
                 settings = SystemSettings.query.first()
                 token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
-
-                # 1. إرسال إحصائية الزوار للإدارة (الساعة 11 بالليل)
                 notify = AdminNotifySettings.query.first()
                 if notify and notify.admin_phone:
                     if now.hour >= 23 and notify.last_report_date < now.date():
@@ -158,14 +167,11 @@ def daily_background_tasks():
                         send_whatsapp(create_session(), token, notify.admin_phone, msg)
                         notify.last_report_date = now.date()
                         db.session.commit()
-
-                # 2. رسائل التذكير بالتجديد للعملاء (تُرسل الساعة 4 عصراً)
                 if now.hour >= 16:
                     if REMINDERS_FILE.exists():
                         with open(REMINDERS_FILE, 'r') as f: sent_reminders = json.load(f)
                     else:
                         sent_reminders = {}
-
                     users = User.query.filter(User.account_expiration.isnot(None)).all()
                     for u in users:
                         exp_date_str = u.account_expiration.strftime('%Y-%m-%d')
@@ -182,35 +188,26 @@ def daily_background_tasks():
 threading.Thread(target=cleanup_old_logs, daemon=True).start()
 threading.Thread(target=daily_background_tasks, daemon=True).start()
 
-# ================= دالة مراقبة صحة الخيوط وإعادة تشغيلها =================
 def monitor_threads_health():
-    """تعمل كل 10 دقائق وتعيد تشغيل أي خيط متوقف للاشتراكات النشطة"""
     while True:
-        time.sleep(600)  # 10 دقائق
+        time.sleep(600)
         with app.app_context():
             try:
                 active_subs = Subscription.query.filter_by(status='active').all()
                 for sub in active_subs:
-                    # التأكد من أن المستخدم نشط والاشتراك لم ينتهِ
                     if not sub.owner.is_active_account:
                         continue
                     if sub.owner.account_expiration and sub.owner.account_expiration <= datetime.datetime.now():
                         continue
-                    
-                    # إذا كان الخيط غير موجود أو غير حي، نعيد تشغيله
                     if sub.id not in ACTIVE_THREADS or not ACTIVE_THREADS[sub.id].is_alive():
                         logger.warning(f"الخيط للاشتراك {sub.id} غير نشط، جاري إعادة تشغيله...")
                         if sub.id in ACTIVE_THREADS:
-                            # محاولة إيقافه بأمان (إذا كان موجوداً لكنه ميت)
                             try:
                                 ACTIVE_THREADS[sub.id].stop()
                             except:
                                 pass
                             del ACTIVE_THREADS[sub.id]
-                        
                         start_thread_for_sub(sub)
-                        
-                        # إرسال إشعار للمدير (اختياري)
                         settings = SystemSettings.query.first()
                         token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
                         notify = AdminNotifySettings.query.first()
@@ -220,11 +217,9 @@ def monitor_threads_health():
             except Exception as e:
                 logger.error(f"خطأ في مراقبة الخيوط: {str(e)}")
 
-# تشغيل دالة المراقبة في خيط منفصل
 threading.Thread(target=monitor_threads_health, daemon=True).start()
-# ==============================================================================
 
-# ================= النماذج (قواعد البيانات) =================
+# ================= النماذج =================
 class SystemSettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     whatsapp_token = db.Column(db.String(255), default="7a203d6ba6f4325ed3261ea87f6b2e751250ad97")
@@ -279,7 +274,7 @@ class AdLog(db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# ================= دوال مساعدة وخوارزمية البحث الدقيقة =================
+# ================= دوال مساعدة =================
 _AR_DIACRITICS_RE = re.compile(r"[\u064B-\u0652\u0670\u0640]")
 _AR_NORM_MAP = str.maketrans({"أ": "ا", "إ": "ا", "آ": "ا", "ؤ": "و", "ئ": "ي", "ى": "ي", "ة": "ه"})
 
@@ -382,7 +377,6 @@ def send_whatsapp(req_session, token, to_msisdn, text, max_retries=3):
                 else:
                     success = True
             
-            # تسجيل المحاولة في ملف JSON
             log_whatsapp_attempt(to_msisdn, success, response_data, text)
             
             if success:
@@ -391,9 +385,8 @@ def send_whatsapp(req_session, token, to_msisdn, text, max_retries=3):
                 return True
             else:
                 logger.error(f"❌ فشل إرسال الرسالة إلى {to_msisdn} (محاولة {attempt}): {response.status_code} - {response.text}")
-                # إذا لم تنجح ولكن الكود 200، نعتبرها فاشلة ونحاول مرة أخرى إذا كان مسموحاً
                 if attempt < max_retries:
-                    wait_time = 2 ** attempt  # 2, 4, 8 ثواني
+                    wait_time = 2 ** attempt
                     logger.info(f"⏳ انتظار {wait_time} ثواني قبل إعادة المحاولة...")
                     time.sleep(wait_time)
                     continue
@@ -408,12 +401,10 @@ def send_whatsapp(req_session, token, to_msisdn, text, max_retries=3):
                 logger.info(f"⏳ انتظار {wait_time} ثواني قبل إعادة المحاولة...")
                 time.sleep(wait_time)
             else:
-                # بعد فشل كل المحاولات، نسجل المحاولة الفاشلة
                 log_whatsapp_attempt(to_msisdn, False, response_data, text)
                 return False
     
     return False
-# ==============================================================================
 
 # ================= صفحة سجل الواتساب المنفصلة =================
 @app.route('/admin/whatsapp_logs')
@@ -514,12 +505,10 @@ class MonitorThread(threading.Thread):
                                         self.seen_ids.add(ad_id)
                                         with open(self.seen_file, 'w') as f: json.dump(list(self.seen_ids), f)
                                         
-                                        # ========== التحقق من عدم إرسال الإعلان مسبقاً ==========
                                         with app.app_context():
                                             existing = AdLog.query.filter_by(user_id=self.cfg['user_id'], url=ad_url).first()
                                             if existing:
                                                 continue
-                                        # ====================================================
                                         
                                         if currently_quiet:
                                             self.queued_ads.append({'kw': kw, 'title': title, 'url': ad_url})
@@ -553,7 +542,6 @@ class MonitorThread(threading.Thread):
                     time.sleep(1)
             except Exception as e:
                 logger.error(f"خطأ غير متوقع في خيط الاشتراك {self.cfg['id']}: {str(e)}")
-                # إذا حدث خطأ غير متوقع، نخرج من الحلقة (يموت الخيط) وسيتم إعادة تشغيله بواسطة المراقبة
                 break
 
     def stop(self):
@@ -618,14 +606,12 @@ def register():
         phone = request.form.get('phone')
         password = request.form.get('password')
         
-        # ========== التحقق من عدم وجود مستخدم مكرر ==========
         existing_user = User.query.filter(
             (User.username == username) | (User.phone == phone)
         ).first()
         if existing_user:
             flash('اسم المستخدم أو رقم الجوال مسجل مسبقاً!', 'danger')
             return redirect(url_for('register'))
-        # =================================================
         
         otp = str(random.randint(1000, 9999))
         session['temp_user'] = {
@@ -772,11 +758,9 @@ def user_dashboard():
                 ACTIVE_THREADS[sub.id].stop()
                 del ACTIVE_THREADS[sub.id]
             
-            # ========== مسح ملف الانتظار (queue) لتجنب إرسال إعلانات قديمة ==========
             queue_file = SUBS_BASE_DIR / f"queue_{sub.id}.json"
             if queue_file.exists():
-                queue_file.unlink()  # حذف الملف
-            # ======================================================================
+                queue_file.unlink()
             
             sub.name = name; sub.keywords = keywords; sub.cities = cities
             sub.city_filter_enabled = city_filter_enabled; sub.excluded_words = excluded_words
@@ -1078,7 +1062,6 @@ def revert_impersonate():
         flash('تمت العودة لحساب الإدارة بنجاح.', 'success')
     return redirect(url_for('admin_dashboard'))
 
-# ================= مسار حذف المستخدم بالكامل =================
 @app.route('/admin_delete_user/<int:user_id>')
 @login_required
 def admin_delete_user(user_id):
@@ -1087,18 +1070,15 @@ def admin_delete_user(user_id):
     
     user = User.query.get_or_404(user_id)
     
-    # لا تسمح للمدير بحذف نفسه
     if user.id == current_user.id:
         flash('لا يمكنك حذف حسابك الخاص!', 'danger')
         return redirect(url_for('admin_dashboard'))
     
     try:
-        # 1. إيقاف الخيط إذا كان نشطاً
         if user.subscription and user.subscription.id in ACTIVE_THREADS:
             ACTIVE_THREADS[user.subscription.id].stop()
             del ACTIVE_THREADS[user.subscription.id]
         
-        # 2. حذف ملفات seen و queue الخاصة بالاشتراك (إذا وجدت)
         if user.subscription:
             sub_id = user.subscription.id
             seen_file = SUBS_BASE_DIR / f"seen_{sub_id}.json"
@@ -1108,14 +1088,11 @@ def admin_delete_user(user_id):
             if queue_file.exists():
                 queue_file.unlink()
         
-        # 3. حذف جميع سجلات AdLog لهذا المستخدم
         AdLog.query.filter_by(user_id=user.id).delete()
         
-        # 4. حذف الاشتراك إن وجد
         if user.subscription:
             db.session.delete(user.subscription)
         
-        # 5. حذف المستخدم نفسه
         db.session.delete(user)
         db.session.commit()
         
@@ -1125,7 +1102,6 @@ def admin_delete_user(user_id):
         flash(f'حدث خطأ أثناء الحذف: {str(e)}', 'danger')
     
     return redirect(url_for('admin_dashboard'))
-# =============================================================
 
 with app.app_context():
     db.create_all()
@@ -1136,12 +1112,10 @@ with app.app_context():
         db.session.add(AdminNotifySettings())
         db.session.commit()
 
-# ========== بدء خيوط الرصد للاشتراكات النشطة (لضمان عملها مع Gunicorn) ==========
 with app.app_context():
     for sub in Subscription.query.filter_by(status='active').all():
         if sub.owner.is_active_account and (not sub.owner.account_expiration or sub.owner.account_expiration > datetime.datetime.now()):
             start_thread_for_sub(sub)
-# =================================================================================
 
 if __name__ == '__main__':
     with app.app_context():
