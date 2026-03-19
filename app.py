@@ -412,6 +412,24 @@ def admin_whatsapp_logs():
     logs.reverse()
     return render_template('whatsapp_logs.html', logs=logs)
 
+# ================= مسار حذف سجل الواتساب (جديد) =================
+@app.route('/admin/clear_whatsapp_logs')
+@login_required
+def admin_clear_whatsapp_logs():
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    
+    try:
+        # إفراغ الملف بكتابة مصفوفة فارغة
+        with open(WHATSAPP_LOG_FILE, 'w') as f:
+            json.dump([], f)
+        flash('✅ تم حذف جميع سجلات الواتساب بنجاح.', 'success')
+    except Exception as e:
+        flash(f'❌ حدث خطأ أثناء حذف السجلات: {str(e)}', 'danger')
+    
+    return redirect(url_for('admin_whatsapp_logs'))
+# ===============================================================
+
 # ================= مسار حذف الأرشيف =================
 @app.route('/admin/clear_archive')
 @login_required
