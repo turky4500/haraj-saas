@@ -336,8 +336,8 @@ def extract_ads(html_bytes, base_url):
             ads.append((a.get_text(strip=True) or "إعلان", urljoin(base_url, href)))
     return list(dict.fromkeys(ads))
 
-# ================= دالة إرسال الواتساب مع تسجيل المحاولات =================
-def send_whatsapp(req_session, token, to_msisdn, text):
+# ================= دالة إرسال الواتساب مع إعادة المحاولة =================
+def send_whatsapp(req_session, token, to_msisdn, text, max_retries=3):
     url = "https://whatsapp.tkwin.com.sa/api/v1/send"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     
@@ -345,58 +345,74 @@ def send_whatsapp(req_session, token, to_msisdn, text):
     
     response_data = {"status_code": None, "text": "", "json": None}
     
-    try:
-        response = req_session.post(
-            url, 
-            json={"to": to_msisdn, "message": text}, 
-            headers=headers, 
-            timeout=20, 
-            verify=False
-        )
-        
-        response_data["status_code"] = response.status_code
-        response_data["text"] = response.text
-        
+    for attempt in range(1, max_retries + 1):
         try:
-            result = response.json()
-            response_data["json"] = result
-            logger.info(f"📥 JSON الرد: {result}")
-        except:
-            result = {"raw_text": response.text}
-            logger.info(f"📥 نص الرد: {response.text}")
-        
-        success = False
-        if response.status_code == 200:
-            if isinstance(result, dict):
-                if result.get("success") is True:
-                    success = True
-                elif result.get("status") == "sent":
-                    success = True
-                elif result.get("message_id"):
-                    success = True
-                elif result.get("error") is None and "message_id" in str(result):
-                    success = True
+            response = req_session.post(
+                url, 
+                json={"to": to_msisdn, "message": text}, 
+                headers=headers, 
+                timeout=20, 
+                verify=False
+            )
+            
+            response_data["status_code"] = response.status_code
+            response_data["text"] = response.text
+            
+            try:
+                result = response.json()
+                response_data["json"] = result
+                logger.info(f"📥 JSON الرد: {result}")
+            except:
+                result = {"raw_text": response.text}
+                logger.info(f"📥 نص الرد: {response.text}")
+            
+            success = False
+            if response.status_code == 200:
+                if isinstance(result, dict):
+                    if result.get("success") is True:
+                        success = True
+                    elif result.get("status") == "sent":
+                        success = True
+                    elif result.get("message_id"):
+                        success = True
+                    elif result.get("error") is None and "message_id" in str(result):
+                        success = True
+                    else:
+                        success = True
                 else:
                     success = True
-            else:
-                success = True
-        
-        # تسجيل المحاولة في ملف JSON
-        log_whatsapp_attempt(to_msisdn, success, response_data, text)
-        
-        if success:
-            update_daily_stat('messages_sent')
-            logger.info(f"✅ تم إرسال الرسالة بنجاح إلى {to_msisdn}")
-            return True
-        else:
-            logger.error(f"❌ فشل إرسال الرسالة إلى {to_msisdn}: {response.status_code} - {response.text}")
-            return False
             
-    except Exception as e:
-        logger.error(f"❌ استثناء في إرسال واتساب إلى {to_msisdn}: {str(e)}")
-        response_data["error"] = str(e)
-        log_whatsapp_attempt(to_msisdn, False, response_data, text)
-        return False
+            # تسجيل المحاولة في ملف JSON
+            log_whatsapp_attempt(to_msisdn, success, response_data, text)
+            
+            if success:
+                update_daily_stat('messages_sent')
+                logger.info(f"✅ تم إرسال الرسالة بنجاح إلى {to_msisdn} (محاولة {attempt})")
+                return True
+            else:
+                logger.error(f"❌ فشل إرسال الرسالة إلى {to_msisdn} (محاولة {attempt}): {response.status_code} - {response.text}")
+                # إذا لم تنجح ولكن الكود 200، نعتبرها فاشلة ونحاول مرة أخرى إذا كان مسموحاً
+                if attempt < max_retries:
+                    wait_time = 2 ** attempt  # 2, 4, 8 ثواني
+                    logger.info(f"⏳ انتظار {wait_time} ثواني قبل إعادة المحاولة...")
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    return False
+                    
+        except requests.exceptions.RequestException as e:
+            logger.error(f"❌ خطأ في الاتصال (محاولة {attempt}): {str(e)}")
+            response_data["error"] = str(e)
+            if attempt < max_retries:
+                wait_time = 2 ** attempt
+                logger.info(f"⏳ انتظار {wait_time} ثواني قبل إعادة المحاولة...")
+                time.sleep(wait_time)
+            else:
+                # بعد فشل كل المحاولات، نسجل المحاولة الفاشلة
+                log_whatsapp_attempt(to_msisdn, False, response_data, text)
+                return False
+    
+    return False
 # ==============================================================================
 
 # ================= صفحة سجل الواتساب المنفصلة =================
