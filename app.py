@@ -18,7 +18,22 @@ urllib3.disable_warnings(InsecureRequestWarning)
 app = Flask(__name__)
 app.secret_key = "haraj_super_secret_key_v18_final_launch"
 
-# إعداد التسجيل
+# دالة تنسيق الوقت بتوقيت السعودية (مضافة لجميع القوالب)
+def format_time_ksa(dt, format_type='full'):
+    if dt is None:
+        return ''
+    ksa_time = dt + datetime.timedelta(hours=3)
+    if format_type == 'full':
+        return ksa_time.strftime('%Y-%m-%d %I:%M %p').replace('AM', 'صباحاً').replace('PM', 'مساءً')
+    elif format_type == 'short' or format_type == 'time':
+        return ksa_time.strftime('%I:%M %p').replace('AM', 'صباحاً').replace('PM', 'مساءً')
+    elif format_type == 'date':
+        return ksa_time.strftime('%Y-%m-%d')
+    else:
+        return str(ksa_time)
+
+app.jinja_env.globals.update(format_time_ksa=format_time_ksa, datetime=datetime.datetime)
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -1035,9 +1050,12 @@ def admin_toggle_sub(sub_id):
 @app.route('/impersonate/<int:user_id>')
 @login_required
 def impersonate(user_id):
-    if current_user.role != 'admin': return redirect(url_for('index'))
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
     user = User.query.get_or_404(user_id)
+    # تخزين معرف المدير الأصلي في الجلسة
     session['admin_impersonating'] = current_user.id
+    # تسجيل الدخول بحساب المستخدم
     login_user(user)
     flash(f'أنت الآن تتصفح وتتحكم بحساب العميل: {user.username}', 'warning')
     return redirect(url_for('user_dashboard'))
@@ -1047,9 +1065,10 @@ def impersonate(user_id):
 def revert_impersonate():
     if 'admin_impersonating' in session:
         admin_user = User.query.get(session['admin_impersonating'])
-        login_user(admin_user)
-        session.pop('admin_impersonating', None)
-        flash('تمت العودة لحساب الإدارة بنجاح.', 'success')
+        if admin_user:
+            login_user(admin_user)
+            session.pop('admin_impersonating', None)
+            flash('تمت العودة لحساب الإدارة بنجاح.', 'success')
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin_delete_user/<int:user_id>')
