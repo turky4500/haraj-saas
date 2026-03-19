@@ -107,7 +107,8 @@
                                 <span class="danger-badge me-2"><i class="fas fa-times-circle"></i> فشل</span>
                             {% endif %}
                         </div>
-                        <small class="text-muted" dir="ltr">{{ format_time_ksa(datetime.datetime.fromisoformat(log.timestamp), 'full') if log.timestamp else '' }}</small>
+                        <!-- عرض الوقت بدون دالة format_time_ksa (باستخدام النص الأصلي) -->
+                        <small class="text-muted" dir="ltr">{{ log.timestamp }}</small>
                     </div>
                     
                     {% if log.message_preview %}
