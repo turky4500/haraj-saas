@@ -14,10 +14,6 @@
         :root {
             --primary: #1abc9c;
             --primary-dark: #16a085;
-            --secondary: #34495e;
-            --light-bg: #f8fafc;
-            --card-shadow: 0 10px 30px -10px rgba(0,0,0,0.1);
-            --border-radius: 24px;
         }
         body {
             font-family: 'Cairo', sans-serif;
@@ -86,10 +82,10 @@
         .feature-card {
             background: rgba(255,255,255,0.8);
             backdrop-filter: blur(8px);
-            border-radius: var(--border-radius);
+            border-radius: 24px;
             padding: 2rem 1.5rem;
             text-align: center;
-            box-shadow: var(--card-shadow);
+            box-shadow: 0 10px 30px -10px rgba(0,0,0,0.1);
             border: 1px solid rgba(255,255,255,0.5);
             transition: 0.3s;
             height: 100%;
@@ -113,72 +109,22 @@
         .faq-section {
             background: rgba(255,255,255,0.5);
             backdrop-filter: blur(4px);
-            border-radius: var(--border-radius);
+            border-radius: 24px;
             padding: 2rem;
             margin: 3rem 0;
-        }
-        .accordion-item {
-            background: transparent;
-            border: none;
-            border-bottom: 1px solid rgba(0,0,0,0.05);
-        }
-        .accordion-button {
-            background: transparent;
-            font-weight: 700;
-            color: #2c3e50;
-            padding: 1.2rem 0;
-        }
-        .accordion-button:not(.collapsed) {
-            color: var(--primary);
-            background: transparent;
-            box-shadow: none;
-        }
-        .accordion-button:focus {
-            box-shadow: none;
         }
         .footer {
             text-align: center;
             padding: 2rem 0;
             color: #5d6d7e;
         }
-        body.dark-mode {
-            background: linear-gradient(145deg, #121212 0%, #1e2b38 100%);
-            color: #e5e7eb;
-        }
-        body.dark-mode .hero-title {
-            color: white;
-        }
-        body.dark-mode .hero-subtitle {
-            color: #b0c4de;
-        }
-        body.dark-mode .feature-card {
-            background: rgba(31,41,55,0.8);
-            border-color: #374151;
-        }
-        body.dark-mode .faq-section {
-            background: rgba(31,41,55,0.5);
-        }
-        body.dark-mode .accordion-button {
-            color: #e5e7eb;
-        }
-        .dark-toggle {
-            background: transparent;
-            border: 2px solid var(--primary);
-            color: var(--primary);
-            border-radius: 30px;
-            padding: 0.5rem 1.5rem;
-            font-weight: 600;
-        }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- شريط التنقل -->
         <nav class="navbar navbar-custom">
             <div class="container-fluid px-0">
-                <button id="darkModeToggle" class="btn dark-toggle">
-                    <i class="fas fa-moon"></i> الوضع الليلي
-                </button>
+                <div></div>
                 <div>
                     <a href="/login" class="btn btn-outline-primary-custom me-2">دخول</a>
                     <a href="/register" class="btn btn-primary-custom">تجربة مجانية</a>
@@ -186,7 +132,6 @@
             </div>
         </nav>
 
-        <!-- قسم الترحيب -->
         <div class="hero-section">
             <div class="hero-icon">
                 <i class="fas fa-satellite-dish"></i>
@@ -200,7 +145,6 @@
             </a>
         </div>
 
-        <!-- المميزات -->
         <div class="row g-4">
             <div class="col-md-4">
                 <div class="feature-card">
@@ -225,7 +169,6 @@
             </div>
         </div>
 
-        <!-- الأسئلة الشائعة -->
         <div class="faq-section">
             <h3 class="text-center fw-bold mb-4"><i class="far fa-lightbulb text-warning ms-2"></i> أسئلة شائعة</h3>
             <div class="accordion" id="faqAccordion">
@@ -268,30 +211,11 @@
             </div>
         </div>
 
-        <!-- تذييل -->
         <div class="footer">
             جميع الحقوق محفوظة &copy; 2026 | منصة راصد حراج
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        const toggleBtn = document.getElementById('darkModeToggle');
-        const body = document.body;
-        if(localStorage.getItem('darkMode') === 'enabled') {
-            body.classList.add('dark-mode');
-            toggleBtn.innerHTML = '<i class="fas fa-sun"></i> الوضع النهاري';
-        }
-        toggleBtn.addEventListener('click', () => {
-            body.classList.toggle('dark-mode');
-            if(body.classList.contains('dark-mode')) {
-                localStorage.setItem('darkMode', 'enabled');
-                toggleBtn.innerHTML = '<i class="fas fa-sun"></i> الوضع النهاري';
-            } else {
-                localStorage.setItem('darkMode', 'disabled');
-                toggleBtn.innerHTML = '<i class="fas fa-moon"></i> الوضع الليلي';
-            }
-        });
-    </script>
 </body>
 </html>
