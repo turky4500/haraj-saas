@@ -14,7 +14,6 @@
         :root {
             --primary: #1abc9c;
             --primary-dark: #16a085;
-            --secondary: #34495e;
         }
         body {
             font-family: 'Cairo', sans-serif;
@@ -48,9 +47,6 @@
             font-weight: 700;
             color: #2c3e50;
         }
-        .auth-header p {
-            color: #5d6d7e;
-        }
         .form-control {
             border-radius: 50px;
             padding: 0.75rem 1.5rem;
@@ -83,46 +79,14 @@
             font-weight: 600;
             font-size: 0.9rem;
         }
-        .forgot-link:hover {
-            text-decoration: underline;
-        }
         .register-link {
             color: var(--primary);
             font-weight: 700;
             text-decoration: none;
         }
-        .dark-mode-toggle {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            background: transparent;
-            border: 2px solid var(--primary);
-            color: var(--primary);
-            border-radius: 30px;
-            padding: 0.4rem 1.5rem;
-            font-weight: 600;
-            cursor: pointer;
-        }
-        body.dark-mode {
-            background: linear-gradient(135deg, #121212 0%, #1e2b38 100%);
-        }
-        body.dark-mode .auth-card {
-            background: rgba(31,41,55,0.9);
-            border-color: #374151;
-        }
-        body.dark-mode .auth-header h3 {
-            color: white;
-        }
-        body.dark-mode .auth-header p {
-            color: #b0c4de;
-        }
     </style>
 </head>
 <body>
-    <button id="darkModeToggle" class="dark-mode-toggle">
-        <i class="fas fa-moon"></i> ليلي
-    </button>
-
     <div class="auth-card">
         <div class="auth-header">
             <i class="fas fa-sign-in-alt"></i>
@@ -142,7 +106,7 @@
             {% endif %}
         {% endwith %}
 
-        <form method="POST" action="/login" id="loginForm">
+        <form method="POST" action="/login">
             <div class="mb-3">
                 <label class="form-label fw-bold small text-muted">اسم المستخدم</label>
                 <input type="text" name="username" class="form-control" required placeholder="أدخل اسم المستخدم">
@@ -163,24 +127,5 @@
             <a href="/register" class="register-link">سجل الآن مجاناً</a>
         </div>
     </div>
-
-    <script>
-        const toggleBtn = document.getElementById('darkModeToggle');
-        const body = document.body;
-        if(localStorage.getItem('darkMode') === 'enabled') {
-            body.classList.add('dark-mode');
-            toggleBtn.innerHTML = '<i class="fas fa-sun"></i> نهاري';
-        }
-        toggleBtn.addEventListener('click', () => {
-            body.classList.toggle('dark-mode');
-            if(body.classList.contains('dark-mode')) {
-                localStorage.setItem('darkMode', 'enabled');
-                toggleBtn.innerHTML = '<i class="fas fa-sun"></i> نهاري';
-            } else {
-                localStorage.setItem('darkMode', 'disabled');
-                toggleBtn.innerHTML = '<i class="fas fa-moon"></i> ليلي';
-            }
-        });
-    </script>
 </body>
 </html>
