@@ -338,11 +338,16 @@
             </div>
         </div>
 
-        <!-- أرشيف الإعلانات الشامل -->
+        <!-- أرشيف الإعلانات الشامل مع زر الحذف -->
         <div class="glass-card log-table">
-            <h5 class="section-title">
-                <i class="fas fa-archive ms-2"></i> الأرشيف الشامل
-            </h5>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="section-title mb-0">
+                    <i class="fas fa-archive ms-2"></i> الأرشيف الشامل
+                </h5>
+                <a href="#" onclick="confirmClearArchive()" class="btn btn-outline-danger btn-sm">
+                    <i class="fas fa-trash-alt"></i> حذف الأرشيف
+                </a>
+            </div>
             <div class="table-responsive">
                 <table class="table table-custom table-sm">
                     <thead>
@@ -356,7 +361,7 @@
                     <tbody>
                         {% for log in logs %}
                         <tr>
-                            <td class="small text-muted">{{ format_time_ksa(log.timestamp, 'full') }}</td>
+                            <td class="small text-muted" dir="ltr">{{ log.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
                             <td><strong>{{ log.owner.username }}</strong></td>
                             <td><span class="badge bg-info text-dark px-2 py-1">{{ log.keyword_matched }}</span></td>
                             <td><a href="{{ log.url }}" target="_blank" class="text-decoration-none text-primary">{{ log.title|truncate(40) }}</a></td>
@@ -373,12 +378,21 @@
     </div>
 
     <script>
+        // دالة تأكيد حذف المستخدم
         function confirmDelete(username, userId) {
             if (confirm(`هل أنت متأكد من حذف المستخدم "${username}" نهائياً؟\nسيتم حذف جميع بياناته (الاشتراكات، السجلات) ولا يمكن التراجع عن هذا الإجراء.`)) {
                 window.location.href = `/admin_delete_user/${userId}`;
             }
         }
 
+        // دالة تأكيد حذف الأرشيف
+        function confirmClearArchive() {
+            if (confirm('⚠️ هل أنت متأكد من حذف جميع سجلات الأرشيف؟\nسيتم حذف جميع الإعلانات المرسلة نهائياً ولا يمكن التراجع عن هذا الإجراء.')) {
+                window.location.href = '/admin/clear_archive';
+            }
+        }
+
+        // Dark mode toggle
         const toggleBtn = document.getElementById('darkModeToggle');
         const body = document.body;
         if(localStorage.getItem('darkMode') === 'enabled') {
@@ -396,6 +410,7 @@
             }
         });
 
+        // رسم المخططات
         const ctxUsers = document.getElementById('usersChart').getContext('2d');
         new Chart(ctxUsers, {
             type: 'doughnut',
