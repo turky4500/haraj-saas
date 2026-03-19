@@ -150,7 +150,7 @@ def daily_background_tasks():
                         if u.account_expiration.date() == now.date() + datetime.timedelta(days=1):
                             uid_str = str(u.id)
                             if sent_reminders.get(uid_str) != exp_date_str:
-                                # ========== رسالة تذكير قبل انتهاء الاشتراك ==========
+                                # رسالة تذكير قبل انتهاء الاشتراك
                                 msg = f"🌸 مرحباً {u.username}،\n\nنذكرك بحب أن اشتراكك في **راصد حراج** سينتهي غداً {u.account_expiration.strftime('%Y-%m-%d')}. 🗓️\n\nنتمنى أن تكون استمتعت بخدمتنا، ولضمان استمرار رصد صيداتك الموفقة بدون انقطاع، يمكنك التواصل معنا لتجديد الاشتراك. نحن هنا لخدمتك دائماً! 💙\n\nشكراً لثقتك بنا."
                                 if send_whatsapp(create_session(), token, u.phone, msg):
                                     sent_reminders[uid_str] = exp_date_str
@@ -397,7 +397,7 @@ def admin_whatsapp_logs():
     logs.reverse()
     return render_template('whatsapp_logs.html', logs=logs)
 
-# ================= مسار حذف الأرشيف (جديد) =================
+# ================= مسار حذف الأرشيف =================
 @app.route('/admin/clear_archive')
 @login_required
 def admin_clear_archive():
@@ -448,7 +448,7 @@ class MonitorThread(threading.Thread):
                         if sub and sub.status == 'active': 
                             sub.status = 'paused'
                             db.session.commit()
-                            # ========== رسالة انتهاء الاشتراك الجديدة ==========
+                            # رسالة انتهاء الاشتراك الجديدة
                             exp_msg = f"🌸 مرحباً {user.username}،\n\nنأمل أن تكون أيامك مليئة بالصيدات الموفقة! مع الأسف، اشتراكك في **راصد حراج** قد انتهى اليوم. 📅\n\nلكن لا تقلق، رادارك ما زال محفوظاً وجاهزاً للاستئناف فور تجديد الاشتراك. نحن هنا لخدمتك دائماً ونسعد بعودتك إلينا. 💙\n\nإذا كان لديك أي استفسار، تواصل معنا بكل حب.\n\nشكراً لثقتك، وإلى لقاء قريب بإذن الله 🌹"
                             send_whatsapp(self.req_session, current_token, self.cfg['recipients'], exp_msg)
                         break 
@@ -713,7 +713,8 @@ def user_profile():
 @app.route('/user_dashboard', methods=['GET', 'POST'])
 @login_required
 def user_dashboard():
-    if current_user.role == 'admin' and 'admin_impersonating' not in session: 
+    # التحقق إذا كان المدير يتصفح بحساب مستخدم
+    if current_user.role == 'admin' and 'admin_impersonating' not in session:
         return redirect(url_for('admin_dashboard'))
     
     sub = Subscription.query.filter_by(user_id=current_user.id).first()
