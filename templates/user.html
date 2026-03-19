@@ -98,7 +98,18 @@
         .btn-add:hover {
             background-color: #e2e8f0;
         }
-        /* Chips */
+        /* Chips (tags) - محسنة */
+        .tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+            min-height: 45px;
+            background: #f9f9f9;
+            border-radius: 12px;
+            padding: 10px;
+            border: 1px dashed #cbd5e0;
+        }
         .tag-chip {
             display: inline-flex;
             align-items: center;
@@ -108,9 +119,9 @@
             border-radius: 30px;
             font-size: 0.9rem;
             font-weight: 600;
-            margin: 0.3rem 0.3rem 0.3rem 0;
             border: 1px solid #b3e6d9;
             box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            transition: 0.2s;
         }
         .tag-chip i {
             margin-right: 8px;
@@ -200,7 +211,7 @@
             border-radius: 16px;
             color: #1e3a8a;
         }
-        /* Dark mode (احتفاظ بالوظيفة) */
+        /* Dark mode */
         body.dark-mode {
             background-color: #121212;
             color: #e5e7eb;
@@ -215,6 +226,15 @@
         }
         body.dark-mode .table-custom thead {
             background-color: #2d3748;
+        }
+        body.dark-mode .tags-container {
+            background: #2d3748;
+            border-color: #4a5568;
+        }
+        body.dark-mode .tag-chip {
+            background: #2c3e50;
+            color: #a7f3d0;
+            border-color: #1abc9c;
         }
     </style>
 </head>
@@ -293,22 +313,23 @@
                                 <input type="text" name="name" class="form-control" required value="{{ sub.name if sub else '' }}" placeholder="مثال: رادار السيارات">
                             </div>
 
-                            <!-- الكلمات المستهدفة -->
+                            <!-- الكلمات المستهدفة - محسنة -->
                             <div class="mb-4">
                                 <label class="fw-bold small text-muted d-block mb-2">
                                     <i class="fas fa-bullseye text-danger ms-1"></i> الكلمات المستهدفة
                                 </label>
                                 <div class="input-group mb-2">
-                                    <input type="text" id="kwInput" class="form-control" placeholder="مثال: لاندكروزر">
+                                    <input type="text" id="kwInput" class="form-control" placeholder="مثال: لاندكروزر" aria-label="كلمة مفتاحية">
                                     <button type="button" class="btn btn-add" onclick="addTag('kwInput', 'kwTags', 'keywordsHidden')">
                                         <i class="fas fa-plus"></i> إضافة
                                     </button>
                                 </div>
-                                <div id="kwTags" class="mb-2"></div>
+                                <div id="kwTags" class="tags-container"></div>
                                 <input type="hidden" name="keywords" id="keywordsHidden" required>
+                                <small class="text-muted">اضغط Enter للإضافة السريعة</small>
                             </div>
 
-                            <!-- الكلمات المحظورة -->
+                            <!-- الكلمات المحظورة - محسنة -->
                             <div class="mb-4">
                                 <div class="d-flex align-items-center mb-2">
                                     <label class="fw-bold small text-muted">
@@ -325,11 +346,11 @@
                                         <i class="fas fa-plus"></i> إضافة
                                     </button>
                                 </div>
-                                <div id="excTags" class="mb-2"></div>
+                                <div id="excTags" class="tags-container"></div>
                                 <input type="hidden" name="excluded_words" id="excHidden">
                             </div>
 
-                            <!-- نطاق المدن -->
+                            <!-- نطاق المدن - محسنة -->
                             <div class="mb-4">
                                 <div class="d-flex align-items-center mb-2">
                                     <label class="fw-bold small text-muted">
@@ -346,7 +367,7 @@
                                         <i class="fas fa-plus"></i> إضافة
                                     </button>
                                 </div>
-                                <div id="cityTags" class="mb-2"></div>
+                                <div id="cityTags" class="tags-container"></div>
                                 <input type="hidden" name="cities" id="cityHidden">
                             </div>
 
@@ -479,7 +500,7 @@
         </div>
     </div>
 
-    <!-- السكريبتات (نفس الوظائف مع تحسينات طفيفة) -->
+    <!-- السكريبتات -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // Dark mode toggle (محفوظ)
@@ -500,7 +521,7 @@
             }
         });
 
-        // متغيرات التاغات (نفس الكود)
+        // متغيرات التاغات
         let keywordsArray = [];
         let excludedArray = [];
         let citiesArray = [];
@@ -536,6 +557,7 @@
                 renderTags(containerId, targetArray, hiddenId);
             }
             input.value = "";
+            input.focus();
         }
 
         function renderTags(containerId, arr, hiddenId) {
@@ -564,15 +586,24 @@
             }
         }
 
-        // إضافة بالضغط على Enter
+        // إضافة بالضغط على Enter (محسّن)
         document.getElementById('kwInput').addEventListener('keypress', function(e) {
-            if(e.key === 'Enter') { e.preventDefault(); addTag('kwInput', 'kwTags', 'keywordsHidden'); }
+            if(e.key === 'Enter') { 
+                e.preventDefault(); 
+                addTag('kwInput', 'kwTags', 'keywordsHidden'); 
+            }
         });
         document.getElementById('excInput').addEventListener('keypress', function(e) {
-            if(e.key === 'Enter') { e.preventDefault(); addTag('excInput', 'excTags', 'excHidden'); }
+            if(e.key === 'Enter') { 
+                e.preventDefault(); 
+                addTag('excInput', 'excTags', 'excHidden'); 
+            }
         });
         document.getElementById('cityInput').addEventListener('keypress', function(e) {
-            if(e.key === 'Enter') { e.preventDefault(); addTag('cityInput', 'cityTags', 'cityHidden'); }
+            if(e.key === 'Enter') { 
+                e.preventDefault(); 
+                addTag('cityInput', 'cityTags', 'cityHidden'); 
+            }
         });
 
         function submitForm() {
