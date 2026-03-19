@@ -128,7 +128,6 @@
             max-height: 400px;
             overflow-y: auto;
         }
-        /* Dark mode */
         body.dark-mode {
             background-color: #121212;
             color: #e5e7eb;
@@ -324,7 +323,6 @@
                                                 <i class="fas fa-check"></i> تفعيل
                                             {% endif %}
                                         </a>
-                                        <!-- زر حذف المستخدم (مع تأكيد) -->
                                         <a href="#" onclick="confirmDelete('{{ user.username }}', '{{ user.id }}')" class="btn btn-sm btn-outline-danger btn-sm-custom">
                                             <i class="fas fa-trash-alt"></i> حذف نهائي
                                         </a>
@@ -358,7 +356,7 @@
                     <tbody>
                         {% for log in logs %}
                         <tr>
-                            <td class="small text-muted" dir="ltr">{{ log.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td class="small text-muted">{{ format_time_ksa(log.timestamp, 'full') }}</td>
                             <td><strong>{{ log.owner.username }}</strong></td>
                             <td><span class="badge bg-info text-dark px-2 py-1">{{ log.keyword_matched }}</span></td>
                             <td><a href="{{ log.url }}" target="_blank" class="text-decoration-none text-primary">{{ log.title|truncate(40) }}</a></td>
@@ -375,14 +373,12 @@
     </div>
 
     <script>
-        // دالة تأكيد الحذف
         function confirmDelete(username, userId) {
             if (confirm(`هل أنت متأكد من حذف المستخدم "${username}" نهائياً؟\nسيتم حذف جميع بياناته (الاشتراكات، السجلات) ولا يمكن التراجع عن هذا الإجراء.`)) {
                 window.location.href = `/admin_delete_user/${userId}`;
             }
         }
 
-        // Dark mode
         const toggleBtn = document.getElementById('darkModeToggle');
         const body = document.body;
         if(localStorage.getItem('darkMode') === 'enabled') {
@@ -400,7 +396,6 @@
             }
         });
 
-        // رسم المخططات
         const ctxUsers = document.getElementById('usersChart').getContext('2d');
         new Chart(ctxUsers, {
             type: 'doughnut',
