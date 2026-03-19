@@ -18,35 +18,7 @@ urllib3.disable_warnings(InsecureRequestWarning)
 app = Flask(__name__)
 app.secret_key = "haraj_super_secret_key_v18_final_launch"
 
-# ================= دالة تنسيق الوقت بتوقيت السعودية وصيغة 12 ساعة =================
-def format_time_ksa(dt, format_type='full'):
-    """
-    تحويل الوقت من UTC إلى توقيت السعودية (UTC+3) وعرضه بصيغة 12 ساعة مع صباح/مساء
-    format_type:
-        'full' -> 2025-03-20 02:30 مساءً
-        'short' -> 02:30 مساءً
-        'date' -> 2025-03-20
-        'time' -> 02:30 مساءً (مثل short)
-    """
-    if dt is None:
-        return ''
-    # إضافة 3 ساعات للتوقيت المحلي (السعودية)
-    ksa_time = dt + datetime.timedelta(hours=3)
-    
-    if format_type == 'full':
-        return ksa_time.strftime('%Y-%m-%d %I:%M %p').replace('AM', 'صباحاً').replace('PM', 'مساءً')
-    elif format_type == 'short' or format_type == 'time':
-        return ksa_time.strftime('%I:%M %p').replace('AM', 'صباحاً').replace('PM', 'مساءً')
-    elif format_type == 'date':
-        return ksa_time.strftime('%Y-%m-%d')
-    else:
-        return str(ksa_time)
-
-# إتاحة الدالة في جميع القوالب
-app.jinja_env.globals.update(format_time_ksa=format_time_ksa)
-# =================================================================================
-
-# إعداد التسجيل (logging) لمشاهدة الردود في سجلات Render
+# إعداد التسجيل
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -178,7 +150,8 @@ def daily_background_tasks():
                         if u.account_expiration.date() == now.date() + datetime.timedelta(days=1):
                             uid_str = str(u.id)
                             if sent_reminders.get(uid_str) != exp_date_str:
-                                msg = "مرحباً بك ⏳\nنذكرك بأن اشتراكك في (راصد حراج) ينتهي غداً.\nلضمان استمرار رصد صيداتك الموفقة بدون انقطاع، نرجو التواصل معنا لتجديد الاشتراك. 🌹"
+                                # ========== رسالة تذكير قبل انتهاء الاشتراك ==========
+                                msg = f"🌸 مرحباً {u.username}،\n\nنذكرك بحب أن اشتراكك في **راصد حراج** سينتهي غداً {u.account_expiration.strftime('%Y-%m-%d')}. 🗓️\n\nنتمنى أن تكون استمتعت بخدمتنا، ولضمان استمرار رصد صيداتك الموفقة بدون انقطاع، يمكنك التواصل معنا لتجديد الاشتراك. نحن هنا لخدمتك دائماً! 💙\n\nشكراً لثقتك بنا."
                                 if send_whatsapp(create_session(), token, u.phone, msg):
                                     sent_reminders[uid_str] = exp_date_str
                                     with open(REMINDERS_FILE, 'w') as f: json.dump(sent_reminders, f)
@@ -406,7 +379,7 @@ def send_whatsapp(req_session, token, to_msisdn, text, max_retries=3):
     
     return False
 
-# ================= صفحة سجل الواتساب المنفصلة =================
+# ================= صفحة سجل الواتساب =================
 @app.route('/admin/whatsapp_logs')
 @login_required
 def admin_whatsapp_logs():
@@ -421,10 +394,26 @@ def admin_whatsapp_logs():
         except:
             logs = []
     
-    # عكس الترتيب لعرض الأحدث أولاً
     logs.reverse()
-    
     return render_template('whatsapp_logs.html', logs=logs)
+
+# ================= مسار حذف الأرشيف (جديد) =================
+@app.route('/admin/clear_archive')
+@login_required
+def admin_clear_archive():
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    
+    try:
+        num_deleted = AdLog.query.delete()
+        db.session.commit()
+        flash(f'✅ تم حذف {num_deleted} سجل من الأرشيف بنجاح.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ حدث خطأ أثناء حذف الأرشيف: {str(e)}', 'danger')
+    
+    return redirect(url_for('admin_dashboard'))
+# =======================================================
 
 # ================= خيط المراقبة =================
 class MonitorThread(threading.Thread):
@@ -459,7 +448,8 @@ class MonitorThread(threading.Thread):
                         if sub and sub.status == 'active': 
                             sub.status = 'paused'
                             db.session.commit()
-                            exp_msg = "انتهى اشتراكك في (راصد حراج) 🛑\n\nسعدنا جداً بخدمتك ونتمنى أن نكون قد وفقنا في صيد أفضل الإعلانات لك وتوفير وقتك.\nنطمح لرؤيتك مجدداً، وتذكر أن رادارك محفوظ وجاهز للاستئناف في أي وقت بمجرد تجديد الاشتراك.\n\nشكراً لثقتك بنا 🌹"
+                            # ========== رسالة انتهاء الاشتراك الجديدة ==========
+                            exp_msg = f"🌸 مرحباً {user.username}،\n\nنأمل أن تكون أيامك مليئة بالصيدات الموفقة! مع الأسف، اشتراكك في **راصد حراج** قد انتهى اليوم. 📅\n\nلكن لا تقلق، رادارك ما زال محفوظاً وجاهزاً للاستئناف فور تجديد الاشتراك. نحن هنا لخدمتك دائماً ونسعد بعودتك إلينا. 💙\n\nإذا كان لديك أي استفسار، تواصل معنا بكل حب.\n\nشكراً لثقتك، وإلى لقاء قريب بإذن الله 🌹"
                             send_whatsapp(self.req_session, current_token, self.cfg['recipients'], exp_msg)
                         break 
                 
@@ -567,7 +557,6 @@ def start_thread_for_sub(sub):
     logger.info(f"✅ تم بدء خيط للاشتراك {sub.id} للمستخدم {sub.owner.username}")
 
 # ================= المسارات =================
-
 @app.route('/')
 def index():
     if request.headers.get('X-Keep-Alive-Bot'):
