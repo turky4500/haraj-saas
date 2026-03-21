@@ -239,7 +239,7 @@
             </div>
         </div>
 
-        <!-- جدول العملاء والاشتراكات مع إضافة عمود مصدر المعرفة -->
+        <!-- جدول العملاء والاشتراكات -->
         <div class="glass-card">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h5 class="section-title mb-0">
@@ -255,7 +255,6 @@
                         <tr>
                             <th>العميل</th>
                             <th>رقم الجوال</th>
-                            <th>مصدر المعرفة</th>
                             <th>تاريخ الانتهاء</th>
                             <th>الاشتراك / الإرساليات</th>
                             <th>حالة الحساب</th>
@@ -271,29 +270,6 @@
                                 {% endif %}
                             </td>
                             <td dir="ltr">{{ user.phone }}</td>
-                            <td>
-                                {% if user.heard_from %}
-                                    {% if user.heard_from == 'صديق' %}
-                                        <span class="badge bg-info text-dark">👥 صديق</span>
-                                    {% elif user.heard_from == 'إعلان واتساب' %}
-                                        <span class="badge bg-success">📱 واتساب</span>
-                                    {% elif user.heard_from == 'إعلان سناب شات' %}
-                                        <span class="badge bg-warning text-dark">👻 سناب شات</span>
-                                    {% elif user.heard_from == 'جوجل' %}
-                                        <span class="badge bg-primary">🔍 جوجل</span>
-                                    {% elif user.heard_from == 'انستقرام' %}
-                                        <span class="badge bg-danger">📷 انستقرام</span>
-                                    {% elif user.heard_from == 'إعلان فيسبوك' %}
-                                        <span class="badge bg-secondary">📘 فيسبوك</span>
-                                    {% elif user.heard_from == 'أخرى' %}
-                                        <span class="badge bg-light text-dark">📌 أخرى</span>
-                                    {% else %}
-                                        <span class="badge bg-secondary">{{ user.heard_from }}</span>
-                                    {% endif %}
-                                {% else %}
-                                    <span class="badge bg-light text-muted">غير محدد</span>
-                                {% endif %}
-                            </td>
                             <td>
                                 {% if user.account_expiration %}
                                     <span class="text-danger fw-bold">{{ user.account_expiration.strftime('%Y-%m-%d') }}</span>
@@ -386,8 +362,8 @@
                             <td class="small text-muted" dir="ltr">{{ log.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
                             <td><strong>{{ log.owner.username }}</strong></td>
                             <td><span class="badge bg-info text-dark px-2 py-1">{{ log.keyword_matched }}</span></td>
-                            <td><a href="{{ log.url }}" target="_blank" class="text-decoration-none text-primary">{{ log.title|truncate(40) }}</a></td>
-                        </tr>
+                            <td><a href="{{ log.url }}" target="_blank" class="text-decoration-none text-primary">{{ log.title|truncate(40) }}</a>None
+                        \)`
                         {% else %}
                         <tr>
                             <td colspan="4" class="text-center text-muted py-4">لا توجد عمليات رصد حتى الآن.</td>
