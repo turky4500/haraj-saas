@@ -18,7 +18,7 @@ urllib3.disable_warnings(InsecureRequestWarning)
 app = Flask(__name__)
 app.secret_key = "haraj_super_secret_key_v18_final_launch"
 
-# دالة تنسيق الوقت بتوقيت السعودية (مضافة لجميع القوالب)
+# دالة تنسيق الوقت بتوقيت السعودية
 def format_time_ksa(dt, format_type='full'):
     if dt is None:
         return ''
@@ -165,7 +165,6 @@ def daily_background_tasks():
                         if u.account_expiration.date() == now.date() + datetime.timedelta(days=1):
                             uid_str = str(u.id)
                             if sent_reminders.get(uid_str) != exp_date_str:
-                                # رسالة تذكير قبل انتهاء الاشتراك
                                 msg = f"🌸 مرحباً {u.username}،\n\nنذكرك بحب أن اشتراكك في **راصد حراج** سينتهي غداً {u.account_expiration.strftime('%Y-%m-%d')}. 🗓️\n\nنتمنى أن تكون استمتعت بخدمتنا، ولضمان استمرار رصد صيداتك الموفقة بدون انقطاع، يمكنك التواصل معنا لتجديد الاشتراك. نحن هنا لخدمتك دائماً! 💙\n\nشكراً لثقتك بنا."
                                 if send_whatsapp(create_session(), token, u.phone, msg):
                                     sent_reminders[uid_str] = exp_date_str
@@ -227,6 +226,7 @@ class User(UserMixin, db.Model):
     role = db.Column(db.String(20), default='user')
     is_active_account = db.Column(db.Boolean, default=True)
     account_expiration = db.Column(db.DateTime, nullable=True)
+    heard_from = db.Column(db.String(100), nullable=True)  # من أين سمع عنا
     subscription = db.relationship('Subscription', backref='owner', uselist=False, lazy=True)
     logs = db.relationship('AdLog', backref='owner', lazy=True)
 
@@ -319,7 +319,7 @@ def extract_ads(html_bytes, base_url):
             ads.append((a.get_text(strip=True) or "إعلان", urljoin(base_url, href)))
     return list(dict.fromkeys(ads))
 
-# ================= دالة إرسال الواتساب مع إعادة المحاولة =================
+# ================= دالة إرسال الواتساب =================
 def send_whatsapp(req_session, token, to_msisdn, text, max_retries=3):
     url = "https://whatsapp.tkwin.com.sa/api/v1/send"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
@@ -412,7 +412,7 @@ def admin_whatsapp_logs():
     logs.reverse()
     return render_template('whatsapp_logs.html', logs=logs)
 
-# ================= مسار حذف سجل الواتساب (جديد) =================
+# ================= مسار حذف سجل الواتساب =================
 @app.route('/admin/clear_whatsapp_logs')
 @login_required
 def admin_clear_whatsapp_logs():
@@ -420,7 +420,6 @@ def admin_clear_whatsapp_logs():
         return redirect(url_for('index'))
     
     try:
-        # إفراغ الملف بكتابة مصفوفة فارغة
         with open(WHATSAPP_LOG_FILE, 'w') as f:
             json.dump([], f)
         flash('✅ تم حذف جميع سجلات الواتساب بنجاح.', 'success')
@@ -428,7 +427,6 @@ def admin_clear_whatsapp_logs():
         flash(f'❌ حدث خطأ أثناء حذف السجلات: {str(e)}', 'danger')
     
     return redirect(url_for('admin_whatsapp_logs'))
-# ===============================================================
 
 # ================= مسار حذف الأرشيف =================
 @app.route('/admin/clear_archive')
@@ -446,7 +444,6 @@ def admin_clear_archive():
         flash(f'❌ حدث خطأ أثناء حذف الأرشيف: {str(e)}', 'danger')
     
     return redirect(url_for('admin_dashboard'))
-# =======================================================
 
 # ================= خيط المراقبة =================
 class MonitorThread(threading.Thread):
@@ -481,7 +478,6 @@ class MonitorThread(threading.Thread):
                         if sub and sub.status == 'active': 
                             sub.status = 'paused'
                             db.session.commit()
-                            # رسالة انتهاء الاشتراك الجديدة
                             exp_msg = f"🌸 مرحباً {user.username}،\n\nنأمل أن تكون أيامك مليئة بالصيدات الموفقة! مع الأسف، اشتراكك في **راصد حراج** قد انتهى اليوم. 📅\n\nلكن لا تقلق، رادارك ما زال محفوظاً وجاهزاً للاستئناف فور تجديد الاشتراك. نحن هنا لخدمتك دائماً ونسعد بعودتك إلينا. 💙\n\nإذا كان لديك أي استفسار، تواصل معنا بكل حب.\n\nشكراً لثقتك، وإلى لقاء قريب بإذن الله 🌹"
                             send_whatsapp(self.req_session, current_token, self.cfg['recipients'], exp_msg)
                         break 
@@ -637,8 +633,10 @@ def register():
         
         otp = str(random.randint(1000, 9999))
         session['temp_user'] = {
-            'username': username, 'phone': phone,
-            'password': generate_password_hash(password, method='pbkdf2:sha256')
+            'username': username,
+            'phone': phone,
+            'password': generate_password_hash(password, method='pbkdf2:sha256'),
+            'heard_from': request.form.get('heard_from')
         }
         session['otp'] = otp
         
@@ -656,7 +654,12 @@ def verify():
     if request.method == 'POST':
         if request.form.get('otp') == session.get('otp'):
             temp = session['temp_user']
-            new_user = User(username=temp['username'], phone=temp['phone'], password=temp['password'])
+            new_user = User(
+                username=temp['username'],
+                phone=temp['phone'],
+                password=temp['password'],
+                heard_from=temp.get('heard_from')
+            )
             
             settings = SystemSettings.query.first()
             trial_days = settings.trial_days if settings else 2
@@ -687,6 +690,8 @@ def verify():
             
         flash('كود التحقق غير صحيح!', 'danger')
     return render_template('verify.html')
+
+# باقي المسارات كما هي (لم تتغير) ...
 
 @app.route('/forgot_password', methods=['GET', 'POST'])
 def forgot_password():
@@ -746,7 +751,6 @@ def user_profile():
 @app.route('/user_dashboard', methods=['GET', 'POST'])
 @login_required
 def user_dashboard():
-    # التحقق إذا كان المدير يتصفح بحساب مستخدم
     if current_user.role == 'admin' and 'admin_impersonating' not in session:
         return redirect(url_for('admin_dashboard'))
     
@@ -1071,9 +1075,7 @@ def impersonate(user_id):
     if current_user.role != 'admin':
         return redirect(url_for('index'))
     user = User.query.get_or_404(user_id)
-    # تخزين معرف المدير الأصلي في الجلسة
     session['admin_impersonating'] = current_user.id
-    # تسجيل الدخول بحساب المستخدم
     login_user(user)
     flash(f'أنت الآن تتصفح وتتحكم بحساب العميل: {user.username}', 'warning')
     return redirect(url_for('user_dashboard'))
@@ -1132,6 +1134,14 @@ def admin_delete_user(user_id):
 
 with app.app_context():
     db.create_all()
+    # محاولة إضافة العمود heard_from إذا لم يكن موجوداً (للقواعد القديمة)
+    try:
+        with db.engine.connect() as conn:
+            conn.execute("ALTER TABLE user ADD COLUMN heard_from VARCHAR(100)")
+            conn.commit()
+    except Exception:
+        pass  # العمود موجود مسبقاً أو قاعدة البيانات لا تدعم ALTER (مثل SQLite قد يتطلب طريقة أخرى)
+
     if not SystemSettings.query.first():
         db.session.add(SystemSettings())
         db.session.commit()
