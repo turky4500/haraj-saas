@@ -355,15 +355,16 @@
                             <th>العميل</th>
                             <th>الكلمة</th>
                             <th>عنوان الإعلان</th>
-                        </thead>
+                        </tr>
+                    </thead>
                     <tbody>
                         {% for log in logs %}
                         <tr>
-                            <td class="small text-muted" dir="ltr">{{ log.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td class="small text-muted" dir="ltr">{{ format_time_ksa(log.timestamp, 'full') }}</td>
                             <td><strong>{{ log.owner.username }}</strong></td>
                             <td><span class="badge bg-info text-dark px-2 py-1">{{ log.keyword_matched }}</span></td>
-                            <td><a href="{{ log.url }}" target="_blank" class="text-decoration-none text-primary">{{ log.title|truncate(40) }}</a>None
-                        \)`
+                            <td><a href="{{ log.url }}" target="_blank" class="text-decoration-none text-primary">{{ log.title|truncate(40) }}</a></td>
+                        </tr>
                         {% else %}
                         <tr>
                             <td colspan="4" class="text-center text-muted py-4">لا توجد عمليات رصد حتى الآن.</td>
