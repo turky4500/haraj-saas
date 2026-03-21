@@ -315,10 +315,7 @@ def extract_ads(html_bytes, base_url):
     for a in soup.find_all("a", href=True):
         href = a["href"].strip()
         if re.match(r"https?://(?:www\.)?haraj\.com(?:\.sa)?/\d+/.+", urljoin(base_url, href)):
-            title = a.get_text(strip=True)
-            if not title:  # إذا كان النص فارغًا أو None
-                title = "إعلان"
-            ads.append((title, urljoin(base_url, href)))
+            ads.append((a.get_text(strip=True) or "إعلان", urljoin(base_url, href)))
     return list(dict.fromkeys(ads))
 
 # ================= دالة إرسال الواتساب =================
@@ -546,7 +543,7 @@ class MonitorThread(threading.Thread):
                                                 log_sub.sent_count += 1
                                                 new_log = AdLog(
                                                     user_id=self.cfg['user_id'], 
-                                                    title=title or "إعلان", 
+                                                    title=title, 
                                                     url=ad_url, 
                                                     keyword_matched=kw
                                                 )
