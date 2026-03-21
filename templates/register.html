@@ -97,7 +97,6 @@
             cursor: pointer;
             z-index: 10;
         }
-        /* شاشة التحميل */
         #loader-overlay {
             display: none;
             position: absolute;
@@ -154,7 +153,6 @@
             <p>انضم إلينا وابدأ رصد إعلاناتك المفضلة</p>
         </div>
 
-        <!-- رسائل الفلاش -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
@@ -207,7 +205,6 @@
             }
         });
 
-        // عرض شاشة التحميل عند تقديم النموذج
         document.getElementById('regForm').addEventListener('submit', function() {
             document.getElementById('loader-overlay').style.display = 'flex';
         });
