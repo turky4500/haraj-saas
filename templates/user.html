@@ -329,68 +329,68 @@
                                 <small class="text-muted">اضغط Enter للإضافة السريعة</small>
                             </div>
 
-                            <!-- الكلمات المحظورة -->
+                            <!-- الكلمات المحظورة (محسّنة: تظهر فقط عند التفعيل) -->
                             <div class="mb-4">
-                                <div class="d-flex align-items-center mb-2">
-                                    <label class="fw-bold small text-muted">
-                                        <i class="fas fa-ban text-secondary ms-1"></i> الكلمات المحظورة
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" name="exclude_enabled" id="excSwitch" {% if sub and sub.exclude_enabled %}checked{% endif %}>
+                                    <label class="form-check-label fw-bold" for="excSwitch">
+                                        <i class="fas fa-ban text-secondary ms-1"></i> تفعيل الكلمات المحظورة
                                     </label>
-                                    <div class="form-check form-switch me-3">
-                                        <input class="form-check-input" type="checkbox" name="exclude_enabled" id="excSwitch" {% if sub and sub.exclude_enabled %}checked{% endif %}>
-                                        <label class="form-check-label small" for="excSwitch">تفعيل</label>
+                                </div>
+                                <div id="excludedWordsSection" style="display: {% if sub and sub.exclude_enabled %}block{% else %}none{% endif %};">
+                                    <div class="input-group mb-2">
+                                        <input type="text" id="excInput" class="form-control" placeholder="مصدوم...">
+                                        <button type="button" class="btn btn-add" onclick="addTag('excInput', 'excTags', 'excHidden')">
+                                            <i class="fas fa-plus"></i> إضافة
+                                        </button>
                                     </div>
+                                    <div id="excTags" class="tags-container"></div>
+                                    <input type="hidden" name="excluded_words" id="excHidden">
+                                    <small class="text-muted">أضف الكلمات التي لا تريد ظهورها في الإعلانات</small>
                                 </div>
-                                <div class="input-group mb-2">
-                                    <input type="text" id="excInput" class="form-control" placeholder="مصدوم...">
-                                    <button type="button" class="btn btn-add" onclick="addTag('excInput', 'excTags', 'excHidden')">
-                                        <i class="fas fa-plus"></i> إضافة
-                                    </button>
-                                </div>
-                                <div id="excTags" class="tags-container"></div>
-                                <input type="hidden" name="excluded_words" id="excHidden">
                             </div>
 
-                            <!-- نطاق المدن -->
+                            <!-- نطاق المدن (محسّن: تظهر فقط عند التفعيل) -->
                             <div class="mb-4">
-                                <div class="d-flex align-items-center mb-2">
-                                    <label class="fw-bold small text-muted">
-                                        <i class="fas fa-map-marker-alt text-success ms-1"></i> المدن المستهدفة
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" name="city_filter_enabled" id="citySwitch" {% if sub and sub.city_filter_enabled %}checked{% endif %}>
+                                    <label class="form-check-label fw-bold" for="citySwitch">
+                                        <i class="fas fa-map-marker-alt text-success ms-1"></i> تحديد المدن المستهدفة
                                     </label>
-                                    <div class="form-check form-switch me-3">
-                                        <input class="form-check-input" type="checkbox" name="city_filter_enabled" id="citySwitch" {% if sub and sub.city_filter_enabled %}checked{% endif %}>
-                                        <label class="form-check-label small" for="citySwitch">تفعيل</label>
+                                </div>
+                                <div id="citiesSection" style="display: {% if sub and sub.city_filter_enabled %}block{% else %}none{% endif %};">
+                                    <div class="input-group mb-2">
+                                        <input type="text" id="cityInput" class="form-control" placeholder="الرياض...">
+                                        <button type="button" class="btn btn-add" onclick="addTag('cityInput', 'cityTags', 'cityHidden')">
+                                            <i class="fas fa-plus"></i> إضافة
+                                        </button>
                                     </div>
+                                    <div id="cityTags" class="tags-container"></div>
+                                    <input type="hidden" name="cities" id="cityHidden">
+                                    <small class="text-muted">اتركها فارغة لتفعيل البحث بكل المدن</small>
                                 </div>
-                                <div class="input-group mb-2">
-                                    <input type="text" id="cityInput" class="form-control" placeholder="الرياض...">
-                                    <button type="button" class="btn btn-add" onclick="addTag('cityInput', 'cityTags', 'cityHidden')">
-                                        <i class="fas fa-plus"></i> إضافة
-                                    </button>
-                                </div>
-                                <div id="cityTags" class="tags-container"></div>
-                                <input type="hidden" name="cities" id="cityHidden">
                             </div>
 
-                            <!-- وقت الهدوء -->
+                            <!-- وقت الهدوء (محسّن: يظهر فقط عند التفعيل) -->
                             <div class="mb-4">
-                                <div class="d-flex align-items-center mb-2">
-                                    <label class="fw-bold small text-muted">
-                                        <i class="fas fa-bed text-info ms-1"></i> وقت الهدوء
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" name="quiet_enabled" id="quietSwitch" {% if sub and sub.quiet_enabled %}checked{% endif %}>
+                                    <label class="form-check-label fw-bold" for="quietSwitch">
+                                        <i class="fas fa-bed text-info ms-1"></i> تفعيل وقت الهدوء
                                     </label>
-                                    <div class="form-check form-switch me-3">
-                                        <input class="form-check-input" type="checkbox" name="quiet_enabled" id="quietSwitch" {% if sub and sub.quiet_enabled %}checked{% endif %}>
-                                        <label class="form-check-label small" for="quietSwitch">تفعيل</label>
-                                    </div>
                                 </div>
-                                <div class="row g-2">
-                                    <div class="col-6">
-                                        <label class="small fw-bold text-muted">من الساعة</label>
-                                        <input type="number" name="q_sh" class="form-control text-center" value="{{ sub.quiet_start_hour if sub else 1 }}" min="0" max="23">
+                                <div id="quietSection" style="display: {% if sub and sub.quiet_enabled %}block{% else %}none{% endif %};">
+                                    <div class="row g-2">
+                                        <div class="col-6">
+                                            <label class="small fw-bold text-muted">من الساعة</label>
+                                            <input type="number" name="q_sh" class="form-control text-center" value="{{ sub.quiet_start_hour if sub else 1 }}" min="0" max="23">
+                                        </div>
+                                        <div class="col-6">
+                                            <label class="small fw-bold text-muted">إلى الساعة</label>
+                                            <input type="number" name="q_eh" class="form-control text-center" value="{{ sub.quiet_end_hour if sub else 6 }}" min="0" max="23">
+                                        </div>
                                     </div>
-                                    <div class="col-6">
-                                        <label class="small fw-bold text-muted">إلى الساعة</label>
-                                        <input type="number" name="q_eh" class="form-control text-center" value="{{ sub.quiet_end_hour if sub else 6 }}" min="0" max="23">
-                                    </div>
+                                    <small class="text-muted">لن يتم إرسال الإشعارات خلال هذه الفترة، وسيتم تخزينها لحين انتهاء الوقت</small>
                                 </div>
                             </div>
 
@@ -418,11 +418,11 @@
                                     <th>الإرساليات</th>
                                     <th>الحالة</th>
                                     <th>الإجراءات</th>
-                                </tr>
+                                 </tr>
                             </thead>
                             <tbody>
                                 {% if sub %}
-                                <tr>
+                                 <tr>
                                     <td class="fw-bold text-primary">{{ sub.name }}</td>
                                     <td><span class="badge bg-secondary bg-opacity-25 text-dark fs-6 px-3 py-2 rounded-pill">{{ sub.sent_count }}</span></td>
                                     <td>
@@ -470,15 +470,15 @@
                     <div class="table-responsive" style="max-height: 380px; overflow-y: auto;">
                         <table class="table table-custom table-sm">
                             <thead>
-                                <tr>
+                                 <tr>
                                     <th>الوقت</th>
                                     <th>الكلمة</th>
                                     <th>عنوان الإعلان</th>
-                                </tr>
+                                 </tr>
                             </thead>
                             <tbody>
                                 {% for log in logs %}
-                                <tr>
+                                 <tr>
                                     <td class="small text-muted">{{ format_time_ksa(log.timestamp, 'full') }}</td>
                                     <td><span class="badge bg-light text-primary border rounded-pill px-2 py-1">{{ log.keyword_matched }}</span></td>
                                     <td class="text-truncate" style="max-width: 200px;">
@@ -486,11 +486,11 @@
                                             {{ log.title }}
                                         </a>
                                     </td>
-                                </tr>
+                                 </tr>
                                 {% else %}
-                                <tr>
+                                 <tr>
                                     <td colspan="3" class="text-center text-muted py-4">لا توجد إعلانات حتى الآن.</td>
-                                </tr>
+                                 </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -520,6 +520,35 @@
                 toggleBtn.innerHTML = '<i class="fas fa-moon"></i>';
             }
         });
+
+        // ----- تحكم إظهار/إخفاء الأقسام حسب checkbox -----
+        const excSwitch = document.getElementById('excSwitch');
+        const excludedWordsSection = document.getElementById('excludedWordsSection');
+        const citySwitch = document.getElementById('citySwitch');
+        const citiesSection = document.getElementById('citiesSection');
+        const quietSwitch = document.getElementById('quietSwitch');
+        const quietSection = document.getElementById('quietSection');
+
+        function toggleSection(checkbox, section) {
+            if (checkbox.checked) {
+                section.style.display = 'block';
+            } else {
+                section.style.display = 'none';
+            }
+        }
+
+        if (excSwitch) {
+            excSwitch.addEventListener('change', () => toggleSection(excSwitch, excludedWordsSection));
+            toggleSection(excSwitch, excludedWordsSection);
+        }
+        if (citySwitch) {
+            citySwitch.addEventListener('change', () => toggleSection(citySwitch, citiesSection));
+            toggleSection(citySwitch, citiesSection);
+        }
+        if (quietSwitch) {
+            quietSwitch.addEventListener('change', () => toggleSection(quietSwitch, quietSection));
+            toggleSection(quietSwitch, quietSection);
+        }
 
         // متغيرات التاغات
         let keywordsArray = [];
