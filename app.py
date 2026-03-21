@@ -226,7 +226,6 @@ class User(UserMixin, db.Model):
     role = db.Column(db.String(20), default='user')
     is_active_account = db.Column(db.Boolean, default=True)
     account_expiration = db.Column(db.DateTime, nullable=True)
-    heard_from = db.Column(db.String(100), nullable=True)  # من أين سمع عنا
     subscription = db.relationship('Subscription', backref='owner', uselist=False, lazy=True)
     logs = db.relationship('AdLog', backref='owner', lazy=True)
 
@@ -635,8 +634,7 @@ def register():
         session['temp_user'] = {
             'username': username,
             'phone': phone,
-            'password': generate_password_hash(password, method='pbkdf2:sha256'),
-            'heard_from': request.form.get('heard_from')
+            'password': generate_password_hash(password, method='pbkdf2:sha256')
         }
         session['otp'] = otp
         
@@ -657,8 +655,7 @@ def verify():
             new_user = User(
                 username=temp['username'],
                 phone=temp['phone'],
-                password=temp['password'],
-                heard_from=temp.get('heard_from')
+                password=temp['password']
             )
             
             settings = SystemSettings.query.first()
@@ -690,8 +687,6 @@ def verify():
             
         flash('كود التحقق غير صحيح!', 'danger')
     return render_template('verify.html')
-
-# باقي المسارات كما هي (لم تتغير) ...
 
 @app.route('/forgot_password', methods=['GET', 'POST'])
 def forgot_password():
@@ -1134,14 +1129,6 @@ def admin_delete_user(user_id):
 
 with app.app_context():
     db.create_all()
-    # محاولة إضافة العمود heard_from إذا لم يكن موجوداً (للقواعد القديمة)
-    try:
-        with db.engine.connect() as conn:
-            conn.execute("ALTER TABLE user ADD COLUMN heard_from VARCHAR(100)")
-            conn.commit()
-    except Exception:
-        pass  # العمود موجود مسبقاً أو قاعدة البيانات لا تدعم ALTER (مثل SQLite قد يتطلب طريقة أخرى)
-
     if not SystemSettings.query.first():
         db.session.add(SystemSettings())
         db.session.commit()
