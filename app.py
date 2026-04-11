@@ -449,15 +449,31 @@ def admin_whatsapp_logs():
         return "غير مصرح", 403
     
     logs = []
-    if WHATSAPP_LOG_FILE.exists():
-        try:
-            with open(WHATSAPP_LOG_FILE, 'r') as f:
-                logs = json.load(f)
-        except:
+    try:
+        if WHATSAPP_LOG_FILE.exists():
+            with open(WHATSAPP_LOG_FILE, 'r', encoding='utf-8') as f:
+                content = f.read().strip()
+                if content:
+                    logs = json.loads(content)
+                else:
+                    logs = []
+        else:
             logs = []
+    except (json.JSONDecodeError, IOError, Exception) as e:
+        logger.error(f"خطأ في قراءة سجل الواتساب: {str(e)}")
+        # في حالة تلف الملف، نبدأ بسجل فارغ ونحتفظ بنسخة احتياطية
+        backup_file = WHATSAPP_LOG_FILE.with_suffix('.json.bak')
+        if WHATSAPP_LOG_FILE.exists():
+            try:
+                WHATSAPP_LOG_FILE.rename(backup_file)
+            except:
+                pass
+        logs = []
+        flash('تم اكتشاف تلف في ملف السجل وتم إنشاء ملف جديد.', 'warning')
     
+    # عكس الترتيب لعرض الأحدث أولاً
     logs.reverse()
-    return render_template('admin_whatsapp_logs.html', logs=logs)
+    return render_template('whatsapp_logs.html', logs=logs)
 
 # ================= مسار حذف سجل الواتساب =================
 @app.route('/admin/clear_whatsapp_logs')
