@@ -1,0 +1,186 @@
+{% extends "admin_base.html" %}
+{% block title %}إدارة المستخدمين - لوحة الإدارة{% endblock %}
+{% block content %}
+<div class="glass-card">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h5 class="section-title mb-0">
+            <i class="fas fa-users-cog ms-2"></i> إدارة العملاء والاشتراكات
+        </h5>
+        <a href="{{ url_for('admin_add_user') }}" class="btn btn-success fw-bold shadow-sm rounded-pill px-4">
+            <i class="fas fa-user-plus"></i> إضافة عميل جديد
+        </a>
+    </div>
+
+    <!-- Search and Filter -->
+    <form method="GET" action="{{ url_for('admin_users') }}" class="row g-3 mb-4">
+        <div class="col-md-5">
+            <div class="input-group">
+                <input type="text" name="search" class="form-control" placeholder="بحث بالاسم، رقم الجوال، أو اسم الاشتراك..." value="{{ search }}">
+                <button class="btn btn-primary" type="submit">
+                    <i class="fas fa-search"></i> بحث
+                </button>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <select name="filter" class="form-select" onchange="this.form.submit()">
+                <option value="all" {% if filter_status == 'all' %}selected{% endif %}>جميع المستخدمين</option>
+                <option value="active" {% if filter_status == 'active' %}selected{% endif %}>نشط فقط</option>
+                <option value="inactive" {% if filter_status == 'inactive' %}selected{% endif %}>موقوف فقط</option>
+                <option value="expired" {% if filter_status == 'expired' %}selected{% endif %}>منتهي الاشتراك</option>
+            </select>
+        </div>
+        <div class="col-md-4 text-end">
+            <span class="text-muted">إجمالي النتائج: {{ users.total }}</span>
+        </div>
+    </form>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>العميل</th>
+                    <th>رقم الجوال</th>
+                    <th>تاريخ الانتهاء</th>
+                    <th>الاشتراك / الإرساليات</th>
+                    <th>حالة الحساب</th>
+                    <th>إجراءات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users.items %}
+                <tr>
+                    <td>
+                        <strong>{{ user.username }}</strong>
+                        {% if user.role == 'admin' %}
+                            <span class="badge bg-warning text-dark d-inline-block me-1">مدير</span>
+                        {% endif %}
+                    </td>
+                    <td dir="ltr">{{ user.phone }}</td>
+                    <td>
+                        {% if user.account_expiration %}
+                            <span class="text-danger fw-bold">{{ user.account_expiration.strftime('%Y-%m-%d') }}</span>
+                        {% else %}
+                            <span class="text-success fw-bold">مفتوح</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if user.subscription %}
+                            <div class="d-flex flex-column gap-1">
+                                <span class="badge bg-info text-dark px-3 py-1">رسائل: {{ user.subscription.sent_count }}</span>
+                                <div class="d-flex gap-1">
+                                    <a href="{{ url_for('admin_toggle_sub', sub_id=user.subscription.id) }}" class="btn btn-sm btn-outline-warning btn-sm-custom">
+                                        {% if user.subscription.status == 'active' %}
+                                            <i class="fas fa-pause"></i> إيقاف
+                                        {% else %}
+                                            <i class="fas fa-play"></i> تشغيل
+                                        {% endif %}
+                                    </a>
+                                    <form action="{{ url_for('admin_update_sleep', sub_id=user.subscription.id) }}" method="POST" class="d-flex gap-1">
+                                        <input type="number" name="sleep_minutes" class="form-control form-control-sm text-center" value="{{ user.subscription.sleep_minutes }}" min="1" style="width: 70px;">
+                                        <button type="submit" class="btn btn-sm btn-secondary" title="حفظ"><i class="fas fa-save"></i></button>
+                                    </form>
+                                </div>
+                            </div>
+                        {% else %}
+                            <span class="text-muted small">لا يوجد اشتراك</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if user.is_active_account %}
+                            <span class="badge bg-success">فعال</span>
+                        {% else %}
+                            <span class="badge bg-danger">موقوف</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if user.id != current_user.id %}
+                            <div class="d-flex flex-column gap-1">
+                                <a href="{{ url_for('admin_edit_user', user_id=user.id) }}" class="btn btn-sm btn-primary">
+                                    <i class="fas fa-edit"></i> تعديل
+                                </a>
+                                <a href="{{ url_for('impersonate', user_id=user.id) }}" class="btn btn-sm btn-dark">
+                                    <i class="fas fa-sign-in-alt"></i> دخول
+                                </a>
+                                <a href="{{ url_for('toggle_user', user_id=user.id) }}" class="btn btn-sm {% if user.is_active_account %}btn-danger{% else %}btn-success{% endif %}">
+                                    {% if user.is_active_account %}
+                                        <i class="fas fa-ban"></i> إيقاف
+                                    {% else %}
+                                        <i class="fas fa-check"></i> تفعيل
+                                    {% endif %}
+                                </a>
+                                <a href="#" onclick="confirmDelete('{{ user.username }}', '{{ user.id }}')" class="btn btn-sm btn-outline-danger">
+                                    <i class="fas fa-trash-alt"></i> حذف
+                                </a>
+                            </div>
+                        {% else %}
+                            <span class="text-muted">حسابك</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center py-4 text-muted">لا يوجد مستخدمين مطابقين للبحث.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if users.pages > 1 %}
+    <nav class="mt-4">
+        <ul class="pagination justify-content-center">
+            <li class="page-item {% if not users.has_prev %}disabled{% endif %}">
+                <a class="page-link" href="{{ url_for('admin_users', page=users.prev_num, search=search, filter=filter_status) if users.has_prev else '#' }}">السابق</a>
+            </li>
+            {% for page_num in users.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                {% if page_num %}
+                    <li class="page-item {% if page_num == users.page %}active{% endif %}">
+                        <a class="page-link" href="{{ url_for('admin_users', page=page_num, search=search, filter=filter_status) }}">{{ page_num }}</a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                {% endif %}
+            {% endfor %}
+            <li class="page-item {% if not users.has_next %}disabled{% endif %}">
+                <a class="page-link" href="{{ url_for('admin_users', page=users.next_num, search=search, filter=filter_status) if users.has_next else '#' }}">التالي</a>
+            </li>
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+
+<script>
+    function confirmDelete(username, userId) {
+        if (confirm(`هل أنت متأكد من حذف المستخدم "${username}" نهائياً؟\nسيتم حذف جميع بياناته (الاشتراكات، السجلات) ولا يمكن التراجع عن هذا الإجراء.`)) {
+            window.location.href = `/admin_delete_user/${userId}`;
+        }
+    }
+    // تحديث عداد الطلبات في الشريط الجانبي (يمكن تحميله عبر API لكننا نمرره من القالب)
+    fetch('/admin/renewal_requests')
+        .then(response => response.text())
+        .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const pendingCount = doc.querySelector('#pendingRenewalsCount')?.textContent || '0';
+            const badge = document.getElementById('pendingBadge');
+            if (badge) {
+                if (parseInt(pendingCount) > 0) {
+                    badge.textContent = pendingCount;
+                    badge.style.display = 'inline-block';
+                } else {
+                    badge.style.display = 'none';
+                }
+            }
+        });
+</script>
+<style>
+    .btn-sm-custom {
+        border-radius: 20px;
+        padding: 0.2rem 0.8rem;
+        font-weight: 600;
+        font-size: 0.75rem;
+    }
+    .table td { vertical-align: middle; }
+</style>
+{% endblock %}
