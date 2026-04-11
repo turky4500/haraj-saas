@@ -489,7 +489,7 @@ class MonitorThread(threading.Thread):
                     time.sleep(3)
                     for ad in self.queued_ads:
                         if self.stop_evt.is_set(): break
-                        msg = f"إعلان ({ad['kw']}):\n{ad['title']}\n{ad['url']}"
+                        msg = f"إعلان ({ad['kw']}):\n{ad['title']}\n{ad['url']}\n\n⚙️ تذكير لطيف: تقدر تتحكم بإعدادات الرصد ومتابعة أرشيف إعلاناتك بكل سهولة من هنا:\n🔗 https://haraj-saas.onrender.com"
                         send_whatsapp(self.req_session, current_token, self.cfg['recipients'], msg)
                         time.sleep(random.uniform(5, 10))
                     
@@ -534,7 +534,7 @@ class MonitorThread(threading.Thread):
                                         else:
                                             delay = random.uniform(30, 60)
                                             time.sleep(delay)
-                                            msg = f"إعلان جديد ({kw}):\n{title}\n{ad_url}"
+                                            msg = f"إعلان جديد ({kw}):\n{title}\n{ad_url}\n\n⚙️ تذكير لطيف: تقدر تتحكم بإعدادات الرصد ومتابعة أرشيف إعلاناتك بكل سهولة من هنا:\n🔗 https://haraj-saas.onrender.com"
                                             send_whatsapp(self.req_session, current_token, self.cfg['recipients'], msg)
                                             
                                         with app.app_context():
