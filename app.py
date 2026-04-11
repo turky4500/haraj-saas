@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-import json, re, time, threading, datetime, random, os
+from werkzeug.utils import secure_filename
+import json, re, time, threading, datetime, random, os, uuid
 from pathlib import Path
 from urllib.parse import urljoin, quote
 import requests
@@ -40,6 +41,17 @@ logger = logging.getLogger(__name__)
 app.jinja_env.globals.update(now=datetime.datetime.now)
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+
+# مجلد رفع صور التحويل (سيتم إنشاؤه تلقائياً)
+UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads', 'renewal_proofs')
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5 ميجابايت
+
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'pdf'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # ================= ربط قاعدة البيانات السحابية =================
 db_url = os.environ.get("DATABASE_URL")
@@ -211,6 +223,11 @@ class SystemSettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     whatsapp_token = db.Column(db.String(255), default="7a203d6ba6f4325ed3261ea87f6b2e751250ad97")
     trial_days = db.Column(db.Integer, default=2)
+    # إعدادات الدفع البنكي
+    bank_account_number = db.Column(db.String(50), default="")
+    bank_account_name = db.Column(db.String(100), default="")
+    bank_qr_text = db.Column(db.Text, default="")
+    subscription_week_price = db.Column(db.Integer, default=5)
 
 class AdminNotifySettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -228,6 +245,7 @@ class User(UserMixin, db.Model):
     account_expiration = db.Column(db.DateTime, nullable=True)
     subscription = db.relationship('Subscription', backref='owner', uselist=False, lazy=True)
     logs = db.relationship('AdLog', backref='owner', lazy=True)
+    renewal_requests = db.relationship('RenewalRequest', backref='owner', lazy=True)
 
 class Subscription(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -256,6 +274,16 @@ class AdLog(db.Model):
     url = db.Column(db.String(500), nullable=False)
     keyword_matched = db.Column(db.String(100))
     timestamp = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+
+class RenewalRequest(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    weeks = db.Column(db.Integer, nullable=False)
+    amount = db.Column(db.Integer, nullable=False)
+    status = db.Column(db.String(20), default='pending')  # pending, approved, rejected
+    proof_filename = db.Column(db.String(255), nullable=True)  # اسم الملف المحفوظ
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    processed_at = db.Column(db.DateTime, nullable=True)
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -392,6 +420,23 @@ def send_whatsapp(req_session, token, to_msisdn, text, max_retries=3):
                 return False
     
     return False
+
+# ================= مسار عرض صورة الإثبات (للأدمن فقط) =================
+@app.route('/admin/view_proof/<int:request_id>')
+@login_required
+def view_proof(request_id):
+    if current_user.role != 'admin':
+        return "غير مصرح", 403
+    req = RenewalRequest.query.get_or_404(request_id)
+    if not req.proof_filename:
+        flash('لا توجد صورة مرفقة لهذا الطلب.', 'warning')
+        return redirect(url_for('admin_renewal_requests'))
+    # التأكد من وجود الملف
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], req.proof_filename)
+    if not os.path.exists(filepath):
+        flash('ملف الصورة غير موجود (ربما تم حذفه تلقائياً).', 'danger')
+        return redirect(url_for('admin_renewal_requests'))
+    return send_from_directory(app.config['UPLOAD_FOLDER'], req.proof_filename)
 
 # ================= صفحة سجل الواتساب =================
 @app.route('/admin/whatsapp_logs')
@@ -767,6 +812,10 @@ def user_dashboard():
     if current_user.role == 'admin' and 'admin_impersonating' not in session:
         return redirect(url_for('admin_dashboard'))
     
+    # التحقق من انتهاء الاشتراك وإعادة التوجيه للتجديد
+    if current_user.account_expiration and datetime.datetime.now() > current_user.account_expiration:
+        return redirect(url_for('renew_subscription'))
+    
     sub = Subscription.query.filter_by(user_id=current_user.id).first()
     logs = AdLog.query.filter_by(user_id=current_user.id).order_by(AdLog.timestamp.desc()).limit(100).all()
 
@@ -832,6 +881,169 @@ def user_dashboard():
         return redirect(url_for('user_dashboard'))
         
     return render_template('user.html', sub=sub, logs=logs, is_expired=is_expired)
+
+# ================= مسار تجديد الاشتراك =================
+@app.route('/renew_subscription', methods=['GET', 'POST'])
+@login_required
+def renew_subscription():
+    if current_user.role == 'admin':
+        flash('حساب الإدارة ليس له تجديد.', 'info')
+        return redirect(url_for('admin_dashboard'))
+    
+    settings = SystemSettings.query.first()
+    week_price = settings.subscription_week_price if settings else 5
+    
+    # منع تقديم طلب جديد إذا كان هناك طلب معلق
+    pending_req = RenewalRequest.query.filter_by(user_id=current_user.id, status='pending').first()
+    if pending_req:
+        flash('لديك طلب تجديد قيد المراجعة بالفعل. سنقوم بتفعيل اشتراكك فور التحقق من الحوالة.', 'info')
+        return render_template('renew_pending.html')
+    
+    if request.method == 'POST':
+        try:
+            weeks = int(request.form.get('weeks', 0))
+            if weeks <= 0:
+                flash('الرجاء اختيار عدد أسابيع صحيح.', 'danger')
+                return redirect(url_for('renew_subscription'))
+        except:
+            flash('عدد الأسابيع غير صالح.', 'danger')
+            return redirect(url_for('renew_subscription'))
+        
+        amount = weeks * week_price
+        
+        # معالجة رفع الصورة (اختياري)
+        proof_filename = None
+        if 'payment_proof' in request.files:
+            file = request.files['payment_proof']
+            if file and file.filename != '' and allowed_file(file.filename):
+                # إنشاء اسم فريد للملف
+                ext = file.filename.rsplit('.', 1)[1].lower()
+                filename = f"{uuid.uuid4().hex}_{current_user.id}.{ext}"
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(filepath)
+                proof_filename = filename
+        
+        # إنشاء طلب التجديد
+        new_req = RenewalRequest(
+            user_id=current_user.id,
+            weeks=weeks,
+            amount=amount,
+            status='pending',
+            proof_filename=proof_filename
+        )
+        db.session.add(new_req)
+        db.session.commit()
+        
+        # إرسال إشعار للإدارة
+        settings = SystemSettings.query.first()
+        token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
+        notify = AdminNotifySettings.query.first()
+        if notify and notify.admin_phone:
+            admin_msg = f"🔔 طلب تجديد جديد:\n👤 المستخدم: {current_user.username}\n📱 الجوال: {current_user.phone}\n📆 عدد الأسابيع: {weeks}\n💰 المبلغ: {amount} ريال\n📎 إثبات: {'مرفق' if proof_filename else 'غير مرفق'}"
+            send_whatsapp(create_session(), token, notify.admin_phone, admin_msg)
+        
+        flash('تم استلام طلب التجديد بنجاح. سنقوم بمراجعة الحوالة وتفعيل اشتراكك قريباً.', 'success')
+        return render_template('renew_pending.html')
+    
+    # GET: عرض صفحة التجديد
+    return render_template('renew.html', settings=settings, week_price=week_price)
+
+# ================= مسارات إدارة طلبات التجديد (للأدمن) =================
+@app.route('/admin/renewal_requests')
+@login_required
+def admin_renewal_requests():
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    
+    requests_list = RenewalRequest.query.order_by(RenewalRequest.created_at.desc()).all()
+    pending_count = RenewalRequest.query.filter_by(status='pending').count()
+    return render_template('admin_renewals.html', requests=requests_list, pending_count=pending_count)
+
+@app.route('/admin/process_renewal/<int:req_id>/<action>')
+@login_required
+def process_renewal(req_id, action):
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    
+    req = RenewalRequest.query.get_or_404(req_id)
+    if req.status != 'pending':
+        flash('تم معالجة هذا الطلب مسبقاً.', 'warning')
+        return redirect(url_for('admin_renewal_requests'))
+    
+    user = User.query.get(req.user_id)
+    settings = SystemSettings.query.first()
+    token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
+    
+    if action == 'approve':
+        # تحديث تاريخ انتهاء الاشتراك
+        if user.account_expiration and user.account_expiration > datetime.datetime.now():
+            # إذا كان الاشتراك لا يزال سارياً، نضيف المدة
+            user.account_expiration = user.account_expiration + datetime.timedelta(weeks=req.weeks)
+        else:
+            # إذا كان منتهياً، نبدأ من الآن
+            user.account_expiration = datetime.datetime.now() + datetime.timedelta(weeks=req.weeks)
+        
+        req.status = 'approved'
+        req.processed_at = datetime.datetime.utcnow()
+        db.session.commit()
+        
+        # إذا كان الاشتراك موجوداً وموقوفاً، نعيد تشغيله
+        if user.subscription:
+            if user.subscription.status != 'active':
+                user.subscription.status = 'active'
+                db.session.commit()
+            # إعادة تشغيل الخيط إذا لم يكن نشطاً
+            if user.subscription.id not in ACTIVE_THREADS:
+                start_thread_for_sub(user.subscription)
+            elif not ACTIVE_THREADS[user.subscription.id].is_alive():
+                # إذا كان الخيط ميتاً، نعيد تشغيله
+                try:
+                    ACTIVE_THREADS[user.subscription.id].stop()
+                except:
+                    pass
+                del ACTIVE_THREADS[user.subscription.id]
+                start_thread_for_sub(user.subscription)
+        
+        # حذف ملف الصورة بعد المعالجة (إذا وجد)
+        if req.proof_filename:
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], req.proof_filename)
+            if os.path.exists(filepath):
+                try:
+                    os.remove(filepath)
+                except:
+                    pass
+        
+        # إرسال إشعار للمستخدم
+        exp_date_str = user.account_expiration.strftime('%Y-%m-%d')
+        user_msg = f"🎉 مبروك! تم تجديد اشتراكك في راصد حراج بنجاح.\n\n📆 المدة: {req.weeks} أسابيع\n📅 تاريخ الانتهاء الجديد: {exp_date_str}\n\nرادارك نشط الآن، نتمنى لك صيدات موفقة! 🚀"
+        send_whatsapp(create_session(), token, user.phone, user_msg)
+        
+        flash(f'تمت الموافقة على طلب {user.username} وتمديد الاشتراك.', 'success')
+    
+    elif action == 'reject':
+        req.status = 'rejected'
+        req.processed_at = datetime.datetime.utcnow()
+        db.session.commit()
+        
+        # حذف ملف الصورة بعد الرفض
+        if req.proof_filename:
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], req.proof_filename)
+            if os.path.exists(filepath):
+                try:
+                    os.remove(filepath)
+                except:
+                    pass
+        
+        # إشعار اختياري للمستخدم
+        # user_msg = "عذراً، لم نتمكن من تأكيد حوالة تجديد الاشتراك. يرجى التواصل مع الإدارة."
+        # send_whatsapp(create_session(), token, user.phone, user_msg)
+        
+        flash(f'تم رفض طلب {user.username}.', 'warning')
+    
+    else:
+        flash('إجراء غير معروف.', 'danger')
+    
+    return redirect(url_for('admin_renewal_requests'))
 
 @app.route('/toggle_sub/<int:sub_id>')
 @login_required
@@ -918,12 +1130,15 @@ def admin_dashboard():
 
     chart_labels = list(daily_ads.keys())
     chart_data = list(daily_ads.values())
+    
+    pending_renewals_count = RenewalRequest.query.filter_by(status='pending').count()
 
     return render_template('admin.html', 
                            users=users, subs=subs, logs=global_logs, 
                            active_threads=ACTIVE_THREADS,
                            total_users=total_users, active_users=active_users, inactive_users=inactive_users,
-                           chart_labels=chart_labels, chart_data=chart_data)
+                           chart_labels=chart_labels, chart_data=chart_data,
+                           pending_renewals_count=pending_renewals_count)
 
 @app.route('/admin_statistics')
 @login_required
@@ -945,6 +1160,11 @@ def admin_settings():
     if request.method == 'POST':
         settings.whatsapp_token = request.form.get('whatsapp_token')
         settings.trial_days = int(request.form.get('trial_days', 2))
+        # إعدادات البنك
+        settings.bank_account_number = request.form.get('bank_account_number', '')
+        settings.bank_account_name = request.form.get('bank_account_name', '')
+        settings.bank_qr_text = request.form.get('bank_qr_text', '')
+        settings.subscription_week_price = int(request.form.get('subscription_week_price', 5))
         
         if notify:
             notify.admin_phone = request.form.get('admin_phone', '')
