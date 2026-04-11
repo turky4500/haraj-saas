@@ -457,7 +457,7 @@ def admin_whatsapp_logs():
             logs = []
     
     logs.reverse()
-    return render_template('whatsapp_logs.html', logs=logs)
+    return render_template('admin_whatsapp_logs.html', logs=logs)
 
 # ================= مسار حذف سجل الواتساب =================
 @app.route('/admin/clear_whatsapp_logs')
@@ -490,7 +490,7 @@ def admin_clear_archive():
         db.session.rollback()
         flash(f'❌ حدث خطأ أثناء حذف الأرشيف: {str(e)}', 'danger')
     
-    return redirect(url_for('admin_dashboard'))
+    return redirect(url_for('admin_ads_log'))
 
 # ================= خيط المراقبة =================
 class MonitorThread(threading.Thread):
@@ -1133,19 +1133,16 @@ def admin_update_sleep(sub_id):
         
     return redirect(request.referrer)
 
-# ================= مسارات الإدارة =================
+# ================= مسارات الإدارة (الجديدة) =================
 @app.route('/admin_dashboard')
 @login_required
 def admin_dashboard():
     if current_user.role != 'admin': return redirect(url_for('user_dashboard'))
     
-    users = User.query.all()
-    subs = Subscription.query.all()
-    global_logs = AdLog.query.order_by(AdLog.timestamp.desc()).limit(200).all()
-
     total_users = User.query.count()
     active_users = User.query.filter_by(is_active_account=True).count()
     inactive_users = total_users - active_users
+    pending_renewals_count = RenewalRequest.query.filter_by(status='pending').count()
 
     seven_days_ago = datetime.datetime.utcnow() - datetime.timedelta(days=7)
     recent_logs = AdLog.query.filter(AdLog.timestamp >= seven_days_ago).all()
@@ -1163,14 +1160,69 @@ def admin_dashboard():
     chart_labels = list(daily_ads.keys())
     chart_data = list(daily_ads.values())
     
-    pending_renewals_count = RenewalRequest.query.filter_by(status='pending').count()
-
-    return render_template('admin.html', 
-                           users=users, subs=subs, logs=global_logs, 
-                           active_threads=ACTIVE_THREADS,
+    return render_template('admin_dashboard.html',
                            total_users=total_users, active_users=active_users, inactive_users=inactive_users,
-                           chart_labels=chart_labels, chart_data=chart_data,
-                           pending_renewals_count=pending_renewals_count)
+                           active_threads=ACTIVE_THREADS,
+                           pending_renewals_count=pending_renewals_count,
+                           chart_labels=chart_labels, chart_data=chart_data)
+
+@app.route('/admin/users')
+@login_required
+def admin_users():
+    if current_user.role != 'admin': return redirect(url_for('user_dashboard'))
+    
+    # معاملات البحث والتصفية
+    search = request.args.get('search', '').strip()
+    filter_status = request.args.get('filter', 'all')
+    page = request.args.get('page', 1, type=int)
+    per_page = 20
+    
+    query = User.query.outerjoin(Subscription)
+    
+    if search:
+        # البحث في اسم المستخدم، رقم الجوال، أو اسم الاشتراك
+        query = query.filter(
+            db.or_(
+                User.username.ilike(f'%{search}%'),
+                User.phone.ilike(f'%{search}%'),
+                Subscription.name.ilike(f'%{search}%')
+            )
+        )
+    
+    if filter_status == 'active':
+        query = query.filter(User.is_active_account == True)
+    elif filter_status == 'inactive':
+        query = query.filter(User.is_active_account == False)
+    elif filter_status == 'expired':
+        query = query.filter(User.account_expiration.isnot(None), User.account_expiration < datetime.datetime.now())
+    
+    users_paginated = query.order_by(User.id.desc()).paginate(page=page, per_page=per_page, error_out=False)
+    
+    return render_template('admin_users.html', users=users_paginated, search=search, filter_status=filter_status)
+
+@app.route('/admin/ads_log')
+@login_required
+def admin_ads_log():
+    if current_user.role != 'admin': return redirect(url_for('user_dashboard'))
+    
+    search = request.args.get('search', '').strip()
+    page = request.args.get('page', 1, type=int)
+    per_page = 50
+    
+    query = db.session.query(AdLog, User).join(User, AdLog.user_id == User.id)
+    
+    if search:
+        query = query.filter(
+            db.or_(
+                User.username.ilike(f'%{search}%'),
+                AdLog.keyword_matched.ilike(f'%{search}%'),
+                AdLog.title.ilike(f'%{search}%')
+            )
+        )
+    
+    logs_paginated = query.order_by(AdLog.timestamp.desc()).paginate(page=page, per_page=per_page, error_out=False)
+    
+    return render_template('admin_ads_log.html', logs=logs_paginated, search=search)
 
 @app.route('/admin_statistics')
 @login_required
@@ -1264,7 +1316,7 @@ def admin_add_user():
                 start_thread_for_sub(new_sub)
 
         flash('تم إضافة العميل وإعداد راداره بنجاح! 🚀', 'success')
-        return redirect(url_for('admin_dashboard'))
+        return redirect(url_for('admin_users'))
 
     return render_template('admin_add_user.html')
 
@@ -1294,7 +1346,7 @@ def admin_edit_user(user_id):
             
         db.session.commit()
         flash(f'تم تعديل بيانات العميل {user.username} بنجاح.', 'success')
-        return redirect(url_for('admin_dashboard'))
+        return redirect(url_for('admin_users'))
     return render_template('admin_edit_user.html', user=user)
 
 @app.route('/toggle_user/<int:user_id>')
@@ -1310,7 +1362,7 @@ def toggle_user(user_id):
                     ACTIVE_THREADS[sub_id].stop()
                     del ACTIVE_THREADS[sub_id]
             db.session.commit()
-    return redirect(url_for('admin_dashboard'))
+    return redirect(request.referrer)
 
 @app.route('/admin_toggle_sub/<int:sub_id>')
 @login_required
@@ -1332,7 +1384,7 @@ def admin_toggle_sub(sub_id):
             start_thread_for_sub(sub)
             flash('تم استئناف اشتراك العميل بنجاح.', 'success')
     db.session.commit()
-    return redirect(url_for('admin_dashboard'))
+    return redirect(request.referrer)
 
 @app.route('/impersonate/<int:user_id>')
 @login_required
@@ -1366,7 +1418,7 @@ def admin_delete_user(user_id):
     
     if user.id == current_user.id:
         flash('لا يمكنك حذف حسابك الخاص!', 'danger')
-        return redirect(url_for('admin_dashboard'))
+        return redirect(url_for('admin_users'))
     
     try:
         if user.subscription and user.subscription.id in ACTIVE_THREADS:
@@ -1395,7 +1447,7 @@ def admin_delete_user(user_id):
         db.session.rollback()
         flash(f'حدث خطأ أثناء الحذف: {str(e)}', 'danger')
     
-    return redirect(url_for('admin_dashboard'))
+    return redirect(url_for('admin_users'))
 
 with app.app_context():
     db.create_all()
