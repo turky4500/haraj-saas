@@ -167,6 +167,14 @@
                 <a href="/admin/whatsapp_logs" class="btn btn-outline-light btn-sm">
                     <i class="fab fa-whatsapp"></i> سجل الإرسال
                 </a>
+                <a href="/admin/renewal_requests" class="btn btn-outline-warning btn-sm position-relative">
+                    <i class="fas fa-sync-alt"></i> طلبات التجديد
+                    {% if pending_renewals_count > 0 %}
+                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                        {{ pending_renewals_count }}
+                    </span>
+                    {% endif %}
+                </a>
                 <a href="/logout" class="btn btn-outline-danger btn-sm">
                     <i class="fas fa-sign-out-alt"></i> خروج
                 </a>
@@ -217,6 +225,14 @@
                     <div class="stat-label">رادارات نشطة</div>
                 </div>
             </div>
+            <!-- بطاقة جديدة: طلبات التجديد المعلقة -->
+            <div class="col-md-3 col-6">
+                <div class="stat-card" style="border-bottom-color: #f39c12;">
+                    <div class="stat-icon"><i class="fas fa-clock" style="color: #f39c12;"></i></div>
+                    <div class="stat-value">{{ pending_renewals_count }}</div>
+                    <div class="stat-label">طلبات تجديد معلقة</div>
+                </div>
+            </div>
         </div>
 
         <!-- الرسم البياني للإعلانات -->
@@ -259,7 +275,8 @@
                             <th>الاشتراك / الإرساليات</th>
                             <th>حالة الحساب</th>
                             <th>إجراءات</th>
-                        </thead>
+                        </tr>
+                    </thead>
                     <tbody>
                         {% for user in users %}
                         <tr>
