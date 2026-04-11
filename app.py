@@ -165,7 +165,7 @@ def daily_background_tasks():
                         if u.account_expiration.date() == now.date() + datetime.timedelta(days=1):
                             uid_str = str(u.id)
                             if sent_reminders.get(uid_str) != exp_date_str:
-                                msg = f"🌸 مرحباً {u.username}،\n\nنذكرك بحب أن اشتراكك في **راصد حراج** سينتهي غداً {u.account_expiration.strftime('%Y-%m-%d')}. 🗓️\n\nنتمنى أن تكون استمتعت بخدمتنا، ولضمان استمرار رصد صيداتك الموفقة بدون انقطاع، يمكنك التواصل معنا لتجديد الاشتراك. نحن هنا لخدمتك دائماً! 💙\n\nشكراً لثقتك بنا."
+                                msg = f"🌸 مرحباً {u.username},\n\nنذكرك بحب أن اشتراكك في **راصد حراج** سينتهي غداً {u.account_expiration.strftime('%Y-%m-%d')}. 🗓️\n\nنتمنى أن تكون استمتعت بخدمتنا، ولضمان استمرار رصد صيداتك الموفقة بدون انقطاع، يمكنك التواصل معنا لتجديد الاشتراك. نحن هنا لخدمتك دائماً! 💙\n\nشكراً لثقتك بنا."
                                 if send_whatsapp(create_session(), token, u.phone, msg):
                                     sent_reminders[uid_str] = exp_date_str
                                     with open(REMINDERS_FILE, 'w') as f: json.dump(sent_reminders, f)
@@ -477,7 +477,7 @@ class MonitorThread(threading.Thread):
                         if sub and sub.status == 'active': 
                             sub.status = 'paused'
                             db.session.commit()
-                            exp_msg = f"🌸 مرحباً {user.username}،\n\nنأمل أن تكون أيامك مليئة بالصيدات الموفقة! مع الأسف، اشتراكك في **راصد حراج** قد انتهى اليوم. 📅\n\nلكن لا تقلق، رادارك ما زال محفوظاً وجاهزاً للاستئناف فور تجديد الاشتراك. نحن هنا لخدمتك دائماً ونسعد بعودتك إلينا. 💙\n\nإذا كان لديك أي استفسار، تواصل معنا بكل حب.\n\nشكراً لثقتك، وإلى لقاء قريب بإذن الله 🌹"
+                            exp_msg = f"🌸 مرحباً {user.username},\n\nنأمل أن تكون أيامك مليئة بالصيدات الموفقة! مع الأسف، اشتراكك في **راصد حراج** قد انتهى اليوم. 📅\n\nلكن لا تقلق، رادارك ما زال محفوظاً وجاهزاً للاستئناف فور تجديد الاشتراك. نحن هنا لخدمتك دائماً ونسعد بعودتك إلينا. 💙\n\nإذا كان لديك أي استفسار، تواصل معنا بكل حب.\n\nشكراً لثقتك، وإلى لقاء قريب بإذن الله 🌹"
                             send_whatsapp(self.req_session, current_token, self.cfg['recipients'], exp_msg)
                         break 
                 
@@ -706,6 +706,24 @@ def forgot_password():
             return redirect(url_for('reset_password'))
         flash('رقم الجوال غير مسجل بالنظام!', 'danger')
     return render_template('forgot_password.html')
+
+@app.route('/forgot_username', methods=['GET', 'POST'])
+def forgot_username():
+    if request.method == 'POST':
+        phone = request.form.get('phone')
+        user = User.query.filter_by(phone=phone).first()
+        if user:
+            settings = SystemSettings.query.first()
+            current_token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
+            username_msg = f"أهلاً بك في راصد حراج 🛡️\n\nاسم المستخدم الخاص بك هو: *{user.username}*\n\nيمكنك الآن تسجيل الدخول بكل سهولة. إذا واجهت أي مشكلة، تواصل مع الدعم."
+            if send_whatsapp(create_session(), current_token, phone, username_msg):
+                flash('تم إرسال اسم المستخدم إلى رقم جوالك المسجل.', 'success')
+            else:
+                flash('تعذر إرسال اسم المستخدم حالياً، حاول مرة أخرى لاحقاً.', 'warning')
+            return redirect(url_for('login'))
+        else:
+            flash('رقم الجوال غير مسجل بالنظام!', 'danger')
+    return render_template('forgot_username.html')
 
 @app.route('/reset_password', methods=['GET', 'POST'])
 def reset_password():
