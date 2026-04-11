@@ -1371,33 +1371,41 @@ def admin_delete_user(user_id):
 with app.app_context():
     db.create_all()
     
-    # === ترحيل يدوي: إضافة أعمدة system_settings إذا لم تكن موجودة ===
+    # === ترحيل آمن: إضافة أعمدة system_settings إذا لم تكن موجودة ===
     try:
-        # محاولة استعلام قد تفشل إذا كانت الأعمدة غير موجودة
-        SystemSettings.query.first()
-    except Exception as e:
-        if 'does not exist' in str(e):
-            # إضافة الأعمدة الجديدة لجدول system_settings
-            with db.engine.connect() as conn:
-                # إضافة كل عمود فقط إذا لم يكن موجوداً
-                columns_to_add = [
-                    ("bank_account_number", "VARCHAR(50) DEFAULT ''"),
-                    ("bank_account_name", "VARCHAR(100) DEFAULT ''"),
-                    ("bank_qr_text", "TEXT DEFAULT ''"),
-                    ("subscription_week_price", "INTEGER DEFAULT 5")
-                ]
-                for col_name, col_type in columns_to_add:
+        with db.engine.connect() as conn:
+            dialect = conn.engine.dialect.name
+            if dialect == 'postgresql':
+                result = conn.execute(db.text("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name='system_settings' 
+                    AND column_name IN ('bank_account_number', 'bank_account_name', 'bank_qr_text', 'subscription_week_price')
+                """))
+                existing_columns = {row[0] for row in result}
+            elif dialect == 'sqlite':
+                result = conn.execute(db.text("PRAGMA table_info(system_settings)"))
+                existing_columns = {row[1] for row in result}
+            else:
+                existing_columns = set()
+            
+            columns_to_add = [
+                ("bank_account_number", "VARCHAR(50) DEFAULT ''"),
+                ("bank_account_name", "VARCHAR(100) DEFAULT ''"),
+                ("bank_qr_text", "TEXT DEFAULT ''"),
+                ("subscription_week_price", "INTEGER DEFAULT 5")
+            ]
+            
+            for col_name, col_type in columns_to_add:
+                if col_name not in existing_columns:
                     try:
-                        conn.execute(db.text(f"ALTER TABLE system_settings ADD COLUMN {col_name} {col_type}"))
-                        conn.commit()
-                    except Exception as col_err:
-                        if 'already exists' not in str(col_err):
-                            print(f"خطأ في إضافة العمود {col_name}: {col_err}")
-        else:
-            # خطأ آخر
-            print(f"خطأ غير متوقع: {e}")
+                        with conn.begin() as trans:
+                            conn.execute(db.text(f"ALTER TABLE system_settings ADD COLUMN {col_name} {col_type}"))
+                    except Exception as e:
+                        print(f"تعذر إضافة العمود {col_name}: {e}")
+    except Exception as e:
+        print(f"خطأ أثناء الترحيل: {e}")
 
-    # إنشاء الجداول الجديدة (RenewalRequest)
     db.create_all()
     
     if not SystemSettings.query.first():
