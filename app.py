@@ -1164,4 +1164,5 @@ if __name__ == '__main__':
         for sub in Subscription.query.filter_by(status='active').all():
             if sub.owner.is_active_account and (not sub.owner.account_expiration or sub.owner.account_expiration > datetime.datetime.now()):
                 start_thread_for_sub(sub)
-    app.run(host='0.0.0.0', port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
