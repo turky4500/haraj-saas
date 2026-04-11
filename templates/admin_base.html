@@ -67,10 +67,23 @@
             width: var(--sidebar-width);
             background: white;
             box-shadow: -2px 0 10px rgba(0,0,0,0.05);
-            transition: width 0.3s ease;
+            transition: transform 0.3s ease, width 0.3s ease;
             overflow-y: auto;
             overflow-x: hidden;
             z-index: 1020;
+        }
+        /* وضع الجوال: مخفي افتراضياً */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(100%);
+                width: var(--sidebar-width) !important;
+            }
+            .sidebar.show {
+                transform: translateX(0);
+            }
+            .menu-toggle {
+                display: block;
+            }
         }
         .sidebar.collapsed {
             width: var(--sidebar-collapsed-width);
@@ -184,20 +197,10 @@
             margin-bottom: 1.5rem;
             display: inline-block;
         }
-        /* Responsive */
+        /* في وضع الجوال، يختفي الهامش الجانبي */
         @media (max-width: 768px) {
-            .sidebar {
-                transform: translateX(100%);
-                transition: transform 0.3s ease;
-            }
-            .sidebar.show {
-                transform: translateX(0);
-            }
             .main-content {
                 margin-right: 0 !important;
-            }
-            .menu-toggle {
-                display: block;
             }
         }
         /* Dark mode support */
@@ -322,30 +325,62 @@
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Sidebar toggle
+        // Sidebar toggle logic
         const sidebar = document.getElementById('sidebar');
         const mainContent = document.getElementById('mainContent');
         const toggleBtn = document.getElementById('sidebarToggle');
+
+        // استرجاع حالة القائمة من localStorage (خاصية الطي/التوسيع)
         let sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
 
         function updateSidebar() {
-            if (sidebarCollapsed) {
-                sidebar.classList.add('collapsed');
-                mainContent.classList.add('expanded');
-            } else {
+            if (window.innerWidth <= 768) {
+                // في وضع الجوال: التعامل مع إظهار/إخفاء باستخدام كلاس 'show'
+                // نضمن أن القائمة لا تحتوي على كلاس 'collapsed' في الجوال
                 sidebar.classList.remove('collapsed');
                 mainContent.classList.remove('expanded');
+            } else {
+                // وضع سطح المكتب: التعامل مع الطي/التوسيع
+                if (sidebarCollapsed) {
+                    sidebar.classList.add('collapsed');
+                    mainContent.classList.add('expanded');
+                } else {
+                    sidebar.classList.remove('collapsed');
+                    mainContent.classList.remove('expanded');
+                }
+                // إزالة كلاس 'show' إذا كان موجوداً من وضع الجوال
+                sidebar.classList.remove('show');
             }
         }
-        updateSidebar();
 
+        // تطبيق الحالة عند التحميل وعند تغيير حجم النافذة
+        updateSidebar();
+        window.addEventListener('resize', updateSidebar);
+
+        // حدث الضغط على زر الهامبرغر
         toggleBtn.addEventListener('click', () => {
-            sidebarCollapsed = !sidebarCollapsed;
-            localStorage.setItem('sidebarCollapsed', sidebarCollapsed);
-            updateSidebar();
+            if (window.innerWidth <= 768) {
+                // في الجوال: toggle كلاس 'show'
+                sidebar.classList.toggle('show');
+            } else {
+                // في سطح المكتب: toggle حالة الطي
+                sidebarCollapsed = !sidebarCollapsed;
+                localStorage.setItem('sidebarCollapsed', sidebarCollapsed);
+                updateSidebar();
+            }
         });
 
-        // Dark mode
+        // إغلاق القائمة الجانبية في الجوال عند النقر على أي رابط داخلها (اختياري، لتحسين التجربة)
+        if (window.innerWidth <= 768) {
+            const navLinks = sidebar.querySelectorAll('.nav-link');
+            navLinks.forEach(link => {
+                link.addEventListener('click', () => {
+                    sidebar.classList.remove('show');
+                });
+            });
+        }
+
+        // Dark mode toggle
         const darkToggle = document.getElementById('darkModeToggle');
         const body = document.body;
         if (localStorage.getItem('darkMode') === 'enabled') {
@@ -360,14 +395,6 @@
             } else {
                 localStorage.setItem('darkMode', 'disabled');
                 darkToggle.innerHTML = '<i class="fas fa-moon"></i>';
-            }
-        });
-
-        // Mobile sidebar toggle
-        document.addEventListener('DOMContentLoaded', function() {
-            if (window.innerWidth <= 768) {
-                sidebarCollapsed = true;
-                updateSidebar();
             }
         });
     </script>
