@@ -31,11 +31,11 @@
                 <small class="text-muted">الرسالة: {{ log.message_preview }}</small>
             </div>
             {% endif %}
-            <div class="response-json bg-light p-2 rounded" style="font-family: monospace; font-size: 0.8rem; max-height: 150px; overflow-y: auto;">
+            <div class="response-json bg-light p-2 rounded" style="font-family: monospace; font-size: 0.8rem; max-height: 150px; overflow-y: auto; direction: ltr; text-align: left;">
                 <strong>رد المزود:</strong><br>
                 {% if log.response %}
                     {% if log.response.json %}
-                        {{ log.response.json|tojson(indent=2) }}
+                        <pre style="margin:0; white-space: pre-wrap;">{{ log.response.json | tojson(indent=2) if log.response.json is not none else 'null' }}</pre>
                     {% elif log.response.text %}
                         {{ log.response.text }}
                     {% elif log.response.error %}
