@@ -1,0 +1,93 @@
+{% extends "admin_base.html" %}
+{% block title %}سجل الإعلانات - لوحة الإدارة{% endblock %}
+{% block content %}
+<div class="glass-card">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h5 class="section-title mb-0">
+            <i class="fas fa-archive ms-2"></i> سجل الإعلانات المرسلة
+        </h5>
+        <a href="#" onclick="confirmClearArchive()" class="btn btn-outline-danger btn-sm">
+            <i class="fas fa-trash-alt"></i> حذف الأرشيف
+        </a>
+    </div>
+
+    <!-- Search -->
+    <form method="GET" action="{{ url_for('admin_ads_log') }}" class="row g-3 mb-4">
+        <div class="col-md-5">
+            <div class="input-group">
+                <input type="text" name="search" class="form-control" placeholder="بحث باسم المستخدم، الكلمة، أو عنوان الإعلان..." value="{{ search }}">
+                <button class="btn btn-primary" type="submit">
+                    <i class="fas fa-search"></i> بحث
+                </button>
+            </div>
+        </div>
+        <div class="col-md-7 text-end">
+            <span class="text-muted">إجمالي النتائج: {{ logs.total }}</span>
+        </div>
+    </form>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>الوقت</th>
+                    <th>العميل</th>
+                    <th>الكلمة</th>
+                    <th>عنوان الإعلان</th>
+                    <th>رابط</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log_item in logs.items %}
+                <tr>
+                    <td class="small text-muted" dir="ltr">{{ format_time_ksa(log_item.AdLog.timestamp, 'full') }}</td>
+                    <td><strong>{{ log_item.User.username }}</strong></td>
+                    <td><span class="badge bg-info text-dark px-2 py-1">{{ log_item.AdLog.keyword_matched }}</span></td>
+                    <td>{{ log_item.AdLog.title|truncate(50) }}</td>
+                    <td>
+                        <a href="{{ log_item.AdLog.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-external-link-alt"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center py-4 text-muted">لا توجد إعلانات مطابقة للبحث.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if logs.pages > 1 %}
+    <nav class="mt-4">
+        <ul class="pagination justify-content-center">
+            <li class="page-item {% if not logs.has_prev %}disabled{% endif %}">
+                <a class="page-link" href="{{ url_for('admin_ads_log', page=logs.prev_num, search=search) if logs.has_prev else '#' }}">السابق</a>
+            </li>
+            {% for page_num in logs.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                {% if page_num %}
+                    <li class="page-item {% if page_num == logs.page %}active{% endif %}">
+                        <a class="page-link" href="{{ url_for('admin_ads_log', page=page_num, search=search) }}">{{ page_num }}</a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                {% endif %}
+            {% endfor %}
+            <li class="page-item {% if not logs.has_next %}disabled{% endif %}">
+                <a class="page-link" href="{{ url_for('admin_ads_log', page=logs.next_num, search=search) if logs.has_next else '#' }}">التالي</a>
+            </li>
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+
+<script>
+    function confirmClearArchive() {
+        if (confirm('⚠️ هل أنت متأكد من حذف جميع سجلات الأرشيف؟\nسيتم حذف جميع الإعلانات المرسلة نهائياً ولا يمكن التراجع عن هذا الإجراء.')) {
+            window.location.href = '/admin/clear_archive';
+        }
+    }
+</script>
+{% endblock %}
