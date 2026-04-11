@@ -42,8 +42,12 @@ app.jinja_env.globals.update(now=datetime.datetime.now)
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
-# مجلد رفع صور التحويل (سيتم إنشاؤه تلقائياً)
-UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads', 'renewal_proofs')
+# مجلد رفع صور التحويل (نستخدم /tmp على Render لأنه مضمون الكتابة)
+if os.environ.get('RENDER') or not os.access(BASE_DIR, os.W_OK):
+    # على Render أو إذا لم نستطع الكتابة في BASE_DIR، نستخدم /tmp
+    UPLOAD_FOLDER = '/tmp/uploads/renewal_proofs'
+else:
+    UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads', 'renewal_proofs')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5 ميجابايت
