@@ -44,7 +44,6 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 # مجلد رفع صور التحويل (نستخدم /tmp على Render لأنه مضمون الكتابة)
 if os.environ.get('RENDER') or not os.access(BASE_DIR, os.W_OK):
-    # على Render أو إذا لم نستطع الكتابة في BASE_DIR، نستخدم /tmp
     UPLOAD_FOLDER = '/tmp/uploads/renewal_proofs'
 else:
     UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads', 'renewal_proofs')
@@ -1371,6 +1370,36 @@ def admin_delete_user(user_id):
 
 with app.app_context():
     db.create_all()
+    
+    # === ترحيل يدوي: إضافة أعمدة system_settings إذا لم تكن موجودة ===
+    try:
+        # محاولة استعلام قد تفشل إذا كانت الأعمدة غير موجودة
+        SystemSettings.query.first()
+    except Exception as e:
+        if 'does not exist' in str(e):
+            # إضافة الأعمدة الجديدة لجدول system_settings
+            with db.engine.connect() as conn:
+                # إضافة كل عمود فقط إذا لم يكن موجوداً
+                columns_to_add = [
+                    ("bank_account_number", "VARCHAR(50) DEFAULT ''"),
+                    ("bank_account_name", "VARCHAR(100) DEFAULT ''"),
+                    ("bank_qr_text", "TEXT DEFAULT ''"),
+                    ("subscription_week_price", "INTEGER DEFAULT 5")
+                ]
+                for col_name, col_type in columns_to_add:
+                    try:
+                        conn.execute(db.text(f"ALTER TABLE system_settings ADD COLUMN {col_name} {col_type}"))
+                        conn.commit()
+                    except Exception as col_err:
+                        if 'already exists' not in str(col_err):
+                            print(f"خطأ في إضافة العمود {col_name}: {col_err}")
+        else:
+            # خطأ آخر
+            print(f"خطأ غير متوقع: {e}")
+
+    # إنشاء الجداول الجديدة (RenewalRequest)
+    db.create_all()
+    
     if not SystemSettings.query.first():
         db.session.add(SystemSettings())
         db.session.commit()
