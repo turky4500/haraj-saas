@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>طلبك قيد المراجعة - راصد حراج</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root { --primary: #1abc9c; --primary-dark: #16a085; --secondary: #34495e; }
+        body { font-family: 'Cairo', sans-serif; background-color: #f0f5f9; color: #2c3e50; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .glass-card { background: rgba(255,255,255,0.95); backdrop-filter: blur(4px); border-radius: 30px; border: 1px solid rgba(255,255,255,0.5); box-shadow: 0 20px 40px -10px rgba(26,188,156,0.2); padding: 3rem; text-align: center; max-width: 500px; width: 100%; }
+        .icon-success { font-size: 5rem; color: var(--primary); margin-bottom: 1.5rem; }
+        h3 { font-weight: 700; color: #2c3e50; margin-bottom: 1rem; }
+        p { color: #5d6d7e; margin-bottom: 2rem; }
+        .btn-primary-custom { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); border: none; border-radius: 50px; padding: 0.8rem 2rem; font-weight: 700; color: white; transition: 0.3s; text-decoration: none; display: inline-block; }
+        .btn-primary-custom:hover { transform: translateY(-3px); box-shadow: 0 15px 30px rgba(26,188,156,0.4); }
+    </style>
+</head>
+<body>
+    <div class="glass-card">
+        <div class="icon-success">
+            <i class="fas fa-clock"></i>
+        </div>
+        <h3>طلب التجديد قيد المراجعة</h3>
+        <p>تم استلام طلب تجديد اشتراكك بنجاح. سنقوم بمراجعة الحوالة وتفعيل اشتراكك في أقرب وقت (عادة خلال دقائق).</p>
+        <p class="text-muted small">سيتم إشعارك برسالة واتساب عند التفعيل.</p>
+        <a href="/user_dashboard" class="btn-primary-custom mt-3">
+            <i class="fas fa-home ms-2"></i> العودة للوحة التحكم
+        </a>
+    </div>
+</body>
+</html>
