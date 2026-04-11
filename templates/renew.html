@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تجديد الاشتراك - راصد حراج</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root { --primary: #1abc9c; --primary-dark: #16a085; --secondary: #34495e; }
+        body { font-family: 'Cairo', sans-serif; background-color: #f0f5f9; color: #2c3e50; padding: 30px 0; }
+        .navbar-custom { background: linear-gradient(135deg, #2c3e50 0%, #1e2b38 100%); padding: 0.8rem 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-bottom: 2rem; }
+        .navbar-custom .navbar-brand { font-weight: 700; font-size: 1.5rem; color: white; }
+        .glass-card { background: rgba(255,255,255,0.95); backdrop-filter: blur(4px); border-radius: 16px; border: 1px solid rgba(255,255,255,0.5); box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); padding: 2rem; }
+        .section-title { font-size: 1.2rem; font-weight: 700; color: var(--secondary); border-bottom: 3px solid var(--primary); padding-bottom: 0.5rem; margin-bottom: 1.5rem; display: inline-block; }
+        .btn-primary-custom { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); border: none; border-radius: 12px; padding: 0.8rem; font-weight: 700; font-size: 1.1rem; color: white; width: 100%; transition: 0.3s; box-shadow: 0 4px 10px rgba(26,188,156,0.3); }
+        .btn-primary-custom:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(26,188,156,0.4); }
+        .form-control, .input-group-text { border-radius: 12px; border: 1px solid #e2e8f0; padding: 0.6rem 1rem; }
+        .form-control:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(26,188,156,0.2); }
+        .bank-details { background: #f8f9fa; border-radius: 12px; padding: 1.5rem; border-right: 5px solid var(--primary); }
+        .amount-display { font-size: 2rem; font-weight: 700; color: var(--primary); }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-custom">
+        <div class="container">
+            <a class="navbar-brand" href="/user_dashboard">
+                <i class="fas fa-arrow-right"></i> العودة للوحة التحكم
+            </a>
+            <span class="text-light fw-bold"><i class="fas fa-sync-alt"></i> تجديد الاشتراك</span>
+        </div>
+    </nav>
+
+    <div class="container" style="max-width: 700px;">
+        <div class="glass-card">
+            <h4 class="section-title"><i class="fas fa-credit-card ms-2" style="color: var(--primary);"></i> تجديد اشتراكك</h4>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm rounded-4 py-3" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="alert alert-info rounded-4">
+                <i class="fas fa-info-circle me-2"></i>
+                اشتراكك الحالي: 
+                <strong>
+                    {% if current_user.account_expiration %}
+                        ينتهي بتاريخ {{ current_user.account_expiration.strftime('%Y-%m-%d') }}
+                    {% else %}
+                        مفتوح (غير محدد)
+                    {% endif %}
+                </strong>
+            </div>
+
+            <form method="POST" enctype="multipart/form-data">
+                <!-- حاسبة التجديد -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold">عدد الأسابيع المطلوبة</label>
+                    <div class="input-group mb-2">
+                        <input type="number" id="weeksInput" name="weeks" class="form-control text-center fw-bold fs-5" value="1" min="1" required>
+                        <span class="input-group-text">أسبوع</span>
+                    </div>
+                    <div class="d-flex gap-2 justify-content-center mt-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setWeeks(1)">أسبوع</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setWeeks(2)">أسبوعين</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setWeeks(4)">شهر</button>
+                    </div>
+                </div>
+
+                <!-- المبلغ الإجمالي -->
+                <div class="mb-4 text-center">
+                    <span class="text-muted">المبلغ الإجمالي:</span>
+                    <div class="amount-display"><span id="totalAmount">{{ week_price }}</span> ريال</div>
+                    <small class="text-muted">سعر الأسبوع: {{ week_price }} ريال</small>
+                </div>
+
+                <!-- بيانات الحساب البنكي -->
+                {% if settings and (settings.bank_account_number or settings.bank_account_name) %}
+                <div class="bank-details mb-4">
+                    <h5 class="fw-bold mb-3"><i class="fas fa-university text-primary ms-1"></i> معلومات التحويل البنكي</h5>
+                    {% if settings.bank_account_name %}
+                    <p class="mb-1"><strong>اسم المستفيد:</strong> {{ settings.bank_account_name }}</p>
+                    {% endif %}
+                    {% if settings.bank_account_number %}
+                    <p class="mb-1"><strong>رقم الحساب (آيبان):</strong> <span dir="ltr">{{ settings.bank_account_number }}</span></p>
+                    {% endif %}
+                    {% if settings.bank_qr_text %}
+                    <div class="mt-3 text-center">
+                        <p class="small text-muted mb-2">باركود التحويل السريع:</p>
+                        <pre style="background:white; padding:10px; border-radius:8px; font-family:monospace; direction:ltr; overflow-x:auto;">{{ settings.bank_qr_text }}</pre>
+                        <small class="text-muted">يمكنك مسح الباركود من تطبيق البنك</small>
+                    </div>
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="alert alert-warning rounded-4">
+                    <i class="fas fa-exclamation-triangle"></i> لم يتم إعداد بيانات الحساب البنكي بعد. يرجى التواصل مع الإدارة.
+                </div>
+                {% endif %}
+
+                <!-- رفع صورة التحويل (اختياري) -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold"><i class="fas fa-camera text-info ms-1"></i> إرفاق صورة التحويل (اختياري)</label>
+                    <input type="file" name="payment_proof" class="form-control" accept="image/png, image/jpeg, image/jpg, application/pdf">
+                    <small class="text-muted">يمكنك رفع لقطة شاشة للحوالة لتسريع التأكيد. (الحد الأقصى 5 ميجابايت)</small>
+                </div>
+
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary-custom">
+                        <i class="fas fa-check-circle"></i> تم التحويل، أبلغ الإدارة
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const weekPrice = {{ week_price }};
+        const weeksInput = document.getElementById('weeksInput');
+        const totalSpan = document.getElementById('totalAmount');
+        function updateTotal() {
+            let weeks = parseInt(weeksInput.value) || 1;
+            if (weeks < 1) weeks = 1;
+            totalSpan.textContent = weeks * weekPrice;
+        }
+        function setWeeks(w) {
+            weeksInput.value = w;
+            updateTotal();
+        }
+        weeksInput.addEventListener('input', updateTotal);
+        updateTotal();
+    </script>
+</body>
+</html>
