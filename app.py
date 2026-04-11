@@ -815,10 +815,7 @@ def user_dashboard():
     if current_user.role == 'admin' and 'admin_impersonating' not in session:
         return redirect(url_for('admin_dashboard'))
     
-    # التحقق من انتهاء الاشتراك وإعادة التوجيه للتجديد
-    if current_user.account_expiration and datetime.datetime.now() > current_user.account_expiration:
-        return redirect(url_for('renew_subscription'))
-    
+    # السماح بالدخول حتى لو كان الاشتراك منتهياً، لكن نمنع التفعيل لاحقاً
     sub = Subscription.query.filter_by(user_id=current_user.id).first()
     logs = AdLog.query.filter_by(user_id=current_user.id).order_by(AdLog.timestamp.desc()).limit(100).all()
 
@@ -827,10 +824,7 @@ def user_dashboard():
         is_expired = True
 
     if request.method == 'POST':
-        if is_expired:
-            flash('عذراً، اشتراكك منتهي! لا يمكنك التعديل.', 'danger')
-            return redirect(url_for('user_dashboard'))
-
+        # السماح بتعديل الإعدادات حتى لو كان منتهياً، لكن لا نسمح بتفعيل الاشتراك
         name = request.form.get('name')
         keywords = request.form.get('keywords')
         cities = request.form.get('cities', '')
@@ -846,6 +840,13 @@ def user_dashboard():
         current_token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
 
         if sub:
+            # إذا كان الاشتراك منتهياً، نجبر الحالة على 'paused' بغض النظر عن القيمة المرسلة
+            new_status = 'active'
+            if is_expired:
+                new_status = 'paused'
+            else:
+                new_status = sub.status  # الإبقاء على الحالة الحالية (لن تتغير من النموذج)
+
             if sub.id in ACTIVE_THREADS:
                 ACTIVE_THREADS[sub.id].stop()
                 del ACTIVE_THREADS[sub.id]
@@ -854,32 +855,57 @@ def user_dashboard():
             if queue_file.exists():
                 queue_file.unlink()
             
-            sub.name = name; sub.keywords = keywords; sub.cities = cities
-            sub.city_filter_enabled = city_filter_enabled; sub.excluded_words = excluded_words
-            sub.exclude_enabled = exclude_enabled; sub.quiet_enabled = quiet_enabled
-            sub.quiet_start_hour = q_sh; sub.quiet_start_minute = 0
-            sub.quiet_end_hour = q_eh; sub.quiet_end_minute = 0
-            sub.end_ts = end_time; sub.status = 'active'
+            sub.name = name
+            sub.keywords = keywords
+            sub.cities = cities
+            sub.city_filter_enabled = city_filter_enabled
+            sub.excluded_words = excluded_words
+            sub.exclude_enabled = exclude_enabled
+            sub.quiet_enabled = quiet_enabled
+            sub.quiet_start_hour = q_sh
+            sub.quiet_start_minute = 0
+            sub.quiet_end_hour = q_eh
+            sub.quiet_end_minute = 0
+            sub.end_ts = end_time
+            sub.status = new_status
             db.session.commit()
-            start_thread_for_sub(sub)
+            
+            if not is_expired and new_status == 'active':
+                start_thread_for_sub(sub)
+            
             flash('تم تعديل الاشتراك وتحديث الرصد!', 'success')
         else:
+            # إنشاء اشتراك جديد (نفس المنطق: إذا كان منتهياً يكون paused)
+            initial_status = 'paused' if is_expired else 'active'
             new_sub = Subscription(
-                user_id=current_user.id, name=name, keywords=keywords, recipients=current_user.phone,
-                cities=cities, city_filter_enabled=city_filter_enabled,
-                excluded_words=excluded_words, exclude_enabled=exclude_enabled,
-                quiet_enabled=quiet_enabled, quiet_start_hour=q_sh, quiet_start_minute=0,
-                quiet_end_hour=q_eh, quiet_end_minute=0, sleep_minutes=15, end_ts=end_time
+                user_id=current_user.id,
+                name=name,
+                keywords=keywords,
+                recipients=current_user.phone,
+                cities=cities,
+                city_filter_enabled=city_filter_enabled,
+                excluded_words=excluded_words,
+                exclude_enabled=exclude_enabled,
+                quiet_enabled=quiet_enabled,
+                quiet_start_hour=q_sh,
+                quiet_start_minute=0,
+                quiet_end_hour=q_eh,
+                quiet_end_minute=0,
+                sleep_minutes=15,
+                end_ts=end_time,
+                status=initial_status
             )
             db.session.add(new_sub)
             db.session.commit()
-            start_thread_for_sub(new_sub)
+            if not is_expired:
+                start_thread_for_sub(new_sub)
             
             exp_text = current_user.account_expiration.strftime('%Y-%m-%d') if current_user.account_expiration else "مفتوح"
             welcome_msg = f"مرحباً بك في راصد حراج! 🎯\nتم تفعيل الرادار الخاص بك بنجاح.\n\nالاسم: {name}\nتاريخ الانتهاء: {exp_text}\n\nنتمنى لك صيدات موفقة! 🚀"
-            send_whatsapp(create_session(), current_token, current_user.phone, welcome_msg)
+            if not is_expired:
+                send_whatsapp(create_session(), current_token, current_user.phone, welcome_msg)
 
-            flash('تم حفظ الاشتراك وبدأ الرصد!', 'success')
+            flash('تم حفظ الاشتراك وبدأ الرصد!' if not is_expired else 'تم حفظ الاشتراك. لا يمكن تشغيل الرادار حتى يتم تجديد الاشتراك.', 'success')
             
         return redirect(url_for('user_dashboard'))
         
@@ -1061,12 +1087,15 @@ def toggle_sub(sub_id):
             flash('تم إيقاف الاشتراك مؤقتاً ⏸', 'warning')
         else:
             user_owner = User.query.get(sub.user_id)
+            # منع التفعيل إذا كان الحساب منتهياً ولم يكن الفاعل أدمن (باستثناء إذا كان الأدمن منتحلاً؟)
             if user_owner.account_expiration and datetime.datetime.now() > user_owner.account_expiration:
-                flash('لا يمكن الاستئناف، حساب العميل منتهي.', 'danger')
-            else:
-                sub.status = 'active'
-                start_thread_for_sub(sub)
-                flash('تم استئناف الاشتراك بنجاح ▶️', 'success')
+                # نسمح للأدمن بالتجاوز
+                if current_user.role != 'admin':
+                    flash('لا يمكن تفعيل الاشتراك لأن الحساب منتهي الصلاحية. يرجى تجديد الاشتراك.', 'danger')
+                    return redirect(request.referrer)
+            sub.status = 'active'
+            start_thread_for_sub(sub)
+            flash('تم استئناف الاشتراك بنجاح ▶️', 'success')
         db.session.commit()
     return redirect(request.referrer)
 
