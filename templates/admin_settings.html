@@ -151,6 +151,30 @@
                     <small class="text-muted">عدد أيام التجربة للعميل الجديد.</small>
                 </div>
 
+                <!-- إعدادات الدفع البنكي -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold"><i class="fas fa-university text-primary ms-1"></i> إعدادات التحويل البنكي</label>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="small text-muted">اسم المستفيد</label>
+                            <input type="text" name="bank_account_name" class="form-control" value="{{ settings.bank_account_name if settings else '' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="small text-muted">رقم الحساب (آيبان)</label>
+                            <input type="text" name="bank_account_number" class="form-control" dir="ltr" value="{{ settings.bank_account_number if settings else '' }}">
+                        </div>
+                        <div class="col-12">
+                            <label class="small text-muted">باركود QR (نص)</label>
+                            <textarea name="bank_qr_text" class="form-control" rows="3" dir="ltr">{{ settings.bank_qr_text if settings else '' }}</textarea>
+                            <small class="text-muted">انسخ نص الباركود الخاص بالحساب (يمكن الحصول عليه من تطبيق البنك).</small>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="small text-muted">سعر الأسبوع (ريال)</label>
+                            <input type="number" name="subscription_week_price" class="form-control" value="{{ settings.subscription_week_price if settings else 5 }}" min="1">
+                        </div>
+                    </div>
+                </div>
+
                 <!-- رقم جوال الإدارة -->
                 <div class="mb-4">
                     <label class="form-label fw-bold"><i class="fas fa-mobile-alt text-primary ms-1"></i> رقم جوال الإدارة (للإشعارات)</label>
