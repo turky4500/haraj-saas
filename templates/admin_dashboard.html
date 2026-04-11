@@ -1,0 +1,114 @@
+{% extends "admin_base.html" %}
+{% block title %}الرئيسية - لوحة الإدارة{% endblock %}
+{% block content %}
+<div class="row g-4 mb-4">
+    <div class="col-md-3 col-6">
+        <div class="stat-card">
+            <div class="stat-icon"><i class="fas fa-users"></i></div>
+            <div class="stat-value">{{ total_users }}</div>
+            <div class="stat-label">إجمالي العملاء</div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card">
+            <div class="stat-icon"><i class="fas fa-check-circle" style="color: #2ecc71;"></i></div>
+            <div class="stat-value">{{ active_users }}</div>
+            <div class="stat-label">نشط</div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card">
+            <div class="stat-icon"><i class="fas fa-ban" style="color: #e74c3c;"></i></div>
+            <div class="stat-value">{{ inactive_users }}</div>
+            <div class="stat-label">موقوف</div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card">
+            <div class="stat-icon"><i class="fas fa-satellite" style="color: #f39c12;"></i></div>
+            <div class="stat-value">{{ active_threads|length }}</div>
+            <div class="stat-label">رادارات نشطة</div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="stat-card" style="border-bottom-color: #f39c12;">
+            <div class="stat-icon"><i class="fas fa-clock" style="color: #f39c12;"></i></div>
+            <div class="stat-value" id="pendingRenewalsCount">{{ pending_renewals_count }}</div>
+            <div class="stat-label">طلبات تجديد معلقة</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-6">
+        <div class="glass-card">
+            <h5 class="section-title">
+                <i class="fas fa-chart-line ms-2" style="color: var(--primary);"></i> توزيع العملاء
+            </h5>
+            <canvas id="usersChart" style="max-height: 250px;"></canvas>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="glass-card">
+            <h5 class="section-title">
+                <i class="fas fa-chart-bar ms-2" style="color: var(--primary);"></i> الإعلانات المرسلة (آخر 7 أيام)
+            </h5>
+            <canvas id="adsChart" style="max-height: 250px;"></canvas>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // تحديث العداد في الشريط الجانبي
+    const pendingCount = {{ pending_renewals_count }};
+    const badge = document.getElementById('pendingBadge');
+    if (badge && pendingCount > 0) {
+        badge.textContent = pendingCount;
+    } else if (badge) {
+        badge.style.display = 'none';
+    }
+
+    // رسم المخططات
+    const ctxUsers = document.getElementById('usersChart').getContext('2d');
+    new Chart(ctxUsers, {
+        type: 'doughnut',
+        data: {
+            labels: ['نشط', 'موقوف'],
+            datasets: [{
+                data: [{{ active_users }}, {{ inactive_users }}],
+                backgroundColor: ['#2ecc71', '#e74c3c'],
+                borderWidth: 0,
+                hoverOffset: 5
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { position: 'bottom', labels: { font: { family: 'Cairo' } } } }
+        }
+    });
+
+    const ctxAds = document.getElementById('adsChart').getContext('2d');
+    new Chart(ctxAds, {
+        type: 'line',
+        data: {
+            labels: {{ chart_labels | tojson }},
+            datasets: [{
+                label: 'إعلانات مرسلة',
+                data: {{ chart_data | tojson }},
+                borderColor: '#1abc9c',
+                backgroundColor: 'rgba(26,188,156,0.1)',
+                fill: true,
+                tension: 0.3,
+                pointBackgroundColor: '#16a085'
+            }]
+        },
+        options: {
+            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+            plugins: { legend: { display: false } }
+        }
+    });
+</script>
+{% endblock %}
