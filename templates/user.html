@@ -274,7 +274,7 @@
                 <i class="fas fa-exclamation-triangle fa-2x me-3"></i>
                 <div>
                     <h4 class="alert-heading fw-bold">انتهى اشتراكك!</h4>
-                    <p class="mb-0">تم إيقاف الرصد مؤقتاً. يرجى التواصل مع الإدارة لتجديد الاشتراك.</p>
+                    <p class="mb-0">تم إيقاف الرصد مؤقتاً. يرجى تجديد الاشتراك لإعادة تفعيل الرادار.</p>
                 </div>
             </div>
         {% else %}
@@ -306,7 +306,7 @@
                     <h5 class="section-title">
                         <i class="fas fa-sliders-h ms-2" style="color: var(--primary);"></i> إعدادات الرصد
                     </h5>
-                    <fieldset {% if is_expired %}disabled{% endif %}>
+                    <fieldset>
                         <form action="/user_dashboard" method="POST" id="monitorForm">
                             <!-- اسم الاشتراك -->
                             <div class="mb-4">
@@ -399,7 +399,7 @@
 
                             <!-- زر الحفظ -->
                             <button type="button" onclick="submitForm()" class="btn btn-primary-custom">
-                                <i class="fas fa-save ms-2"></i> حفظ التعديلات وبدء الرصد
+                                <i class="fas fa-save ms-2"></i> حفظ التعديلات
                             </button>
                         </form>
                     </fieldset>
@@ -437,7 +437,7 @@
                                     </td>
                                     <td>
                                         <div class="d-flex gap-2 justify-content-center">
-                                            {% if not is_expired %}
+                                            {% if not is_expired or sub.status == 'active' %}
                                                 <a href="/toggle_sub/{{ sub.id }}" class="btn btn-sm btn-outline-custom">
                                                     {% if sub.status == 'active' %}
                                                         <i class="fas fa-pause"></i> إيقاف
@@ -445,6 +445,10 @@
                                                         <i class="fas fa-play"></i> استئناف
                                                     {% endif %}
                                                 </a>
+                                            {% else %}
+                                                <button class="btn btn-sm btn-outline-secondary" disabled title="يجب تجديد الاشتراك أولاً">
+                                                    <i class="fas fa-play"></i> استئناف
+                                                </button>
                                             {% endif %}
                                             <a href="/delete_sub/{{ sub.id }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من حذف الاشتراك نهائياً؟')">
                                                 <i class="fas fa-trash"></i>
