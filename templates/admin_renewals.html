@@ -1,118 +1,78 @@
-<!DOCTYPE html>
-<html dir="rtl" lang="ar">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>طلبات التجديد - الإدارة</title>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        :root { --primary: #1abc9c; --primary-dark: #16a085; --secondary: #34495e; }
-        body { font-family: 'Cairo', sans-serif; background-color: #f0f5f9; color: #2c3e50; padding: 20px 0; }
-        .navbar-custom { background: linear-gradient(135deg, #2c3e50 0%, #1e2b38 100%); padding: 0.8rem 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-bottom: 2rem; }
-        .navbar-custom .navbar-brand { font-weight: 700; font-size: 1.5rem; color: white; }
-        .glass-card { background: rgba(255,255,255,0.95); backdrop-filter: blur(4px); border-radius: 16px; border: 1px solid rgba(255,255,255,0.5); box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); padding: 1.5rem; margin-bottom: 1.5rem; }
-        .table-custom { background: white; border-radius: 14px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
-        .table-custom thead { background-color: #2c3e50; color: white; font-weight: 700; }
-        .badge-pending { background: #fff3cd; color: #856404; padding: 0.4rem 0.8rem; border-radius: 30px; font-weight: 600; }
-        .badge-approved { background: #d4edda; color: #155724; padding: 0.4rem 0.8rem; border-radius: 30px; font-weight: 600; }
-        .badge-rejected { background: #f8d7da; color: #721c24; padding: 0.4rem 0.8rem; border-radius: 30px; font-weight: 600; }
-        .btn-sm-custom { border-radius: 20px; padding: 0.3rem 1rem; font-weight: 600; font-size: 0.8rem; }
-    </style>
-</head>
-<body>
-    <nav class="navbar navbar-custom">
-        <div class="container">
-            <a class="navbar-brand" href="/admin_dashboard">
-                <i class="fas fa-arrow-right"></i> العودة للوحة الإدارة
-            </a>
-            <span class="text-light fw-bold"><i class="fas fa-clock"></i> طلبات تجديد الاشتراك</span>
-        </div>
-    </nav>
-
-    <div class="container">
-        <div class="glass-card">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h4 class="fw-bold"><i class="fas fa-sync-alt text-primary ms-2"></i> إدارة طلبات التجديد</h4>
-                <span class="badge bg-warning text-dark rounded-pill px-3 py-2">{{ pending_count }} طلب معلق</span>
-            </div>
-
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                        <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm rounded-4 py-3" role="alert">
-                            {{ message }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        </div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
-
-            <div class="table-responsive">
-                <table class="table table-custom align-middle">
-                    <thead>
-                        <tr>
-                            <th>المستخدم</th>
-                            <th>الجوال</th>
-                            <th>الأسابيع</th>
-                            <th>المبلغ</th>
-                            <th>تاريخ الطلب</th>
-                            <th>الحالة</th>
-                            <th>الإثبات</th>
-                            <th>إجراءات</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for req in requests %}
-                        <tr>
-                            <td><strong>{{ req.owner.username }}</strong></td>
-                            <td dir="ltr">{{ req.owner.phone }}</td>
-                            <td>{{ req.weeks }}</td>
-                            <td>{{ req.amount }} ريال</td>
-                            <td>{{ format_time_ksa(req.created_at, 'date') }}</td>
-                            <td>
-                                {% if req.status == 'pending' %}
-                                    <span class="badge-pending">معلق</span>
-                                {% elif req.status == 'approved' %}
-                                    <span class="badge-approved">مقبول</span>
-                                {% else %}
-                                    <span class="badge-rejected">مرفوض</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if req.proof_filename %}
-                                    <a href="/admin/view_proof/{{ req.id }}" target="_blank" class="btn btn-sm btn-outline-info btn-sm-custom">
-                                        <i class="fas fa-image"></i> عرض
-                                    </a>
-                                {% else %}
-                                    <span class="text-muted small">لا يوجد</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if req.status == 'pending' %}
-                                    <div class="d-flex gap-1">
-                                        <a href="/admin/process_renewal/{{ req.id }}/approve" class="btn btn-sm btn-success btn-sm-custom" onclick="return confirm('هل أنت متأكد من قبول الطلب وتمديد الاشتراك؟')">
-                                            <i class="fas fa-check"></i> قبول
-                                        </a>
-                                        <a href="/admin/process_renewal/{{ req.id }}/reject" class="btn btn-sm btn-danger btn-sm-custom" onclick="return confirm('هل أنت متأكد من رفض الطلب؟')">
-                                            <i class="fas fa-times"></i> رفض
-                                        </a>
-                                    </div>
-                                {% else %}
-                                    <span class="text-muted small">{{ format_time_ksa(req.processed_at, 'date') }}</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="8" class="text-center text-muted py-4">لا توجد طلبات تجديد حتى الآن.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+{% extends "admin_base.html" %}
+{% block title %}طلبات التجديد - لوحة الإدارة{% endblock %}
+{% block content %}
+<div class="glass-card">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="fw-bold"><i class="fas fa-sync-alt text-primary ms-2"></i> إدارة طلبات التجديد</h4>
+        <span class="badge bg-warning text-dark rounded-pill px-3 py-2" id="pendingRenewalsCount">{{ pending_count }} طلب معلق</span>
     </div>
-</body>
-</html>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>المستخدم</th>
+                    <th>الجوال</th>
+                    <th>الأسابيع</th>
+                    <th>المبلغ</th>
+                    <th>تاريخ الطلب</th>
+                    <th>الحالة</th>
+                    <th>الإثبات</th>
+                    <th>إجراءات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for req in requests %}
+                <tr>
+                    <td><strong>{{ req.owner.username }}</strong></td>
+                    <td dir="ltr">{{ req.owner.phone }}</td>
+                    <td>{{ req.weeks }}</td>
+                    <td>{{ req.amount }} ريال</td>
+                    <td>{{ format_time_ksa(req.created_at, 'date') }}</td>
+                    <td>
+                        {% if req.status == 'pending' %}
+                            <span class="badge bg-warning text-dark">معلق</span>
+                        {% elif req.status == 'approved' %}
+                            <span class="badge bg-success">مقبول</span>
+                        {% else %}
+                            <span class="badge bg-danger">مرفوض</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if req.proof_filename %}
+                            <a href="{{ url_for('view_proof', request_id=req.id) }}" target="_blank" class="btn btn-sm btn-outline-info">
+                                <i class="fas fa-image"></i> عرض
+                            </a>
+                        {% else %}
+                            <span class="text-muted small">لا يوجد</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if req.status == 'pending' %}
+                            <div class="d-flex gap-1">
+                                <a href="{{ url_for('process_renewal', req_id=req.id, action='approve') }}" class="btn btn-sm btn-success" onclick="return confirm('هل أنت متأكد من قبول الطلب وتمديد الاشتراك؟')">
+                                    <i class="fas fa-check"></i> قبول
+                                </a>
+                                <a href="{{ url_for('process_renewal', req_id=req.id, action='reject') }}" class="btn btn-sm btn-danger" onclick="return confirm('هل أنت متأكد من رفض الطلب؟')">
+                                    <i class="fas fa-times"></i> رفض
+                                </a>
+                            </div>
+                        {% else %}
+                            <span class="text-muted small">{{ format_time_ksa(req.processed_at, 'date') }}</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" class="text-center py-4 text-muted">لا توجد طلبات تجديد حتى الآن.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+<script>
+    document.getElementById('pendingBadge').textContent = '{{ pending_count }}';
+    if ({{ pending_count }} === 0) document.getElementById('pendingBadge').style.display = 'none';
+</script>
+{% endblock %}
