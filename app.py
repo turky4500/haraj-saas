@@ -204,7 +204,9 @@ def monitor_threads_health():
                         continue
                     if sub.owner.account_expiration and sub.owner.account_expiration <= datetime.datetime.now():
                         continue
-                    if sub.id not in ACTIVE_THREADS or not ACTIVE_THREADS[sub.id].is_alive():
+                    
+                    thread = ACTIVE_THREADS.get(sub.id)
+                    if not thread or not thread.is_alive():
                         logger.warning(f"الخيط للاشتراك {sub.id} غير نشط، جاري إعادة تشغيله...")
                         if sub.id in ACTIVE_THREADS:
                             try:
@@ -549,31 +551,34 @@ class MonitorThread(threading.Thread):
             try:
                 with app.app_context():
                     # إعادة تحميل إعدادات الاشتراك من قاعدة البيانات في كل دورة
-                    sub = Subscription.query.get(self.cfg['id'])
-                    if not sub:
-                        break
-                    
-                    user = sub.owner
-                    if not user or not user.is_active_account or (user.account_expiration and user.account_expiration < datetime.datetime.now()):
-                        if sub.status == 'active': 
-                            sub.status = 'paused'
-                            db.session.commit()
-                            exp_msg = f"🌸 مرحباً {user.username},\n\nنأمل أن تكون أيامك مليئة بالصيدات الموفقة! مع الأسف، اشتراكك في **راصد حراج** قد انتهى اليوم. 📅\n\nلكن لا تقلق، رادارك ما زال محفوظاً وجاهزاً للاستئناف فور تجديد الاشتراك. نحن هنا لخدمتك دائماً ونسعد بعودتك إلينا. 💙\n\nإذا كان لديك أي استفسار، تواصل معنا بكل حب.\n\nشكراً لثقتك، وإلى لقاء قريب بإذن الله 🌹"
-                            send_whatsapp(self.req_session, self.cfg.get('token', ''), self.cfg['recipients'], exp_msg)
-                        break
-                    
-                    # تحديث التكوين من قاعدة البيانات (عدا sleep_minutes)
-                    self.cfg['keywords'] = [k.strip() for k in sub.keywords.split(',') if k.strip()]
-                    self.cfg['cities'] = [c.strip() for c in sub.cities.split(',') if c.strip()]
-                    self.cfg['city_filter_enabled'] = sub.city_filter_enabled
-                    self.cfg['excluded_words'] = [e.strip() for e in sub.excluded_words.split(',') if e.strip()]
-                    self.cfg['exclude_enabled'] = sub.exclude_enabled
-                    self.cfg['quiet_enabled'] = sub.quiet_enabled
-                    self.cfg['q_sh'] = sub.quiet_start_hour
-                    self.cfg['q_sm'] = sub.quiet_start_minute
-                    self.cfg['q_eh'] = sub.quiet_end_hour
-                    self.cfg['q_em'] = sub.quiet_end_minute
-                    # self.cfg['sleep_minutes'] = sub.sleep_minutes  # نتركه ثابتاً كما بدأ الخيط
+                    try:
+                        sub = Subscription.query.get(self.cfg['id'])
+                        if not sub:
+                            break
+                        
+                        user = sub.owner
+                        if not user or not user.is_active_account or (user.account_expiration and user.account_expiration < datetime.datetime.now()):
+                            if sub.status == 'active': 
+                                sub.status = 'paused'
+                                db.session.commit()
+                                exp_msg = f"🌸 مرحباً {user.username},\n\nنأمل أن تكون أيامك مليئة بالصيدات الموفقة! مع الأسف، اشتراكك في **راصد حراج** قد انتهى اليوم. 📅\n\nلكن لا تقلق، رادارك ما زال محفوظاً وجاهزاً للاستئناف فور تجديد الاشتراك. نحن هنا لخدمتك دائماً ونسعد بعودتك إلينا. 💙\n\nإذا كان لديك أي استفسار، تواصل معنا بكل حب.\n\nشكراً لثقتك، وإلى لقاء قريب بإذن الله 🌹"
+                                send_whatsapp(self.req_session, self.cfg.get('token', ''), self.cfg['recipients'], exp_msg)
+                            break
+                        
+                        # تحديث التكوين من قاعدة البيانات (عدا sleep_minutes)
+                        self.cfg['keywords'] = [k.strip() for k in sub.keywords.split(',') if k.strip()]
+                        self.cfg['cities'] = [c.strip() for c in sub.cities.split(',') if c.strip()]
+                        self.cfg['city_filter_enabled'] = sub.city_filter_enabled
+                        self.cfg['excluded_words'] = [e.strip() for e in sub.excluded_words.split(',') if e.strip()]
+                        self.cfg['exclude_enabled'] = sub.exclude_enabled
+                        self.cfg['quiet_enabled'] = sub.quiet_enabled
+                        self.cfg['q_sh'] = sub.quiet_start_hour
+                        self.cfg['q_sm'] = sub.quiet_start_minute
+                        self.cfg['q_eh'] = sub.quiet_end_hour
+                        self.cfg['q_em'] = sub.quiet_end_minute
+                    except Exception as reload_err:
+                        logger.error(f"خطأ في إعادة تحميل إعدادات الاشتراك {self.cfg['id']}: {reload_err}")
+                        # نستمر بالإعدادات القديمة دون إنهاء الخيط
                     
                     settings = SystemSettings.query.first()
                     current_token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
@@ -581,7 +586,7 @@ class MonitorThread(threading.Thread):
                     currently_quiet = is_quiet_now(self.cfg['quiet_enabled'], self.cfg['q_sh'], self.cfg['q_sm'], self.cfg['q_eh'], self.cfg['q_em'])
                     
                     # تسجيل للتصحيح (اختياري)
-                    # logger.info(f"🔍 [Sub {sub.id}] فحص الكلمات: {self.cfg['keywords']}")
+                    # logger.info(f"🔍 [Sub {self.cfg['id']}] فحص الكلمات: {self.cfg['keywords']}")
 
                     if not currently_quiet and self.queued_ads:
                         wake_msg = "🌅 انتهت فترة الهدوء!\nإليك الإعلانات التي تم رصدها وتخزينها أثناء فترة توقف الإشعارات:"
