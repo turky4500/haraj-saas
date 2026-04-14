@@ -550,10 +550,11 @@ class MonitorThread(threading.Thread):
         while not self.stop_evt.is_set():
             try:
                 with app.app_context():
-                    # إعادة تحميل إعدادات الاشتراك من قاعدة البيانات في كل دورة
+                    # --- إعادة تحميل إعدادات الاشتراك من قاعدة البيانات ---
                     try:
                         sub = Subscription.query.get(self.cfg['id'])
                         if not sub:
+                            logger.error(f"الاشتراك {self.cfg['id']} لم يعد موجوداً. إيقاف الخيط.")
                             break
                         
                         user = sub.owner
@@ -563,6 +564,7 @@ class MonitorThread(threading.Thread):
                                 db.session.commit()
                                 exp_msg = f"🌸 مرحباً {user.username},\n\nنأمل أن تكون أيامك مليئة بالصيدات الموفقة! مع الأسف، اشتراكك في **راصد حراج** قد انتهى اليوم. 📅\n\nلكن لا تقلق، رادارك ما زال محفوظاً وجاهزاً للاستئناف فور تجديد الاشتراك. نحن هنا لخدمتك دائماً ونسعد بعودتك إلينا. 💙\n\nإذا كان لديك أي استفسار، تواصل معنا بكل حب.\n\nشكراً لثقتك، وإلى لقاء قريب بإذن الله 🌹"
                                 send_whatsapp(self.req_session, self.cfg.get('token', ''), self.cfg['recipients'], exp_msg)
+                            logger.info(f"الاشتراك {self.cfg['id']} غير نشط أو منتهي. إيقاف الخيط.")
                             break
                         
                         # تحديث التكوين من قاعدة البيانات (عدا sleep_minutes)
@@ -584,9 +586,6 @@ class MonitorThread(threading.Thread):
                     current_token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
                     
                     currently_quiet = is_quiet_now(self.cfg['quiet_enabled'], self.cfg['q_sh'], self.cfg['q_sm'], self.cfg['q_eh'], self.cfg['q_em'])
-                    
-                    # تسجيل للتصحيح (اختياري)
-                    # logger.info(f"🔍 [Sub {self.cfg['id']}] فحص الكلمات: {self.cfg['keywords']}")
 
                     if not currently_quiet and self.queued_ads:
                         wake_msg = "🌅 انتهت فترة الهدوء!\nإليك الإعلانات التي تم رصدها وتخزينها أثناء فترة توقف الإشعارات:"
@@ -655,7 +654,8 @@ class MonitorThread(threading.Thread):
                                                     db.session.add(new_log)
                                                     db.session.commit()
                             except Exception as e:
-                                logger.error(f"خطأ في رصد الإعلانات للاشتراك {self.cfg['id']}: {str(e)}")
+                                logger.error(f"خطأ في رصد الإعلانات (كلمة: {kw}، صفحة: {page}) للاشتراك {self.cfg['id']}: {str(e)}")
+                                # استمرار الحلقة دون إنهاء الخيط
                                 pass
                             time.sleep(random.uniform(3, 7))
                     
@@ -664,8 +664,11 @@ class MonitorThread(threading.Thread):
                         if self.stop_evt.is_set(): break
                         time.sleep(1)
             except Exception as e:
+                # أي خطأ غير متوقع لا ينهي الخيط إلا إذا كان خطأ فادحاً (مثل MemoryError)
                 logger.error(f"خطأ غير متوقع في خيط الاشتراك {self.cfg['id']}: {str(e)}")
-                break
+                # انتظار قليل ثم إعادة المحاولة
+                time.sleep(60)
+                continue
 
     def stop(self):
         self.stop_evt.set()
