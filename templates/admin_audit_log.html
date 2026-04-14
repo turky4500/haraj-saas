@@ -120,13 +120,13 @@
             let html = '<div style="font-size: 0.9rem; line-height: 1.6;">';
             
             // تنسيق حسب نوع الحدث (اختياري)
-            if (details['نوع التغيير']) {
-                html += `<strong>${details['نوع التغيير']}</strong><br>`;
+            if (details['نوع التغيير'] || details['نوع الحدث']) {
+                html += `<strong>${details['نوع التغيير'] || details['نوع الحدث']}</strong><br>`;
             }
             
             // عرض الأزواج مفتاح-قيمة
             for (const [key, value] of Object.entries(details)) {
-                if (key === 'نوع التغيير') continue;
+                if (key === 'نوع التغيير' || key === 'نوع الحدث') continue;
                 if (value === null || value === '') continue;
                 
                 let displayValue = value;
