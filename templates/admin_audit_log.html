@@ -62,17 +62,8 @@
                     <td>
                         <span class="badge bg-secondary">{{ log.action }}</span>
                     </td>
-                    <td>
-                        {% if log.details %}
-                            {% set details = log.details|tojson %}
-                            {% if details|length > 100 %}
-                                <small>{{ details[:100] }}...</small>
-                            {% else %}
-                                <small>{{ details }}</small>
-                            {% endif %}
-                        {% else %}
-                            -
-                        {% endif %}
+                    <td class="audit-details-cell" data-details="{{ log.details or '' }}">
+                        <!-- سيتم ملؤها بواسطة JavaScript -->
                     </td>
                     <td dir="ltr">{{ log.ip_address or '-' }}</td>
                 </tr>
@@ -115,5 +106,42 @@
             window.location.href = '/admin/clear_audit_log';
         }
     }
+
+    // تنسيق التفاصيل وعرضها بشكل جميل
+    document.querySelectorAll('.audit-details-cell').forEach(cell => {
+        const rawDetails = cell.dataset.details;
+        if (!rawDetails) {
+            cell.innerHTML = '<span class="text-muted">-</span>';
+            return;
+        }
+        
+        try {
+            const details = JSON.parse(rawDetails);
+            let html = '<div style="font-size: 0.9rem; line-height: 1.6;">';
+            
+            // تنسيق حسب نوع الحدث (اختياري)
+            if (details['نوع التغيير']) {
+                html += `<strong>${details['نوع التغيير']}</strong><br>`;
+            }
+            
+            // عرض الأزواج مفتاح-قيمة
+            for (const [key, value] of Object.entries(details)) {
+                if (key === 'نوع التغيير') continue;
+                if (value === null || value === '') continue;
+                
+                let displayValue = value;
+                if (typeof value === 'boolean') {
+                    displayValue = value ? '✅ نعم' : '❌ لا';
+                }
+                html += `<span class="text-secondary">${key}:</span> ${displayValue}<br>`;
+            }
+            
+            html += '</div>';
+            cell.innerHTML = html;
+        } catch (e) {
+            // إذا لم يكن JSON صالحاً، نعرض النص كما هو
+            cell.innerHTML = `<small>${rawDetails}</small>`;
+        }
+    });
 </script>
 {% endblock %}
