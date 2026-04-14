@@ -285,6 +285,12 @@
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link {% if request.endpoint == 'admin_audit_log' %}active{% endif %}" href="{{ url_for('admin_audit_log') }}">
+                    <i class="fas fa-history"></i>
+                    <span>سجل التدقيق</span>
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link {% if request.endpoint == 'admin_statistics' %}active{% endif %}" href="{{ url_for('admin_statistics') }}">
                     <i class="fas fa-chart-pie"></i>
                     <span>إحصائيات المنصة</span>
