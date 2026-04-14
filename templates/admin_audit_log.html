@@ -1,0 +1,119 @@
+{% extends "admin_base.html" %}
+{% block title %}سجل التدقيق - لوحة الإدارة{% endblock %}
+{% block content %}
+<div class="glass-card">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h5 class="section-title mb-0">
+            <i class="fas fa-history ms-2"></i> سجل التدقيق والحركات
+        </h5>
+        <a href="#" onclick="confirmClearAuditLog()" class="btn btn-outline-danger btn-sm">
+            <i class="fas fa-trash-alt"></i> حذف السجل القديم
+        </a>
+    </div>
+
+    <!-- Search and Filter -->
+    <form method="GET" action="{{ url_for('admin_audit_log') }}" class="row g-3 mb-4">
+        <div class="col-md-5">
+            <div class="input-group">
+                <input type="text" name="search" class="form-control" placeholder="بحث باسم المستخدم، الحدث، أو IP..." value="{{ search }}">
+                <button class="btn btn-primary" type="submit">
+                    <i class="fas fa-search"></i> بحث
+                </button>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <select name="action" class="form-select" onchange="this.form.submit()">
+                <option value="">جميع الأحداث</option>
+                {% for action in actions %}
+                <option value="{{ action }}" {% if action_filter == action %}selected{% endif %}>{{ action }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-4 text-end">
+            <span class="text-muted">إجمالي النتائج: {{ logs.total }}</span>
+        </div>
+    </form>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>الوقت</th>
+                    <th>المستخدم</th>
+                    <th>الحدث</th>
+                    <th>التفاصيل</th>
+                    <th>IP</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs.items %}
+                <tr>
+                    <td class="small text-muted" dir="ltr">{{ format_time_ksa(log.timestamp, 'full') }}</td>
+                    <td>
+                        {% if log.user %}
+                            <strong>{{ log.user.username }}</strong>
+                            {% if log.user.role == 'admin' %}
+                                <span class="badge bg-warning text-dark">مدير</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="text-muted">نظام</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge bg-secondary">{{ log.action }}</span>
+                    </td>
+                    <td>
+                        {% if log.details %}
+                            {% set details = log.details|tojson %}
+                            {% if details|length > 100 %}
+                                <small>{{ details[:100] }}...</small>
+                            {% else %}
+                                <small>{{ details }}</small>
+                            {% endif %}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td dir="ltr">{{ log.ip_address or '-' }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center py-4 text-muted">لا توجد سجلات تدقيق مطابقة.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if logs.pages > 1 %}
+    <nav class="mt-4">
+        <ul class="pagination justify-content-center">
+            <li class="page-item {% if not logs.has_prev %}disabled{% endif %}">
+                <a class="page-link" href="{{ url_for('admin_audit_log', page=logs.prev_num, search=search, action=action_filter) if logs.has_prev else '#' }}">السابق</a>
+            </li>
+            {% for page_num in logs.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                {% if page_num %}
+                    <li class="page-item {% if page_num == logs.page %}active{% endif %}">
+                        <a class="page-link" href="{{ url_for('admin_audit_log', page=page_num, search=search, action=action_filter) }}">{{ page_num }}</a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                {% endif %}
+            {% endfor %}
+            <li class="page-item {% if not logs.has_next %}disabled{% endif %}">
+                <a class="page-link" href="{{ url_for('admin_audit_log', page=logs.next_num, search=search, action=action_filter) if logs.has_next else '#' }}">التالي</a>
+            </li>
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+
+<script>
+    function confirmClearAuditLog() {
+        if (confirm('⚠️ هل أنت متأكد من حذف جميع سجلات التدقيق الأقدم من 90 يوماً؟\nلا يمكن التراجع عن هذا الإجراء.')) {
+            window.location.href = '/admin/clear_audit_log';
+        }
+    }
+</script>
+{% endblock %}
