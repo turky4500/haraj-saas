@@ -87,6 +87,9 @@ HARAJ_BASE = "https://haraj.com.sa"
 HARAJ_HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Accept-Language": "ar-SA"}
 ACTIVE_THREADS = {} 
 
+# أقفال للملفات المشتركة
+seen_file_lock = threading.Lock()
+
 def get_ksa_time():
     return datetime.datetime.utcnow() + datetime.timedelta(hours=3)
 
@@ -517,111 +520,144 @@ class MonitorThread(threading.Thread):
         self.req_session = create_session()
         
         self.seen_file = SUBS_BASE_DIR / f"seen_{self.cfg['id']}.json"
-        if self.seen_file.exists():
-            with open(self.seen_file, 'r') as f: self.seen_ids = set(json.load(f))
-        else:
-            self.seen_ids = set()
-
+        self._load_seen()
+        
         self.queue_file = SUBS_BASE_DIR / f"queue_{self.cfg['id']}.json"
         if self.queue_file.exists():
             with open(self.queue_file, 'r') as f: self.queued_ads = json.load(f)
         else:
             self.queued_ads = []
 
+    def _load_seen(self):
+        with seen_file_lock:
+            if self.seen_file.exists():
+                try:
+                    with open(self.seen_file, 'r') as f:
+                        self.seen_ids = set(json.load(f))
+                except:
+                    self.seen_ids = set()
+            else:
+                self.seen_ids = set()
+
+    def _save_seen(self):
+        with seen_file_lock:
+            with open(self.seen_file, 'w') as f:
+                json.dump(list(self.seen_ids), f)
+
     def run(self):
         while not self.stop_evt.is_set():
             try:
                 with app.app_context():
-                    user = User.query.get(self.cfg['user_id'])
+                    # إعادة تحميل إعدادات الاشتراك من قاعدة البيانات في كل دورة
                     sub = Subscription.query.get(self.cfg['id'])
-                    settings = SystemSettings.query.first()
-                    current_token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
-
-                    if not user or not user.is_active_account or not sub or sub.status != 'active' or (user.account_expiration and user.account_expiration < datetime.datetime.now()):
-                        if sub and sub.status == 'active': 
+                    if not sub:
+                        break
+                    
+                    user = sub.owner
+                    if not user or not user.is_active_account or (user.account_expiration and user.account_expiration < datetime.datetime.now()):
+                        if sub.status == 'active': 
                             sub.status = 'paused'
                             db.session.commit()
                             exp_msg = f"🌸 مرحباً {user.username},\n\nنأمل أن تكون أيامك مليئة بالصيدات الموفقة! مع الأسف، اشتراكك في **راصد حراج** قد انتهى اليوم. 📅\n\nلكن لا تقلق، رادارك ما زال محفوظاً وجاهزاً للاستئناف فور تجديد الاشتراك. نحن هنا لخدمتك دائماً ونسعد بعودتك إلينا. 💙\n\nإذا كان لديك أي استفسار، تواصل معنا بكل حب.\n\nشكراً لثقتك، وإلى لقاء قريب بإذن الله 🌹"
-                            send_whatsapp(self.req_session, current_token, self.cfg['recipients'], exp_msg)
-                        break 
-                
-                currently_quiet = is_quiet_now(self.cfg['quiet_enabled'], self.cfg['q_sh'], self.cfg['q_sm'], self.cfg['q_eh'], self.cfg['q_em'])
+                            send_whatsapp(self.req_session, self.cfg.get('token', ''), self.cfg['recipients'], exp_msg)
+                        break
+                    
+                    # تحديث التكوين من قاعدة البيانات (عدا sleep_minutes)
+                    self.cfg['keywords'] = [k.strip() for k in sub.keywords.split(',') if k.strip()]
+                    self.cfg['cities'] = [c.strip() for c in sub.cities.split(',') if c.strip()]
+                    self.cfg['city_filter_enabled'] = sub.city_filter_enabled
+                    self.cfg['excluded_words'] = [e.strip() for e in sub.excluded_words.split(',') if e.strip()]
+                    self.cfg['exclude_enabled'] = sub.exclude_enabled
+                    self.cfg['quiet_enabled'] = sub.quiet_enabled
+                    self.cfg['q_sh'] = sub.quiet_start_hour
+                    self.cfg['q_sm'] = sub.quiet_start_minute
+                    self.cfg['q_eh'] = sub.quiet_end_hour
+                    self.cfg['q_em'] = sub.quiet_end_minute
+                    # self.cfg['sleep_minutes'] = sub.sleep_minutes  # نتركه ثابتاً كما بدأ الخيط
+                    
+                    settings = SystemSettings.query.first()
+                    current_token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
+                    
+                    currently_quiet = is_quiet_now(self.cfg['quiet_enabled'], self.cfg['q_sh'], self.cfg['q_sm'], self.cfg['q_eh'], self.cfg['q_em'])
+                    
+                    # تسجيل للتصحيح (اختياري)
+                    # logger.info(f"🔍 [Sub {sub.id}] فحص الكلمات: {self.cfg['keywords']}")
 
-                if not currently_quiet and self.queued_ads:
-                    wake_msg = "🌅 انتهت فترة الهدوء!\nإليك الإعلانات التي تم رصدها وتخزينها أثناء فترة توقف الإشعارات:"
-                    send_whatsapp(self.req_session, current_token, self.cfg['recipients'], wake_msg)
-                    time.sleep(3)
-                    for ad in self.queued_ads:
-                        if self.stop_evt.is_set(): break
-                        msg = f"إعلان ({ad['kw']}):\n{ad['title']}\n{ad['url']}\n\n⚙️ تذكير لطيف: تقدر تتحكم بإعدادات الرصد ومتابعة أرشيف إعلاناتك بكل سهولة من هنا:\n🔗 https://haraj-saas.onrender.com"
-                        send_whatsapp(self.req_session, current_token, self.cfg['recipients'], msg)
-                        time.sleep(random.uniform(5, 10))
+                    if not currently_quiet and self.queued_ads:
+                        wake_msg = "🌅 انتهت فترة الهدوء!\nإليك الإعلانات التي تم رصدها وتخزينها أثناء فترة توقف الإشعارات:"
+                        send_whatsapp(self.req_session, current_token, self.cfg['recipients'], wake_msg)
+                        time.sleep(3)
+                        for ad in self.queued_ads:
+                            if self.stop_evt.is_set(): break
+                            msg = f"إعلان ({ad['kw']}):\n{ad['title']}\n{ad['url']}\n\n⚙️ تذكير لطيف: تقدر تتحكم بإعدادات الرصد ومتابعة أرشيف إعلاناتك بكل سهولة من هنا:\n🔗 https://haraj-saas.onrender.com"
+                            send_whatsapp(self.req_session, current_token, self.cfg['recipients'], msg)
+                            time.sleep(random.uniform(5, 10))
+                        
+                        self.queued_ads = []
+                        if self.queue_file.exists():
+                            with open(self.queue_file, 'w') as f: json.dump(self.queued_ads, f)
                     
-                    self.queued_ads = []
-                    if self.queue_file.exists():
-                        with open(self.queue_file, 'w') as f: json.dump(self.queued_ads, f)
-                
-                for kw in self.cfg['keywords']:
-                    if self.stop_evt.is_set(): break
-                    
-                    for page in range(1, 4):
+                    for kw in self.cfg['keywords']:
                         if self.stop_evt.is_set(): break
                         
-                        if kw:
-                            url = f"{HARAJ_BASE}/search/{quote(kw, safe='')}/page/{page}" if page > 1 else f"{HARAJ_BASE}/search/{quote(kw, safe='')}/"
-                        else:
-                            url = f"{HARAJ_BASE}/page/{page}" if page > 1 else f"{HARAJ_BASE}/"
+                        for page in range(1, 4):
+                            if self.stop_evt.is_set(): break
                             
-                        try:
-                            html = self.req_session.get(url, headers=HARAJ_HEADERS, timeout=15, verify=False).content
-                            for title, ad_url in extract_ads(html, HARAJ_BASE):
-                                ad_id = re.search(r"/(\d+)(?:/|$)", ad_url).group(1)
-                                if ad_id not in self.seen_ids:
-                                    ad_html = self.req_session.get(ad_url, headers=HARAJ_HEADERS, timeout=15, verify=False).content
-                                    soup = BeautifulSoup(ad_html, "html.parser")
-                                    full_text = soup.get_text(" ", strip=True)
-                                    
-                                    if is_target_city(full_text, self.cfg['cities'], self.cfg['city_filter_enabled']) and \
-                                       matches_keyword_precise(full_text, kw, self.cfg['excluded_words'], self.cfg['exclude_enabled']):
+                            if kw:
+                                url = f"{HARAJ_BASE}/search/{quote(kw, safe='')}/page/{page}" if page > 1 else f"{HARAJ_BASE}/search/{quote(kw, safe='')}/"
+                            else:
+                                url = f"{HARAJ_BASE}/page/{page}" if page > 1 else f"{HARAJ_BASE}/"
+                                
+                            try:
+                                html = self.req_session.get(url, headers=HARAJ_HEADERS, timeout=15, verify=False).content
+                                for title, ad_url in extract_ads(html, HARAJ_BASE):
+                                    ad_id = re.search(r"/(\d+)(?:/|$)", ad_url).group(1)
+                                    if ad_id not in self.seen_ids:
+                                        ad_html = self.req_session.get(ad_url, headers=HARAJ_HEADERS, timeout=15, verify=False).content
+                                        soup = BeautifulSoup(ad_html, "html.parser")
+                                        full_text = soup.get_text(" ", strip=True)
                                         
-                                        self.seen_ids.add(ad_id)
-                                        with open(self.seen_file, 'w') as f: json.dump(list(self.seen_ids), f)
-                                        
-                                        with app.app_context():
-                                            existing = AdLog.query.filter_by(user_id=self.cfg['user_id'], url=ad_url).first()
-                                            if existing:
-                                                continue
-                                        
-                                        if currently_quiet:
-                                            self.queued_ads.append({'kw': kw, 'title': title, 'url': ad_url})
-                                            with open(self.queue_file, 'w') as f: json.dump(self.queued_ads, f)
-                                        else:
-                                            delay = random.uniform(30, 60)
-                                            time.sleep(delay)
-                                            msg = f"إعلان جديد ({kw}):\n{title}\n{ad_url}\n\n⚙️ تذكير لطيف: تقدر تتحكم بإعدادات الرصد ومتابعة أرشيف إعلاناتك بكل سهولة من هنا:\n🔗 https://haraj-saas.onrender.com"
-                                            send_whatsapp(self.req_session, current_token, self.cfg['recipients'], msg)
+                                        if is_target_city(full_text, self.cfg['cities'], self.cfg['city_filter_enabled']) and \
+                                           matches_keyword_precise(full_text, kw, self.cfg['excluded_words'], self.cfg['exclude_enabled']):
                                             
-                                        with app.app_context():
-                                            log_sub = Subscription.query.get(self.cfg['id'])
-                                            if log_sub:
-                                                log_sub.sent_count += 1
-                                                new_log = AdLog(
-                                                    user_id=self.cfg['user_id'], 
-                                                    title=title, 
-                                                    url=ad_url, 
-                                                    keyword_matched=kw
-                                                )
-                                                db.session.add(new_log)
-                                                db.session.commit()
-                        except Exception as e:
-                            logger.error(f"خطأ في رصد الإعلانات للاشتراك {self.cfg['id']}: {str(e)}")
-                            pass
-                        time.sleep(random.uniform(3, 7))
-                
-                sleep_seconds = self.cfg['sleep_minutes'] * 60
-                for _ in range(sleep_seconds):
-                    if self.stop_evt.is_set(): break
-                    time.sleep(1)
+                                            self.seen_ids.add(ad_id)
+                                            self._save_seen()
+                                            
+                                            with app.app_context():
+                                                existing = AdLog.query.filter_by(user_id=self.cfg['user_id'], url=ad_url).first()
+                                                if existing:
+                                                    continue
+                                            
+                                            if currently_quiet:
+                                                self.queued_ads.append({'kw': kw, 'title': title, 'url': ad_url})
+                                                with open(self.queue_file, 'w') as f: json.dump(self.queued_ads, f)
+                                            else:
+                                                delay = random.uniform(30, 60)
+                                                time.sleep(delay)
+                                                msg = f"إعلان جديد ({kw}):\n{title}\n{ad_url}\n\n⚙️ تذكير لطيف: تقدر تتحكم بإعدادات الرصد ومتابعة أرشيف إعلاناتك بكل سهولة من هنا:\n🔗 https://haraj-saas.onrender.com"
+                                                send_whatsapp(self.req_session, current_token, self.cfg['recipients'], msg)
+                                                
+                                            with app.app_context():
+                                                log_sub = Subscription.query.get(self.cfg['id'])
+                                                if log_sub:
+                                                    log_sub.sent_count += 1
+                                                    new_log = AdLog(
+                                                        user_id=self.cfg['user_id'], 
+                                                        title=title, 
+                                                        url=ad_url, 
+                                                        keyword_matched=kw
+                                                    )
+                                                    db.session.add(new_log)
+                                                    db.session.commit()
+                            except Exception as e:
+                                logger.error(f"خطأ في رصد الإعلانات للاشتراك {self.cfg['id']}: {str(e)}")
+                                pass
+                            time.sleep(random.uniform(3, 7))
+                    
+                    sleep_seconds = self.cfg['sleep_minutes'] * 60
+                    for _ in range(sleep_seconds):
+                        if self.stop_evt.is_set(): break
+                        time.sleep(1)
             except Exception as e:
                 logger.error(f"خطأ غير متوقع في خيط الاشتراك {self.cfg['id']}: {str(e)}")
                 break
