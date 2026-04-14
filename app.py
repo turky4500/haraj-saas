@@ -89,6 +89,7 @@ ACTIVE_THREADS = {}
 
 # أقفال للملفات المشتركة
 seen_file_lock = threading.Lock()
+audit_log_lock = threading.Lock()  # قفل لسجل التدقيق
 
 def get_ksa_time():
     return datetime.datetime.utcnow() + datetime.timedelta(hours=3)
@@ -153,6 +154,11 @@ def cleanup_old_logs():
                     for l in old_logs:
                         db.session.delete(l)
                     db.session.commit()
+                
+                # تنظيف سجل التدقيق القديم (أكبر من 90 يوماً)
+                cutoff_date = datetime.datetime.utcnow() - datetime.timedelta(days=90)
+                AuditLog.query.filter(AuditLog.timestamp < cutoff_date).delete()
+                db.session.commit()
             except:
                 pass
 
@@ -226,6 +232,24 @@ def monitor_threads_health():
 
 threading.Thread(target=monitor_threads_health, daemon=True).start()
 
+# ================= دوال سجل التدقيق =================
+def log_audit_async(user_id, action, details=None, ip_address=None):
+    """تسجيل حدث تدقيق بشكل غير متزامن لتجنب تأخير الاستجابة"""
+    def _log():
+        with app.app_context():
+            try:
+                log_entry = AuditLog(
+                    user_id=user_id,
+                    action=action,
+                    details=json.dumps(details) if details else None,
+                    ip_address=ip_address
+                )
+                db.session.add(log_entry)
+                db.session.commit()
+            except Exception as e:
+                logger.error(f"فشل تسجيل التدقيق: {e}")
+    threading.Thread(target=_log, daemon=True).start()
+
 # ================= النماذج =================
 class SystemSettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -292,6 +316,16 @@ class RenewalRequest(db.Model):
     proof_filename = db.Column(db.String(255), nullable=True)  # اسم الملف المحفوظ
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     processed_at = db.Column(db.DateTime, nullable=True)
+
+class AuditLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    action = db.Column(db.String(50), nullable=False)
+    details = db.Column(db.Text, nullable=True)
+    ip_address = db.Column(db.String(45), nullable=True)
+    timestamp = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    
+    user = db.relationship('User', backref='audit_logs', lazy=True)
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -714,13 +748,16 @@ def login():
         return redirect(url_for('admin_dashboard') if current_user.role == 'admin' else url_for('user_dashboard'))
     
     if request.method == 'POST':
-        user = User.query.filter_by(username=request.form.get('username')).first()
+        username = request.form.get('username')
+        user = User.query.filter_by(username=username).first()
         if user and check_password_hash(user.password, request.form.get('password')):
             if not user.is_active_account:
                 flash('حسابك موقوف من قبل الإدارة.', 'danger')
                 return redirect(url_for('login'))
             login_user(user)
+            log_audit_async(user.id, 'login', {'username': username}, request.remote_addr)
             return redirect(url_for('admin_dashboard') if user.role == 'admin' else url_for('user_dashboard'))
+        # تسجيل محاولة فاشلة (اختياري)
         flash('بيانات الدخول غير صحيحة!', 'danger')
     return render_template('login.html')
 
@@ -790,6 +827,7 @@ def verify():
             session.pop('temp_user', None)
             session.pop('otp', None)
             
+            log_audit_async(new_user.id, 'register', {'username': new_user.username, 'phone': new_user.phone}, request.remote_addr)
             flash('تم التسجيل والدخول بنجاح! مرحباً بك 🚀', 'success')
             return redirect(url_for('user_dashboard'))
             
@@ -843,6 +881,7 @@ def reset_password():
             db.session.commit()
             session.pop('reset_phone', None)
             session.pop('reset_otp', None)
+            log_audit_async(user.id, 'password_reset', {}, request.remote_addr)
             flash('تم تغيير كلمة المرور بنجاح! يمكنك الدخول الآن.', 'success')
             return redirect(url_for('login'))
         flash('كود التحقق غير صحيح!', 'danger')
@@ -851,6 +890,7 @@ def reset_password():
 @app.route('/logout')
 @login_required
 def logout():
+    log_audit_async(current_user.id, 'logout', {}, request.remote_addr)
     logout_user()
     return redirect(url_for('index'))
 
@@ -863,6 +903,7 @@ def user_profile():
         if check_password_hash(current_user.password, old_password):
             current_user.password = generate_password_hash(new_password, method='pbkdf2:sha256')
             db.session.commit()
+            log_audit_async(current_user.id, 'change_password', {}, request.remote_addr)
             flash('تم تغيير كلمة المرور بنجاح! 🔒', 'success')
             return redirect(url_for('user_profile'))
         else:
@@ -895,6 +936,17 @@ def user_dashboard():
         q_sh = int(request.form.get('q_sh', 1))
         q_eh = int(request.form.get('q_eh', 6))
         end_time = current_user.account_expiration.isoformat() if current_user.account_expiration else ""
+        
+        # تجهيز تفاصيل سجل التدقيق
+        old_kw = sub.keywords if sub else ''
+        new_kw = keywords
+        audit_details = {
+            'old_keywords': old_kw,
+            'new_keywords': new_kw,
+            'cities': cities,
+            'excluded': excluded_words,
+            'quiet': quiet_enabled
+        }
         
         settings = SystemSettings.query.first()
         current_token = settings.whatsapp_token if settings else "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
@@ -933,6 +985,7 @@ def user_dashboard():
             if not is_expired and new_status == 'active':
                 start_thread_for_sub(sub)
             
+            log_audit_async(current_user.id, 'update_subscription', audit_details, request.remote_addr)
             flash('تم تعديل الاشتراك وتحديث الرصد!', 'success')
         else:
             # إنشاء اشتراك جديد (نفس المنطق: إذا كان منتهياً يكون paused)
@@ -965,6 +1018,7 @@ def user_dashboard():
             if not is_expired:
                 send_whatsapp(create_session(), current_token, current_user.phone, welcome_msg)
 
+            log_audit_async(current_user.id, 'create_subscription', audit_details, request.remote_addr)
             flash('تم حفظ الاشتراك وبدأ الرصد!' if not is_expired else 'تم حفظ الاشتراك. لا يمكن تشغيل الرادار حتى يتم تجديد الاشتراك.', 'success')
             
         return redirect(url_for('user_dashboard'))
@@ -1031,6 +1085,7 @@ def renew_subscription():
             admin_msg = f"🔔 طلب تجديد جديد:\n👤 المستخدم: {current_user.username}\n📱 الجوال: {current_user.phone}\n📆 عدد الأسابيع: {weeks}\n💰 المبلغ: {amount} ريال\n📎 إثبات: {'مرفق' if proof_filename else 'غير مرفق'}"
             send_whatsapp(create_session(), token, notify.admin_phone, admin_msg)
         
+        log_audit_async(current_user.id, 'renewal_request', {'weeks': weeks, 'amount': amount}, request.remote_addr)
         flash('تم استلام طلب التجديد بنجاح. سنقوم بمراجعة الحوالة وتفعيل اشتراكك قريباً.', 'success')
         return render_template('renew_pending.html')
     
@@ -1107,6 +1162,7 @@ def process_renewal(req_id, action):
         user_msg = f"🎉 مبروك! تم تجديد اشتراكك في راصد حراج بنجاح.\n\n📆 المدة: {req.weeks} أسابيع\n📅 تاريخ الانتهاء الجديد: {exp_date_str}\n\nرادارك نشط الآن، نتمنى لك صيدات موفقة! 🚀"
         send_whatsapp(create_session(), token, user.phone, user_msg)
         
+        log_audit_async(current_user.id, 'approve_renewal', {'user': user.username, 'weeks': req.weeks}, request.remote_addr)
         flash(f'تمت الموافقة على طلب {user.username} وتمديد الاشتراك.', 'success')
     
     elif action == 'reject':
@@ -1123,10 +1179,7 @@ def process_renewal(req_id, action):
                 except:
                     pass
         
-        # إشعار اختياري للمستخدم
-        # user_msg = "عذراً، لم نتمكن من تأكيد حوالة تجديد الاشتراك. يرجى التواصل مع الإدارة."
-        # send_whatsapp(create_session(), token, user.phone, user_msg)
-        
+        log_audit_async(current_user.id, 'reject_renewal', {'user': user.username}, request.remote_addr)
         flash(f'تم رفض طلب {user.username}.', 'warning')
     
     else:
@@ -1144,6 +1197,7 @@ def toggle_sub(sub_id):
             if sub.id in ACTIVE_THREADS:
                 ACTIVE_THREADS[sub.id].stop()
                 del ACTIVE_THREADS[sub.id]
+            log_audit_async(current_user.id, 'pause_subscription', {'sub_id': sub_id}, request.remote_addr)
             flash('تم إيقاف الاشتراك مؤقتاً ⏸', 'warning')
         else:
             user_owner = User.query.get(sub.user_id)
@@ -1155,6 +1209,7 @@ def toggle_sub(sub_id):
                     return redirect(request.referrer)
             sub.status = 'active'
             start_thread_for_sub(sub)
+            log_audit_async(current_user.id, 'resume_subscription', {'sub_id': sub_id}, request.remote_addr)
             flash('تم استئناف الاشتراك بنجاح ▶️', 'success')
         db.session.commit()
     return redirect(request.referrer)
@@ -1169,6 +1224,7 @@ def delete_sub(sub_id):
             del ACTIVE_THREADS[sub.id]
         db.session.delete(sub)
         db.session.commit()
+        log_audit_async(current_user.id, 'delete_subscription', {'sub_id': sub_id}, request.remote_addr)
         flash('تم حذف الاشتراك نهائياً 🗑️', 'info')
     return redirect(request.referrer)
 
@@ -1180,6 +1236,7 @@ def admin_update_sleep(sub_id):
     new_sleep = request.form.get('sleep_minutes', type=int)
     
     if new_sleep and new_sleep > 0:
+        old_sleep = sub.sleep_minutes
         sub.sleep_minutes = new_sleep
         db.session.commit()
         
@@ -1188,7 +1245,8 @@ def admin_update_sleep(sub_id):
                 ACTIVE_THREADS[sub.id].stop()
                 del ACTIVE_THREADS[sub.id]
             start_thread_for_sub(sub)
-            
+        
+        log_audit_async(current_user.id, 'update_sleep', {'sub_id': sub_id, 'old': old_sleep, 'new': new_sleep}, request.remote_addr)
         flash('تم تحديث مدة الفحص (الدورة) للعميل بنجاح.', 'success')
         
     return redirect(request.referrer)
@@ -1284,6 +1342,55 @@ def admin_ads_log():
     
     return render_template('admin_ads_log.html', logs=logs_paginated, search=search)
 
+@app.route('/admin/audit_log')
+@login_required
+def admin_audit_log():
+    if current_user.role != 'admin': return redirect(url_for('user_dashboard'))
+    
+    search = request.args.get('search', '').strip()
+    action_filter = request.args.get('action', '')
+    page = request.args.get('page', 1, type=int)
+    per_page = 30
+    
+    query = AuditLog.query.outerjoin(User, AuditLog.user_id == User.id)
+    
+    if search:
+        query = query.filter(
+            db.or_(
+                User.username.ilike(f'%{search}%'),
+                AuditLog.action.ilike(f'%{search}%'),
+                AuditLog.ip_address.ilike(f'%{search}%')
+            )
+        )
+    
+    if action_filter:
+        query = query.filter(AuditLog.action == action_filter)
+    
+    logs_paginated = query.order_by(AuditLog.timestamp.desc()).paginate(page=page, per_page=per_page, error_out=False)
+    
+    # قائمة بأنواع الإجراءات الموجودة لفلتر
+    actions = db.session.query(AuditLog.action).distinct().all()
+    actions = [a[0] for a in actions]
+    
+    return render_template('admin_audit_log.html', logs=logs_paginated, search=search, action_filter=action_filter, actions=actions)
+
+@app.route('/admin/clear_audit_log')
+@login_required
+def admin_clear_audit_log():
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    
+    try:
+        num_deleted = AuditLog.query.delete()
+        db.session.commit()
+        log_audit_async(current_user.id, 'clear_audit_log', {'count': num_deleted}, request.remote_addr)
+        flash(f'✅ تم حذف {num_deleted} سجل تدقيق بنجاح.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ حدث خطأ أثناء حذف سجل التدقيق: {str(e)}', 'danger')
+    
+    return redirect(url_for('admin_audit_log'))
+
 @app.route('/admin_statistics')
 @login_required
 def admin_statistics():
@@ -1314,6 +1421,7 @@ def admin_settings():
             notify.admin_phone = request.form.get('admin_phone', '')
             
         db.session.commit()
+        log_audit_async(current_user.id, 'update_settings', {}, request.remote_addr)
         flash('تم حفظ إعدادات النظام بنجاح ⚙️', 'success')
         return redirect(url_for('admin_settings'))
         
@@ -1375,6 +1483,7 @@ def admin_add_user():
             if not exp_date or exp_date > datetime.datetime.now():
                 start_thread_for_sub(new_sub)
 
+        log_audit_async(current_user.id, 'admin_add_user', {'username': username, 'phone': phone}, request.remote_addr)
         flash('تم إضافة العميل وإعداد راداره بنجاح! 🚀', 'success')
         return redirect(url_for('admin_users'))
 
@@ -1405,6 +1514,7 @@ def admin_edit_user(user_id):
             user.subscription.end_ts = user.account_expiration.isoformat() if user.account_expiration else ""
             
         db.session.commit()
+        log_audit_async(current_user.id, 'admin_edit_user', {'user_id': user_id, 'username': user.username}, request.remote_addr)
         flash(f'تم تعديل بيانات العميل {user.username} بنجاح.', 'success')
         return redirect(url_for('admin_users'))
     return render_template('admin_edit_user.html', user=user)
@@ -1422,6 +1532,8 @@ def toggle_user(user_id):
                     ACTIVE_THREADS[sub_id].stop()
                     del ACTIVE_THREADS[sub_id]
             db.session.commit()
+            action = 'deactivate' if not user.is_active_account else 'activate'
+            log_audit_async(current_user.id, f'admin_{action}_user', {'user_id': user_id}, request.remote_addr)
     return redirect(request.referrer)
 
 @app.route('/admin_toggle_sub/<int:sub_id>')
@@ -1434,6 +1546,7 @@ def admin_toggle_sub(sub_id):
         if sub.id in ACTIVE_THREADS:
             ACTIVE_THREADS[sub.id].stop()
             del ACTIVE_THREADS[sub.id]
+        log_audit_async(current_user.id, 'admin_pause_sub', {'sub_id': sub_id}, request.remote_addr)
         flash('تم إيقاف اشتراك العميل بنجاح.', 'warning')
     else:
         user_owner = User.query.get(sub.user_id)
@@ -1442,6 +1555,7 @@ def admin_toggle_sub(sub_id):
         else:
             sub.status = 'active'
             start_thread_for_sub(sub)
+            log_audit_async(current_user.id, 'admin_resume_sub', {'sub_id': sub_id}, request.remote_addr)
             flash('تم استئناف اشتراك العميل بنجاح.', 'success')
     db.session.commit()
     return redirect(request.referrer)
@@ -1454,6 +1568,7 @@ def impersonate(user_id):
     user = User.query.get_or_404(user_id)
     session['admin_impersonating'] = current_user.id
     login_user(user)
+    log_audit_async(current_user.id, 'impersonate', {'target_user': user.username}, request.remote_addr)
     flash(f'أنت الآن تتصفح وتتحكم بحساب العميل: {user.username}', 'warning')
     return redirect(url_for('user_dashboard'))
 
@@ -1465,6 +1580,7 @@ def revert_impersonate():
         if admin_user:
             login_user(admin_user)
             session.pop('admin_impersonating', None)
+            log_audit_async(admin_user.id, 'revert_impersonate', {}, request.remote_addr)
             flash('تمت العودة لحساب الإدارة بنجاح.', 'success')
     return redirect(url_for('admin_dashboard'))
 
@@ -1502,6 +1618,7 @@ def admin_delete_user(user_id):
         db.session.delete(user)
         db.session.commit()
         
+        log_audit_async(current_user.id, 'admin_delete_user', {'username': user.username}, request.remote_addr)
         flash(f'تم حذف المستخدم {user.username} وجميع بياناته بنجاح.', 'success')
     except Exception as e:
         db.session.rollback()
