@@ -4,59 +4,188 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>الملف الشخصي - راصد حراج</title>
+    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Bootstrap RTL -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        :root { --primary: #1abc9c; --primary-dark: #16a085; --secondary: #34495e; }
-        body { font-family: 'Cairo', sans-serif; background: linear-gradient(135deg, #f0f5f9 0%, #e6f7f4 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
-        .profile-card { background: rgba(255,255,255,0.9); backdrop-filter: blur(10px); border-radius: 30px; padding: 2.5rem; box-shadow: 0 20px 40px -10px rgba(26,188,156,0.2); border: 1px solid rgba(255,255,255,0.5); width: 100%; max-width: 500px; }
-        .profile-header { text-align: center; margin-bottom: 2rem; }
-        .profile-header i { font-size: 4rem; color: var(--primary); margin-bottom: 1rem; }
-        .form-control { border-radius: 50px; padding: 0.75rem 1.5rem; border: 1px solid #e2e8f0; }
-        .form-control:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(26,188,156,0.2); }
-        .btn-update { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); border: none; border-radius: 50px; padding: 0.75rem; font-weight: 700; color: white; width: 100%; }
-        .btn-back { background: #edf2f7; border: 1px solid #cbd5e0; border-radius: 50px; padding: 0.75rem; text-align: center; display: block; margin-top: 1rem; color: #2d3748; font-weight: 600; text-decoration: none; }
+        :root {
+            --primary: #1abc9c;
+            --primary-dark: #16a085;
+            --secondary: #34495e;
+        }
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: linear-gradient(135deg, #f0f5f9 0%, #e6f7f4 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .profile-card {
+            background: rgba(255,255,255,0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 30px;
+            padding: 2.5rem;
+            box-shadow: 0 20px 40px -10px rgba(26,188,156,0.2);
+            border: 1px solid rgba(255,255,255,0.5);
+            width: 100%;
+            max-width: 500px;
+        }
+        .profile-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .profile-header i {
+            font-size: 4rem;
+            color: var(--primary);
+            margin-bottom: 1rem;
+        }
+        .profile-header h3 {
+            font-weight: 700;
+            color: #2c3e50;
+        }
+        .form-control {
+            border-radius: 50px;
+            padding: 0.75rem 1.5rem;
+            border: 1px solid #e2e8f0;
+        }
+        .form-control:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(26,188,156,0.2);
+        }
+        .btn-update {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border: none;
+            border-radius: 50px;
+            padding: 0.75rem;
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: white;
+            width: 100%;
+            transition: 0.3s;
+            box-shadow: 0 8px 20px rgba(26,188,156,0.3);
+        }
+        .btn-update:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 30px rgba(26,188,156,0.4);
+        }
+        .btn-back {
+            background: #edf2f7;
+            border: 1px solid #cbd5e0;
+            border-radius: 50px;
+            padding: 0.75rem;
+            font-weight: 600;
+            color: #2d3748;
+            width: 100%;
+            text-align: center;
+            text-decoration: none;
+            display: block;
+        }
+        .btn-back:hover {
+            background: #e2e8f0;
+        }
+        .dark-mode-toggle {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: transparent;
+            border: 2px solid var(--primary);
+            color: var(--primary);
+            border-radius: 30px;
+            padding: 0.4rem 1.5rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        body.dark-mode {
+            background: linear-gradient(135deg, #121212 0%, #1e2b38 100%);
+        }
+        body.dark-mode .profile-card {
+            background: rgba(31,41,55,0.9);
+            border-color: #374151;
+        }
+        body.dark-mode .profile-header h3 {
+            color: white;
+        }
     </style>
 </head>
 <body>
+    <button id="darkModeToggle" class="dark-mode-toggle">
+        <i class="fas fa-moon"></i> ليلي
+    </button>
+
     <div class="profile-card">
         <div class="profile-header">
             <i class="fas fa-user-circle"></i>
             <h3>الملف الشخصي</h3>
+            <p class="text-muted">يمكنك تغيير كلمة المرور وإضافة معرف التلقرام</p>
         </div>
+
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} rounded-pill small">{{ message }}</div>
+                    <div class="alert alert-{{ category }} alert-dismissible fade show rounded-pill small" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
-        <form method="POST">
+
+        <form method="POST" action="/user_profile">
             <div class="mb-3">
                 <label class="form-label fw-bold small text-muted">اسم المستخدم</label>
-                <input type="text" class="form-control" value="{{ current_user.username }}" disabled>
+                <input type="text" class="form-control" value="{{ current_user.username }}" disabled readonly style="background-color: #f1f5f9;">
             </div>
             <div class="mb-3">
                 <label class="form-label fw-bold small text-muted">رقم الجوال</label>
-                <input type="text" class="form-control" value="{{ current_user.phone }}" disabled>
+                <input type="text" class="form-control" value="{{ current_user.phone }}" disabled readonly style="background-color: #f1f5f9;">
             </div>
+
+            <!-- حقل معرف التلقرام (جديد) -->
             <div class="mb-3">
-                <label class="form-label fw-bold small text-muted">معرف التلقرام (Chat ID)</label>
-                <input type="text" name="telegram_chat_id" class="form-control" value="{{ current_user.telegram_chat_id or '' }}" dir="ltr" placeholder="اختياري – لاستقبال الإعلانات على تيليجرام">
-                <small class="text-muted">احصل عليه من <a href="https://t.me/userinfobot" target="_blank">@userinfobot</a> وأرسل /start</small>
+                <label class="form-label fw-bold small text-muted">معرف التلقرام (Chat ID) – اختياري</label>
+                <input type="text" name="telegram_chat_id" class="form-control" value="{{ current_user.telegram_chat_id or '' }}" dir="ltr" placeholder="مثال: 123456789">
+                <small class="text-muted">أرسل "/start" إلى <a href="https://t.me/userinfobot" target="_blank">@userinfobot</a> لمعرفة معرفك.</small>
             </div>
+
             <div class="mb-3">
                 <label class="form-label fw-bold small text-muted">كلمة المرور الحالية</label>
-                <input type="password" name="old_password" class="form-control" required placeholder="لتأكيد التغييرات">
+                <input type="password" name="old_password" class="form-control" required placeholder="أدخل كلمة المرور الحالية">
             </div>
             <div class="mb-4">
                 <label class="form-label fw-bold small text-muted">كلمة المرور الجديدة</label>
-                <input type="password" name="new_password" class="form-control" required placeholder="أدخل كلمة مرور جديدة">
+                <input type="password" name="new_password" class="form-control" required placeholder="أدخل كلمة المرور الجديدة">
             </div>
-            <button type="submit" class="btn-update"><i class="fas fa-sync-alt ms-2"></i> تحديث</button>
+            <button type="submit" class="btn-update mb-3">
+                <i class="fas fa-sync-alt ms-2"></i> تحديث البيانات
+            </button>
         </form>
-        <a href="{% if current_user.role == 'admin' %}/admin_dashboard{% else %}/user_dashboard{% endif %}" class="btn-back">العودة للوحة التحكم</a>
+        <a href="{% if current_user.role == 'admin' %}/admin_dashboard{% else %}/user_dashboard{% endif %}" class="btn-back">
+            <i class="fas fa-arrow-right ms-2"></i> العودة للوحة التحكم
+        </a>
     </div>
+
+    <script>
+        const toggleBtn = document.getElementById('darkModeToggle');
+        const body = document.body;
+        if(localStorage.getItem('darkMode') === 'enabled') {
+            body.classList.add('dark-mode');
+            toggleBtn.innerHTML = '<i class="fas fa-sun"></i> نهاري';
+        }
+        toggleBtn.addEventListener('click', () => {
+            body.classList.toggle('dark-mode');
+            if(body.classList.contains('dark-mode')) {
+                localStorage.setItem('darkMode', 'enabled');
+                toggleBtn.innerHTML = '<i class="fas fa-sun"></i> نهاري';
+            } else {
+                localStorage.setItem('darkMode', 'disabled');
+                toggleBtn.innerHTML = '<i class="fas fa-moon"></i> ليلي';
+            }
+        });
+    </script>
 </body>
 </html>
