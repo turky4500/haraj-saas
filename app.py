@@ -211,10 +211,8 @@ def monitor_threads_health():
                     if not thread or not thread.is_alive():
                         logger.warning(f"الخيط للاشتراك {sub.id} غير نشط، جاري إعادة تشغيله...")
                         if sub.id in ACTIVE_THREADS:
-                            try:
-                                ACTIVE_THREADS[sub.id].stop()
-                            except:
-                                pass
+                            try: ACTIVE_THREADS[sub.id].stop()
+                            except: pass
                             del ACTIVE_THREADS[sub.id]
                         start_thread_for_sub(sub)
                         notify_msg = f"🔄 تم إعادة تشغيل رادار المستخدم {sub.owner.username} (الاشتراك {sub.id}) تلقائياً."
@@ -245,9 +243,9 @@ class SystemSettings(db.Model):
     bank_account_name = db.Column(db.String(100), default="")
     bank_qr_text = db.Column(db.Text, default="")
     subscription_week_price = db.Column(db.Integer, default=5)
-    messaging_method = db.Column(db.String(10), default='whatsapp')  # whatsapp أو telegram
+    messaging_method = db.Column(db.String(10), default='whatsapp')
     telegram_bot_token = db.Column(db.String(255), default='')
-    telegram_chat_id = db.Column(db.String(50), default='')  # للحالات الإدارية العامة
+    telegram_chat_id = db.Column(db.String(50), default='')
 
 class AdminNotifySettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -263,7 +261,7 @@ class User(UserMixin, db.Model):
     role = db.Column(db.String(20), default='user')
     is_active_account = db.Column(db.Boolean, default=True)
     account_expiration = db.Column(db.DateTime, nullable=True)
-    telegram_chat_id = db.Column(db.String(50), nullable=True)  # معرف التلقرام الخاص بالمستخدم
+    telegram_chat_id = db.Column(db.String(50), nullable=True)
     subscription = db.relationship('Subscription', backref='owner', uselist=False, lazy=True)
     logs = db.relationship('AdLog', backref='owner', lazy=True)
     renewal_requests = db.relationship('RenewalRequest', backref='owner', lazy=True)
@@ -425,10 +423,9 @@ def send_telegram(bot_token, chat_id, text):
         logger.error(f"❌ استثناء تيليجرام: {e}")
         return False
 
-def send_user_message(destination, message, user_id=None, is_admin=False):
+def _send_user_message(destination, message, user_id=None, is_admin=False):
     """
-    إرسال رسالة إلى وجهة ما (رقم واتساب أو معرف تلقرام) بناءً على إعدادات النظام وبيانات المستخدم.
-    إذا تم توفير user_id، نستخدم تفضيلات هذا المستخدم (telegram_chat_id) إذا كانت طريقة الإرسال تيليجرام.
+    المنطق الداخلي لإرسال رسالة.
     """
     settings = SystemSettings.query.first()
     if not settings:
@@ -456,6 +453,23 @@ def send_user_message(destination, message, user_id=None, is_admin=False):
         return send_telegram(bot_token, target_chat, message)
     return False
 
+def send_user_message(destination, message, user_id=None, is_admin=False):
+    """
+    واجهة إرسال آمنة يمكن استدعاؤها من أي مكان (مع أو بدون سياق Flask).
+    """
+    try:
+        from flask import current_app
+        if current_app:
+            # نحن داخل سياق التطبيق بالفعل
+            return _send_user_message(destination, message, user_id, is_admin)
+    except (RuntimeError, Exception):
+        pass
+    # لا يوجد سياق تطبيق، ننشئ واحدًا
+    with app.app_context():
+        return _send_user_message(destination, message, user_id, is_admin)
+
+# --- نهاية الجزء الأول ---
+# يتبع في الرد التالي مع بقية المسارات وخيوط المراقبة والترحيل.
 # ================= مسار عرض صورة الإثبات =================
 @app.route('/admin/view_proof/<int:request_id>')
 @login_required
@@ -555,6 +569,7 @@ class MonitorThread(threading.Thread):
                             db.session.commit()
                             send_user_message(self.cfg['recipients'], "🌸 انتهى اشتراكك في راصد حراج.", user_id=user.id if user else None)
                         break
+                    # تحديث الإعدادات من قاعدة البيانات
                     self.cfg['keywords'] = [k.strip() for k in sub.keywords.split(',') if k.strip()]
                     self.cfg['cities'] = [c.strip() for c in sub.cities.split(',') if c.strip()]
                     self.cfg['city_filter_enabled'] = sub.city_filter_enabled
@@ -566,7 +581,6 @@ class MonitorThread(threading.Thread):
                     self.cfg['q_eh'] = sub.quiet_end_hour
                     self.cfg['q_em'] = sub.quiet_end_minute
                     
-                    settings = SystemSettings.query.first()
                     currently_quiet = is_quiet_now(self.cfg['quiet_enabled'], self.cfg['q_sh'], self.cfg['q_sm'], self.cfg['q_eh'], self.cfg['q_em'])
 
                     if not currently_quiet and self.queued_ads:
@@ -576,15 +590,15 @@ class MonitorThread(threading.Thread):
                             if self.stop_evt.is_set(): break
                             msg = f"إعلان ({ad['kw']}):\n{ad['title']}\n{ad['url']}\n\n⚙️ https://haraj-saas.onrender.com"
                             send_user_message(self.cfg['recipients'], msg, user_id=user.id)
-                            time.sleep(random.uniform(4,8))
+                            time.sleep(random.uniform(4, 8))
                         self.queued_ads = []
-                        if self.queue_file.exists(): json.dump([], open(self.queue_file,'w'))
+                        if self.queue_file.exists(): json.dump([], open(self.queue_file, 'w'))
 
                     for kw in self.cfg['keywords']:
                         if self.stop_evt.is_set(): break
-                        for page in range(1,4):
+                        for page in range(1, 4):
                             if self.stop_evt.is_set(): break
-                            url = f"{HARAJ_BASE}/search/{quote(kw)}/page/{page}" if page>1 else f"{HARAJ_BASE}/search/{quote(kw)}"
+                            url = f"{HARAJ_BASE}/search/{quote(kw)}/page/{page}" if page > 1 else f"{HARAJ_BASE}/search/{quote(kw)}"
                             try:
                                 html = self.req_session.get(url, headers=HARAJ_HEADERS, timeout=15, verify=False).content
                                 for title, ad_url in extract_ads(html, HARAJ_BASE):
@@ -601,10 +615,10 @@ class MonitorThread(threading.Thread):
                                                 if AdLog.query.filter_by(user_id=self.cfg['user_id'], url=ad_url).first():
                                                     continue
                                             if currently_quiet:
-                                                self.queued_ads.append({'kw':kw,'title':title,'url':ad_url})
-                                                json.dump(self.queued_ads, open(self.queue_file,'w'))
+                                                self.queued_ads.append({'kw': kw, 'title': title, 'url': ad_url})
+                                                json.dump(self.queued_ads, open(self.queue_file, 'w'))
                                             else:
-                                                time.sleep(random.uniform(30,60))
+                                                time.sleep(random.uniform(30, 60))
                                                 msg = f"إعلان جديد ({kw}):\n{title}\n{ad_url}\n\n⚙️ https://haraj-saas.onrender.com"
                                                 send_user_message(self.cfg['recipients'], msg, user_id=user.id)
                                             with app.app_context():
@@ -615,8 +629,8 @@ class MonitorThread(threading.Thread):
                                                     db.session.commit()
                             except Exception as e:
                                 logger.error(f"خطأ رصد ({kw}، صفحة {page}): {e}")
-                            time.sleep(random.uniform(3,7))
-                    time.sleep(self.cfg['sleep_minutes']*60)
+                            time.sleep(random.uniform(3, 7))
+                    time.sleep(self.cfg['sleep_minutes'] * 60)
             except Exception as e:
                 logger.error(f"خطأ غير متوقع: {e}")
                 time.sleep(60)
@@ -642,6 +656,7 @@ def start_thread_for_sub(sub):
     t = MonitorThread(cfg)
     ACTIVE_THREADS[sub.id] = t
     t.start()
+    logger.info(f"✅ بدء خيط الاشتراك {sub.id}")
 
 # ================= المسارات =================
 @app.route('/')
@@ -670,7 +685,7 @@ def login():
                 return redirect(url_for('login'))
             login_user(user)
             log_audit_async(user.id, 'login', {'مستخدم': user.username}, request.remote_addr)
-            return redirect(url_for('admin_dashboard') if user.role=='admin' else url_for('user_dashboard'))
+            return redirect(url_for('admin_dashboard') if user.role == 'admin' else url_for('user_dashboard'))
         flash('بيانات غير صحيحة.', 'danger')
     return render_template('login.html')
 
@@ -680,13 +695,13 @@ def register():
         username = request.form.get('username')
         phone = request.form.get('phone')
         password = request.form.get('password')
-        if User.query.filter((User.username==username)|(User.phone==phone)).first():
+        if User.query.filter((User.username == username) | (User.phone == phone)).first():
             flash('المستخدم مسجل.', 'danger')
             return redirect(url_for('register'))
-        otp = str(random.randint(1000,9999))
-        session['temp_user'] = {'username':username,'phone':phone,'password':generate_password_hash(password, method='pbkdf2:sha256')}
+        otp = str(random.randint(1000, 9999))
+        session['temp_user'] = {'username': username, 'phone': phone, 'password': generate_password_hash(password, method='pbkdf2:sha256')}
         session['otp'] = otp
-        send_user_message(phone, f"كود التفعيل: *{otp}*", is_admin=False if not User.query.count()==0 else True)
+        send_user_message(phone, f"كود التفعيل: *{otp}*")
         return redirect(url_for('verify'))
     return render_template('register.html')
 
@@ -706,26 +721,22 @@ def verify():
             db.session.commit()
             update_daily_stat('registrations')
             notify = AdminNotifySettings.query.first()
-            if notify and notify.admin_phone and new_user.role!='admin':
+            if notify and notify.admin_phone and new_user.role != 'admin':
                 send_user_message(notify.admin_phone, f"🔔 مستخدم جديد: {new_user.username}", is_admin=True)
             login_user(new_user)
-            session.pop('temp_user',None); session.pop('otp',None)
-            log_audit_async(new_user.id, 'register', {'مستخدم':new_user.username}, request.remote_addr)
+            session.pop('temp_user', None); session.pop('otp', None)
+            log_audit_async(new_user.id, 'register', {'مستخدم': new_user.username}, request.remote_addr)
             flash('تم التسجيل.', 'success')
             return redirect(url_for('user_dashboard'))
         flash('كود خطأ.', 'danger')
     return render_template('verify.html')
 
-# ... (بقية المسارات: forgot_password, forgot_username, reset_password, logout, user_profile, user_dashboard, renew_subscription, admin_renewal_requests, process_renewal, toggle_sub, delete_sub, admin_update_sleep, admin_dashboard, admin_users, admin_ads_log, admin_audit_log, admin_statistics, admin_settings, admin_add_user, admin_edit_user, toggle_user, admin_toggle_sub, impersonate, revert_impersonate, admin_delete_user, إلخ) ...
-# يتم تضمينهم كاملين من آخر نسخة مستقرة، مع استبدال أي استخدام لـ send_whatsapp المباشر بـ send_user_message حيث الإمكان.
-
-# بعد ذلك يأتي قسم بدء التشغيل مع الترحيل.
 @app.route('/forgot_password', methods=['GET', 'POST'])
 def forgot_password():
     if request.method == 'POST':
         user = User.query.filter_by(phone=request.form.get('phone')).first()
         if user:
-            otp = str(random.randint(1000,9999))
+            otp = str(random.randint(1000, 9999))
             session['reset_phone'] = user.phone
             session['reset_otp'] = otp
             send_user_message(user.phone, f"كود استعادة كلمة المرور: *{otp}*", user_id=user.id)
@@ -752,7 +763,7 @@ def reset_password():
             user = User.query.filter_by(phone=session['reset_phone']).first()
             user.password = generate_password_hash(request.form.get('new_password'), method='pbkdf2:sha256')
             db.session.commit()
-            session.pop('reset_phone',None); session.pop('reset_otp',None)
+            session.pop('reset_phone', None); session.pop('reset_otp', None)
             log_audit_async(user.id, 'password_reset', {}, request.remote_addr)
             flash('تم تغيير كلمة المرور.', 'success')
             return redirect(url_for('login'))
@@ -772,7 +783,6 @@ def user_profile():
     if request.method == 'POST':
         if check_password_hash(current_user.password, request.form.get('old_password')):
             current_user.password = generate_password_hash(request.form.get('new_password'), method='pbkdf2:sha256')
-            # تحديث معرف التلقرام
             current_user.telegram_chat_id = request.form.get('telegram_chat_id', '').strip() or None
             db.session.commit()
             log_audit_async(current_user.id, 'change_password', {}, request.remote_addr)
@@ -792,29 +802,29 @@ def user_dashboard():
     if request.method == 'POST':
         name = request.form.get('name')
         keywords = request.form.get('keywords')
-        cities = request.form.get('cities','')
+        cities = request.form.get('cities', '')
         city_en = 'city_filter_enabled' in request.form
-        excl_words = request.form.get('excluded_words','')
+        excl_words = request.form.get('excluded_words', '')
         excl_en = 'exclude_enabled' in request.form
         quiet_en = 'quiet_enabled' in request.form
-        q_sh = int(request.form.get('q_sh',1))
-        q_eh = int(request.form.get('q_eh',6))
+        q_sh = int(request.form.get('q_sh', 1))
+        q_eh = int(request.form.get('q_eh', 6))
         end_time = current_user.account_expiration.isoformat() if current_user.account_expiration else ""
         
         old_kw = sub.keywords if sub else ''
-        audit_details = {'الكلمات قبل':old_kw,'الكلمات بعد':keywords,'مدن':cities or 'كل المدن','محظورة':excl_words or 'لا يوجد','هدوء':'مفعل' if quiet_en else 'غير مفعل'}
+        audit_details = {'الكلمات قبل': old_kw, 'الكلمات بعد': keywords, 'مدن': cities or 'كل المدن', 'محظورة': excl_words or 'لا يوجد', 'هدوء': 'مفعل' if quiet_en else 'غير مفعل'}
         
         if sub:
             new_status = 'paused' if is_expired else sub.status
             if sub.id in ACTIVE_THREADS:
                 ACTIVE_THREADS[sub.id].stop(); del ACTIVE_THREADS[sub.id]
-            sub.name=name; sub.keywords=keywords; sub.cities=cities; sub.city_filter_enabled=city_en
-            sub.excluded_words=excl_words; sub.exclude_enabled=excl_en; sub.quiet_enabled=quiet_en
-            sub.quiet_start_hour=q_sh; sub.quiet_end_hour=q_eh; sub.end_ts=end_time; sub.status=new_status
+            sub.name = name; sub.keywords = keywords; sub.cities = cities; sub.city_filter_enabled = city_en
+            sub.excluded_words = excl_words; sub.exclude_enabled = excl_en; sub.quiet_enabled = quiet_en
+            sub.quiet_start_hour = q_sh; sub.quiet_end_hour = q_eh; sub.end_ts = end_time; sub.status = new_status
             db.session.commit()
-            if not is_expired and new_status=='active':
+            if not is_expired and new_status == 'active':
                 start_thread_for_sub(sub)
-            flash('تم التعديل.','success')
+            flash('تم التعديل.', 'success')
         else:
             new_sub = Subscription(user_id=current_user.id, name=name, keywords=keywords, recipients=current_user.phone,
                                    cities=cities, city_filter_enabled=city_en, excluded_words=excl_words, exclude_enabled=excl_en,
@@ -822,32 +832,32 @@ def user_dashboard():
                                    end_ts=end_time, status='paused' if is_expired else 'active')
             db.session.add(new_sub); db.session.commit()
             if not is_expired: start_thread_for_sub(new_sub)
-            flash('تم الحفظ.','success')
+            flash('تم الحفظ.', 'success')
         log_audit_async(current_user.id, 'update_subscription', audit_details, request.remote_addr)
         return redirect(url_for('user_dashboard'))
     return render_template('user.html', sub=sub, logs=logs, is_expired=is_expired)
 
 # ==== تجديد الاشتراك ====
-@app.route('/renew_subscription', methods=['GET','POST'])
+@app.route('/renew_subscription', methods=['GET', 'POST'])
 @login_required
 def renew_subscription():
-    if current_user.role=='admin': return redirect(url_for('admin_dashboard'))
+    if current_user.role == 'admin': return redirect(url_for('admin_dashboard'))
     settings = SystemSettings.query.first()
     week_price = settings.subscription_week_price if settings else 5
     if RenewalRequest.query.filter_by(user_id=current_user.id, status='pending').first():
-        flash('لديك طلب معلق.','info')
+        flash('لديك طلب معلق.', 'info')
         return render_template('renew_pending.html')
     if request.method == 'POST':
         try:
             weeks = int(request.form.get('weeks'))
         except:
-            flash('عدد غير صالح.','danger'); return redirect(url_for('renew_subscription'))
+            flash('عدد غير صالح.', 'danger'); return redirect(url_for('renew_subscription'))
         amount = weeks * week_price
         proof = None
         if 'payment_proof' in request.files:
             file = request.files['payment_proof']
             if file and allowed_file(file.filename):
-                ext = file.filename.rsplit('.',1)[1].lower()
+                ext = file.filename.rsplit('.', 1)[1].lower()
                 fname = f"{uuid.uuid4().hex}_{current_user.id}.{ext}"
                 file.save(os.path.join(app.config['UPLOAD_FOLDER'], fname))
                 proof = fname
@@ -856,8 +866,8 @@ def renew_subscription():
         notify = AdminNotifySettings.query.first()
         if notify and notify.admin_phone:
             send_user_message(notify.admin_phone, f"🔔 طلب تجديد: {current_user.username} {weeks} أسبوع بـ{amount} ريال", is_admin=True)
-        log_audit_async(current_user.id, 'renewal_request', {'weeks':weeks}, request.remote_addr)
-        flash('تم استلام طلبك.','success')
+        log_audit_async(current_user.id, 'renewal_request', {'weeks': weeks}, request.remote_addr)
+        flash('تم استلام طلبك.', 'success')
         return render_template('renew_pending.html')
     return render_template('renew.html', settings=settings, week_price=week_price)
 
@@ -869,16 +879,16 @@ def admin_dashboard():
     total = User.query.count()
     active = User.query.filter_by(is_active_account=True).count()
     pending = RenewalRequest.query.filter_by(status='pending').count()
-    recent = AdLog.query.filter(AdLog.timestamp >= datetime.datetime.utcnow()-datetime.timedelta(days=7)).all()
+    recent = AdLog.query.filter(AdLog.timestamp >= datetime.datetime.utcnow() - datetime.timedelta(days=7)).all()
     daily_ads = {}
-    for i in range(6,-1,-1):
-        day = (datetime.datetime.utcnow()-datetime.timedelta(days=i)).strftime('%m-%d')
-        daily_ads[day]=0
+    for i in range(6, -1, -1):
+        day = (datetime.datetime.utcnow() - datetime.timedelta(days=i)).strftime('%m-%d')
+        daily_ads[day] = 0
     for log in recent:
         day = log.timestamp.strftime('%m-%d')
-        if day in daily_ads: daily_ads[day]+=1
+        if day in daily_ads: daily_ads[day] += 1
     return render_template('admin_dashboard.html', total_users=total, active_users=active,
-                           inactive_users=total-active, pending_renewals_count=pending,
+                           inactive_users=total - active, pending_renewals_count=pending,
                            chart_labels=list(daily_ads.keys()), chart_data=list(daily_ads.values()),
                            active_threads=ACTIVE_THREADS)
 
@@ -886,15 +896,15 @@ def admin_dashboard():
 @login_required
 def admin_users():
     if current_user.role != 'admin': return redirect(url_for('user_dashboard'))
-    search = request.args.get('search','').strip()
-    filter_status = request.args.get('filter','all')
-    page = request.args.get('page',1,type=int)
+    search = request.args.get('search', '').strip()
+    filter_status = request.args.get('filter', 'all')
+    page = request.args.get('page', 1, type=int)
     query = User.query.outerjoin(Subscription)
     if search:
         query = query.filter(db.or_(User.username.ilike(f'%{search}%'), User.phone.ilike(f'%{search}%'), Subscription.name.ilike(f'%{search}%')))
-    if filter_status=='active': query = query.filter(User.is_active_account==True)
-    elif filter_status=='inactive': query = query.filter(User.is_active_account==False)
-    elif filter_status=='expired': query = query.filter(User.account_expiration.isnot(None), User.account_expiration < datetime.datetime.now())
+    if filter_status == 'active': query = query.filter(User.is_active_account == True)
+    elif filter_status == 'inactive': query = query.filter(User.is_active_account == False)
+    elif filter_status == 'expired': query = query.filter(User.account_expiration.isnot(None), User.account_expiration < datetime.datetime.now())
     users_paginated = query.order_by(User.id.desc()).paginate(page=page, per_page=20, error_out=False)
     return render_template('admin_users.html', users=users_paginated, search=search, filter_status=filter_status)
 
@@ -902,8 +912,8 @@ def admin_users():
 @login_required
 def admin_ads_log():
     if current_user.role != 'admin': return redirect(url_for('user_dashboard'))
-    search = request.args.get('search','').strip()
-    page = request.args.get('page',1,type=int)
+    search = request.args.get('search', '').strip()
+    page = request.args.get('page', 1, type=int)
     query = db.session.query(AdLog, User).join(User)
     if search:
         query = query.filter(db.or_(User.username.ilike(f'%{search}%'), AdLog.keyword_matched.ilike(f'%{search}%'), AdLog.title.ilike(f'%{search}%')))
@@ -914,12 +924,12 @@ def admin_ads_log():
 @login_required
 def admin_audit_log():
     if current_user.role != 'admin': return redirect(url_for('user_dashboard'))
-    search = request.args.get('search','').strip()
-    action_filter = request.args.get('action','')
-    page = request.args.get('page',1,type=int)
+    search = request.args.get('search', '').strip()
+    action_filter = request.args.get('action', '')
+    page = request.args.get('page', 1, type=int)
     query = AuditLog.query.outerjoin(User)
     if search: query = query.filter(db.or_(User.username.ilike(f'%{search}%'), AuditLog.action.ilike(f'%{search}%'), AuditLog.ip_address.ilike(f'%{search}%')))
-    if action_filter: query = query.filter(AuditLog.action==action_filter)
+    if action_filter: query = query.filter(AuditLog.action == action_filter)
     logs_paginated = query.order_by(AuditLog.timestamp.desc()).paginate(page=page, per_page=30, error_out=False)
     actions = [a[0] for a in db.session.query(AuditLog.action).distinct().all()]
     return render_template('admin_audit_log.html', logs=logs_paginated, search=search, action_filter=action_filter, actions=actions)
@@ -942,7 +952,7 @@ def admin_statistics():
     total_ads = AdLog.query.count()
     return render_template('admin_statistics.html', daily_stats=stats, total_users=total_users, active_subs=active_subs, total_ads_logged=total_ads)
 
-@app.route('/admin_settings', methods=['GET','POST'])
+@app.route('/admin_settings', methods=['GET', 'POST'])
 @login_required
 def admin_settings():
     if current_user.role != 'admin': return redirect(url_for('user_dashboard'))
@@ -950,22 +960,22 @@ def admin_settings():
     notify = AdminNotifySettings.query.first()
     if request.method == 'POST':
         settings.whatsapp_token = request.form.get('whatsapp_token')
-        settings.trial_days = int(request.form.get('trial_days',2))
-        settings.bank_account_number = request.form.get('bank_account_number','')
-        settings.bank_account_name = request.form.get('bank_account_name','')
-        settings.bank_qr_text = request.form.get('bank_qr_text','')
-        settings.subscription_week_price = int(request.form.get('subscription_week_price',5))
-        settings.messaging_method = request.form.get('messaging_method','whatsapp')
-        settings.telegram_bot_token = request.form.get('telegram_bot_token','')
-        settings.telegram_chat_id = request.form.get('telegram_chat_id','')
+        settings.trial_days = int(request.form.get('trial_days', 2))
+        settings.bank_account_number = request.form.get('bank_account_number', '')
+        settings.bank_account_name = request.form.get('bank_account_name', '')
+        settings.bank_qr_text = request.form.get('bank_qr_text', '')
+        settings.subscription_week_price = int(request.form.get('subscription_week_price', 5))
+        settings.messaging_method = request.form.get('messaging_method', 'whatsapp')
+        settings.telegram_bot_token = request.form.get('telegram_bot_token', '')
+        settings.telegram_chat_id = request.form.get('telegram_chat_id', '')
         if notify:
-            notify.admin_phone = request.form.get('admin_phone','')
+            notify.admin_phone = request.form.get('admin_phone', '')
         db.session.commit()
-        flash('تم حفظ الإعدادات.','success')
+        flash('تم حفظ الإعدادات.', 'success')
         return redirect(url_for('admin_settings'))
     return render_template('admin_settings.html', settings=settings, notify=notify)
 
-@app.route('/admin_add_user', methods=['GET','POST'])
+@app.route('/admin_add_user', methods=['GET', 'POST'])
 @login_required
 def admin_add_user():
     if current_user.role != 'admin': return redirect(url_for('user_dashboard'))
@@ -974,28 +984,28 @@ def admin_add_user():
         phone = request.form.get('phone')
         password = request.form.get('password')
         exp_date = request.form.get('account_expiration')
-        if User.query.filter(db.or_(User.username==username, User.phone==phone)).first():
+        if User.query.filter(db.or_(User.username == username, User.phone == phone)).first():
             flash('مستخدم موجود.', 'danger')
             return redirect(url_for('admin_add_user'))
         new_user = User(username=username, phone=phone, password=generate_password_hash(password, method='pbkdf2:sha256'),
-                        account_expiration=datetime.datetime.strptime(exp_date,'%Y-%m-%d') if exp_date else None)
+                        account_expiration=datetime.datetime.strptime(exp_date, '%Y-%m-%d') if exp_date else None)
         db.session.add(new_user); db.session.commit()
         if request.form.get('keywords'):
-            sub = Subscription(user_id=new_user.id, name=request.form.get('name','اشتراك'), keywords=request.form.get('keywords'),
-                               recipients=phone, cities=request.form.get('cities',''), city_filter_enabled='city_filter_enabled' in request.form,
-                               excluded_words=request.form.get('excluded_words',''), exclude_enabled='exclude_enabled' in request.form,
-                               quiet_enabled='quiet_enabled' in request.form, quiet_start_hour=int(request.form.get('q_sh',1)),
-                               quiet_end_hour=int(request.form.get('q_eh',6)), sleep_minutes=15,
+            sub = Subscription(user_id=new_user.id, name=request.form.get('name', 'اشتراك'), keywords=request.form.get('keywords'),
+                               recipients=phone, cities=request.form.get('cities', ''), city_filter_enabled='city_filter_enabled' in request.form,
+                               excluded_words=request.form.get('excluded_words', ''), exclude_enabled='exclude_enabled' in request.form,
+                               quiet_enabled='quiet_enabled' in request.form, quiet_start_hour=int(request.form.get('q_sh', 1)),
+                               quiet_end_hour=int(request.form.get('q_eh', 6)), sleep_minutes=15,
                                end_ts=exp_date if exp_date else "")
             db.session.add(sub); db.session.commit()
-            if not exp_date or datetime.datetime.strptime(exp_date,'%Y-%m-%d') > datetime.datetime.now():
+            if not exp_date or datetime.datetime.strptime(exp_date, '%Y-%m-%d') > datetime.datetime.now():
                 start_thread_for_sub(sub)
         send_user_message(phone, f"تم إنشاء حسابك في راصد حراج. تاريخ الانتهاء: {exp_date or 'مفتوح'}", user_id=new_user.id)
         flash('تم إضافة العميل.', 'success')
         return redirect(url_for('admin_users'))
     return render_template('admin_add_user.html')
 
-@app.route('/admin_edit_user/<int:user_id>', methods=['GET','POST'])
+@app.route('/admin_edit_user/<int:user_id>', methods=['GET', 'POST'])
 @login_required
 def admin_edit_user(user_id):
     if current_user.role != 'admin': return redirect(url_for('user_dashboard'))
@@ -1005,7 +1015,7 @@ def admin_edit_user(user_id):
         user.phone = request.form.get('phone')
         if request.form.get('password'):
             user.password = generate_password_hash(request.form.get('password'), method='pbkdf2:sha256')
-        user.account_expiration = datetime.datetime.strptime(request.form.get('account_expiration'),'%Y-%m-%d') if request.form.get('account_expiration') else None
+        user.account_expiration = datetime.datetime.strptime(request.form.get('account_expiration'), '%Y-%m-%d') if request.form.get('account_expiration') else None
         if user.subscription:
             user.subscription.recipients = user.phone
             user.subscription.end_ts = user.account_expiration.isoformat() if user.account_expiration else ""
@@ -1078,7 +1088,7 @@ def admin_delete_user(user_id):
             ACTIVE_THREADS[user.subscription.id].stop(); del ACTIVE_THREADS[user.subscription.id]
         if user.subscription:
             sid = user.subscription.id
-            for f in [SUBS_BASE_DIR/f"seen_{sid}.json", SUBS_BASE_DIR/f"queue_{sid}.json"]:
+            for f in [SUBS_BASE_DIR / f"seen_{sid}.json", SUBS_BASE_DIR / f"queue_{sid}.json"]:
                 if f.exists(): f.unlink()
         AdLog.query.filter_by(user_id=user.id).delete()
         if user.subscription: db.session.delete(user.subscription)
@@ -1160,7 +1170,6 @@ def process_renewal(req_id, action):
             if user.subscription.status != 'active': user.subscription.status = 'active'
             if user.subscription.id not in ACTIVE_THREADS or not ACTIVE_THREADS[user.subscription.id].is_alive():
                 start_thread_for_sub(user.subscription)
-        # حذف الصورة
         if req.proof_filename:
             pf = os.path.join(app.config['UPLOAD_FOLDER'], req.proof_filename)
             if os.path.exists(pf): os.remove(pf)
@@ -1182,21 +1191,35 @@ with app.app_context():
     try:
         with db.engine.connect() as conn:
             if conn.engine.dialect.name == 'postgresql':
-                # إضافة أعمدة الإعدادات الجديدة
-                cols = [("messaging_method", "VARCHAR(10) DEFAULT 'whatsapp'"),
-                        ("telegram_bot_token", "VARCHAR(255) DEFAULT ''"),
-                        ("telegram_chat_id", "VARCHAR(50) DEFAULT ''")]
-                for c, t in cols:
-                    conn.execute(db.text(f"ALTER TABLE system_settings ADD COLUMN IF NOT EXISTS {c} {t}"))
-                # إضافة عمود المستخدم
-                conn.execute(db.text("ALTER TABLE \"user\" ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(50)"))
-                conn.commit()
+                # إضافة أعمدة system_settings
+                settings_cols = [
+                    ("messaging_method", "VARCHAR(10) DEFAULT 'whatsapp'"),
+                    ("telegram_bot_token", "VARCHAR(255) DEFAULT ''"),
+                    ("telegram_chat_id", "VARCHAR(50) DEFAULT ''")
+                ]
+                for col, typ in settings_cols:
+                    try:
+                        conn.execute(db.text(f"ALTER TABLE system_settings ADD COLUMN {col} {typ}"))
+                        conn.commit()
+                    except Exception as ex:
+                        if 'already exists' not in str(ex):
+                            logger.warning(f"عمود system_settings {col}: {ex}")
+                # إضافة عمود telegram_chat_id للمستخدمين
+                try:
+                    conn.execute(db.text('ALTER TABLE "user" ADD COLUMN telegram_chat_id VARCHAR(50)'))
+                    conn.commit()
+                except Exception as ex:
+                    if 'already exists' not in str(ex):
+                        logger.warning(f"عمود user.telegram_chat_id: {ex}")
     except Exception as e:
-        logger.error(f"ترحيل الأعمدة: {e}")
+        logger.error(f"خطأ ترحيل: {e}")
+    
     if not SystemSettings.query.first():
-        db.session.add(SystemSettings()); db.session.commit()
+        db.session.add(SystemSettings())
+        db.session.commit()
     if not AdminNotifySettings.query.first():
-        db.session.add(AdminNotifySettings()); db.session.commit()
+        db.session.add(AdminNotifySettings())
+        db.session.commit()
 
 with app.app_context():
     for sub in Subscription.query.filter_by(status='active').all():
