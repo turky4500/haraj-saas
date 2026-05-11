@@ -1,22 +1,119 @@
-<!-- إعدادات المراسلة -->
-<div class="mb-4">
-    <label class="form-label fw-bold"><i class="fas fa-comment-dots text-info ms-1"></i> طريقة الإرسال الافتراضية</label>
-    <div class="row g-3">
-        <div class="col-md-6">
-            <label class="small text-muted">طريقة الإرسال</label>
-            <select name="messaging_method" class="form-select">
-                <option value="whatsapp" {% if settings.messaging_method == 'whatsapp' %}selected{% endif %}>واتساب</option>
-                <option value="telegram" {% if settings.messaging_method == 'telegram' %}selected{% endif %}>تيليجرام</option>
-            </select>
-        </div>
-        <div class="col-md-6">
-            <label class="small text-muted">توكن بوت تيليجرام</label>
-            <input type="text" name="telegram_bot_token" class="form-control" dir="ltr" value="{{ settings.telegram_bot_token or '' }}">
-        </div>
-        <div class="col-md-6">
-            <label class="small text-muted">معرف الدردشة الافتراضي (لإشعارات الإدارة)</label>
-            <input type="text" name="telegram_chat_id" class="form-control" dir="ltr" value="{{ settings.telegram_chat_id or '' }}">
-        </div>
+{% extends "admin_base.html" %}
+{% block title %}إعدادات النظام - لوحة الإدارة{% endblock %}
+{% block content %}
+<div class="glass-card" style="max-width: 600px; margin: 0 auto;">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="section-title mb-0">
+            <i class="fas fa-sliders-h ms-2" style="color: var(--primary);"></i> إعدادات المنصة
+        </h4>
+        <a href="{{ url_for('admin_whatsapp_logs') }}" class="btn btn-info-custom">
+            <i class="fab fa-whatsapp"></i> سجل الإرسال
+        </a>
     </div>
-    <small class="text-muted">عند اختيار تيليجرام، تأكد من أن المستخدمين قد أضافوا معرف التلقرام الخاص بهم.</small>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm rounded-4 py-3" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <form method="POST">
+        <!-- توكن الواتساب -->
+        <div class="mb-4">
+            <label class="form-label fw-bold"><i class="fab fa-whatsapp text-success ms-1"></i> توكن الواتساب</label>
+            <input type="text" name="whatsapp_token" class="form-control" dir="ltr" value="{{ settings.whatsapp_token if settings else '' }}" required>
+            <small class="text-muted">مفتاح API الخاص بخدمة إرسال الواتساب.</small>
+        </div>
+
+        <!-- أيام التجربة -->
+        <div class="mb-4">
+            <label class="form-label fw-bold"><i class="fas fa-gift text-warning ms-1"></i> أيام التجربة المجانية</label>
+            <input type="number" name="trial_days" class="form-control text-center" value="{{ settings.trial_days if settings else 2 }}" min="0" required>
+            <small class="text-muted">عدد أيام التجربة للعميل الجديد.</small>
+        </div>
+
+        <!-- إعدادات المراسلة (جديد) -->
+        <div class="mb-4">
+            <label class="form-label fw-bold"><i class="fas fa-comment-dots text-info ms-1"></i> طريقة الإرسال الافتراضية</label>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="small text-muted">طريقة الإرسال</label>
+                    <select name="messaging_method" class="form-select">
+                        <option value="whatsapp" {% if settings.messaging_method == 'whatsapp' %}selected{% endif %}>واتساب</option>
+                        <option value="telegram" {% if settings.messaging_method == 'telegram' %}selected{% endif %}>تيليجرام</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="small text-muted">توكن بوت تيليجرام</label>
+                    <input type="text" name="telegram_bot_token" class="form-control" dir="ltr" value="{{ settings.telegram_bot_token if settings else '' }}" placeholder="بوت توكن">
+                </div>
+                <div class="col-md-6">
+                    <label class="small text-muted">معرف الدردشة الافتراضي (لإشعارات الإدارة)</label>
+                    <input type="text" name="telegram_chat_id" class="form-control" dir="ltr" value="{{ settings.telegram_chat_id if settings else '' }}" placeholder="Chat ID">
+                </div>
+            </div>
+            <small class="text-muted">عند اختيار تيليجرام، تُرسل إعلانات المستخدمين إلى معرف التلقرام الخاص بكل مستخدم (إذا أدخله)، وإلا تُستخدم هذه الوجهة الافتراضية.</small>
+        </div>
+
+        <!-- إعدادات الدفع البنكي -->
+        <div class="mb-4">
+            <label class="form-label fw-bold"><i class="fas fa-university text-primary ms-1"></i> إعدادات التحويل البنكي</label>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="small text-muted">اسم المستفيد</label>
+                    <input type="text" name="bank_account_name" class="form-control" value="{{ settings.bank_account_name if settings else '' }}">
+                </div>
+                <div class="col-md-6">
+                    <label class="small text-muted">رقم الحساب (آيبان)</label>
+                    <input type="text" name="bank_account_number" class="form-control" dir="ltr" value="{{ settings.bank_account_number if settings else '' }}">
+                </div>
+                <div class="col-12">
+                    <label class="small text-muted">باركود QR (نص)</label>
+                    <textarea name="bank_qr_text" class="form-control" rows="3" dir="ltr">{{ settings.bank_qr_text if settings else '' }}</textarea>
+                    <small class="text-muted">انسخ نص الباركود الخاص بالحساب (يمكن الحصول عليه من تطبيق البنك).</small>
+                </div>
+                <div class="col-md-4">
+                    <label class="small text-muted">سعر الأسبوع (ريال)</label>
+                    <input type="number" name="subscription_week_price" class="form-control" value="{{ settings.subscription_week_price if settings else 5 }}" min="1">
+                </div>
+            </div>
+        </div>
+
+        <!-- رقم جوال الإدارة -->
+        <div class="mb-4">
+            <label class="form-label fw-bold"><i class="fas fa-mobile-alt text-primary ms-1"></i> رقم جوال الإدارة (للإشعارات)</label>
+            <input type="text" name="admin_phone" class="form-control" dir="ltr" placeholder="9665xxxxxxxx" value="{{ notify.admin_phone if notify else '' }}">
+            <small class="text-muted">سيتم إرسال إشعارات تسجيل العملاء والتقارير اليومية لهذا الرقم.</small>
+        </div>
+
+        <div class="d-grid">
+            <button type="submit" class="btn btn-primary-custom">
+                <i class="fas fa-save"></i> حفظ الإعدادات
+            </button>
+        </div>
+    </form>
 </div>
+<style>
+    .btn-primary-custom {
+        background: linear-gradient(135deg, #1abc9c, #16a085);
+        border: none;
+        border-radius: 12px;
+        padding: 0.8rem;
+        font-weight: 700;
+        color: white;
+    }
+    .btn-info-custom {
+        background: #17a2b8;
+        border: none;
+        border-radius: 12px;
+        padding: 0.5rem 1rem;
+        font-weight: 600;
+        color: white;
+    }
+</style>
+{% endblock %}
