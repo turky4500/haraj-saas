@@ -1190,30 +1190,49 @@ with app.app_context():
     db.create_all()
     try:
         with db.engine.connect() as conn:
-            if conn.engine.dialect.name == 'postgresql':
-                # إضافة أعمدة system_settings
-                settings_cols = [
+            dialect = conn.engine.dialect.name
+
+            # --- أعمدة system_settings ---
+            if dialect == 'postgresql':
+                for col, typ in [
                     ("messaging_method", "VARCHAR(10) DEFAULT 'whatsapp'"),
                     ("telegram_bot_token", "VARCHAR(255) DEFAULT ''"),
                     ("telegram_chat_id", "VARCHAR(50) DEFAULT ''")
-                ]
-                for col, typ in settings_cols:
+                ]:
                     try:
-                        conn.execute(db.text(f"ALTER TABLE system_settings ADD COLUMN {col} {typ}"))
+                        conn.execute(db.text(f"ALTER TABLE system_settings ADD COLUMN IF NOT EXISTS {col} {typ}"))
+                        conn.commit()
+                    except Exception:
+                        try:
+                            conn.execute(db.text(f"ALTER TABLE system_settings ADD COLUMN {col} {typ}"))
+                            conn.commit()
+                        except Exception as ex:
+                            if 'already exists' not in str(ex):
+                                logger.warning(f"system_settings.{col}: {ex}")
+
+            # --- عمود user.telegram_chat_id ---
+            if dialect == 'postgresql':
+                try:
+                    conn.execute(db.text('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(50)'))
+                    conn.commit()
+                except Exception:
+                    try:
+                        conn.execute(db.text('ALTER TABLE "user" ADD COLUMN telegram_chat_id VARCHAR(50)'))
                         conn.commit()
                     except Exception as ex:
                         if 'already exists' not in str(ex):
-                            logger.warning(f"عمود system_settings {col}: {ex}")
-                # إضافة عمود telegram_chat_id للمستخدمين
+                            logger.warning(f"user.telegram_chat_id: {ex}")
+            elif dialect == 'sqlite':
                 try:
-                    conn.execute(db.text('ALTER TABLE "user" ADD COLUMN telegram_chat_id VARCHAR(50)'))
+                    conn.execute(db.text("ALTER TABLE user ADD COLUMN telegram_chat_id VARCHAR(50)"))
                     conn.commit()
                 except Exception as ex:
-                    if 'already exists' not in str(ex):
-                        logger.warning(f"عمود user.telegram_chat_id: {ex}")
+                    if 'duplicate column' not in str(ex).lower():
+                        logger.warning(f"SQLite user.telegram_chat_id: {ex}")
+
     except Exception as e:
         logger.error(f"خطأ ترحيل: {e}")
-    
+
     if not SystemSettings.query.first():
         db.session.add(SystemSettings())
         db.session.commit()
