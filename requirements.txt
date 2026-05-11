@@ -7,3 +7,4 @@ beautifulsoup4==4.12.2
 psycopg2-binary==2.9.9
 gunicorn==22.0.0
 setuptools
+cloudscraper==1.2.71
