@@ -11,17 +11,6 @@
         </a>
     </div>
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-                <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm rounded-4 py-3" role="alert">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-            {% endfor %}
-        {% endif %}
-    {% endwith %}
-
     <form method="POST">
         <!-- توكن الواتساب -->
         <div class="mb-4">
@@ -35,29 +24,6 @@
             <label class="form-label fw-bold"><i class="fas fa-gift text-warning ms-1"></i> أيام التجربة المجانية</label>
             <input type="number" name="trial_days" class="form-control text-center" value="{{ settings.trial_days if settings else 2 }}" min="0" required>
             <small class="text-muted">عدد أيام التجربة للعميل الجديد.</small>
-        </div>
-
-        <!-- إعدادات المراسلة (جديد) -->
-        <div class="mb-4">
-            <label class="form-label fw-bold"><i class="fas fa-comment-dots text-info ms-1"></i> طريقة الإرسال الافتراضية</label>
-            <div class="row g-3">
-                <div class="col-md-6">
-                    <label class="small text-muted">طريقة الإرسال</label>
-                    <select name="messaging_method" class="form-select">
-                        <option value="whatsapp" {% if settings.messaging_method == 'whatsapp' %}selected{% endif %}>واتساب</option>
-                        <option value="telegram" {% if settings.messaging_method == 'telegram' %}selected{% endif %}>تيليجرام</option>
-                    </select>
-                </div>
-                <div class="col-md-6">
-                    <label class="small text-muted">توكن بوت تيليجرام</label>
-                    <input type="text" name="telegram_bot_token" class="form-control" dir="ltr" value="{{ settings.telegram_bot_token if settings else '' }}" placeholder="بوت توكن">
-                </div>
-                <div class="col-md-6">
-                    <label class="small text-muted">معرف الدردشة الافتراضي (لإشعارات الإدارة)</label>
-                    <input type="text" name="telegram_chat_id" class="form-control" dir="ltr" value="{{ settings.telegram_chat_id if settings else '' }}" placeholder="Chat ID">
-                </div>
-            </div>
-            <small class="text-muted">عند اختيار تيليجرام، تُرسل إعلانات المستخدمين إلى معرف التلقرام الخاص بكل مستخدم (إذا أدخله)، وإلا تُستخدم هذه الوجهة الافتراضية.</small>
         </div>
 
         <!-- إعدادات الدفع البنكي -->
