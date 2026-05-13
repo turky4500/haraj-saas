@@ -121,7 +121,7 @@
         <div class="profile-header">
             <i class="fas fa-user-circle"></i>
             <h3>الملف الشخصي</h3>
-            <p class="text-muted">يمكنك تغيير كلمة المرور وإضافة معرف التلقرام</p>
+            <p class="text-muted">يمكنك تغيير كلمة المرور هنا</p>
         </div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -144,14 +144,6 @@
                 <label class="form-label fw-bold small text-muted">رقم الجوال</label>
                 <input type="text" class="form-control" value="{{ current_user.phone }}" disabled readonly style="background-color: #f1f5f9;">
             </div>
-
-            <!-- حقل معرف التلقرام (جديد) -->
-            <div class="mb-3">
-                <label class="form-label fw-bold small text-muted">معرف التلقرام (Chat ID) – اختياري</label>
-                <input type="text" name="telegram_chat_id" class="form-control" value="{{ current_user.telegram_chat_id or '' }}" dir="ltr" placeholder="مثال: 123456789">
-                <small class="text-muted">أرسل "/start" إلى <a href="https://t.me/userinfobot" target="_blank">@userinfobot</a> لمعرفة معرفك.</small>
-            </div>
-
             <div class="mb-3">
                 <label class="form-label fw-bold small text-muted">كلمة المرور الحالية</label>
                 <input type="password" name="old_password" class="form-control" required placeholder="أدخل كلمة المرور الحالية">
@@ -161,7 +153,7 @@
                 <input type="password" name="new_password" class="form-control" required placeholder="أدخل كلمة المرور الجديدة">
             </div>
             <button type="submit" class="btn-update mb-3">
-                <i class="fas fa-sync-alt ms-2"></i> تحديث البيانات
+                <i class="fas fa-sync-alt ms-2"></i> تحديث كلمة المرور
             </button>
         </form>
         <a href="{% if current_user.role == 'admin' %}/admin_dashboard{% else %}/user_dashboard{% endif %}" class="btn-back">
