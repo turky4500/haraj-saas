@@ -395,7 +395,7 @@ def extract_ads(html_bytes, base_url):
 
 # ================= دالة إرسال الواتساب =================
 def send_whatsapp(req_session, token, to_msisdn, text, max_retries=3):
-    url = "http://wats-enzn.onrender.com/api/v1/send"
+    url = "https://wats-enzn.onrender.com/api/v1/send"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     
     logger.info(f"📤 محاولة إرسال واتساب إلى {to_msisdn} - نص الرسالة: {text[:50]}...")
@@ -426,18 +426,20 @@ def send_whatsapp(req_session, token, to_msisdn, text, max_retries=3):
             success = False
             if response.status_code == 200:
                 if isinstance(result, dict):
-                    if result.get("success") is True:
+                    # إذا فيه error فالرد = فشل حتى لو كود 200
+                    if result.get("error"):
+                        success = False
+                        logger.error(f"❌ API أرجع خطأ: {result.get('error')}")
+                    elif result.get("success") is True:
                         success = True
                     elif result.get("status") == "sent":
                         success = True
                     elif result.get("message_id"):
                         success = True
-                    elif result.get("error") is None and "message_id" in str(result):
-                        success = True
                     else:
-                        success = True
+                        success = False
                 else:
-                    success = True
+                    success = False
             
             log_whatsapp_attempt(to_msisdn, success, response_data, text)
             
