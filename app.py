@@ -1674,63 +1674,61 @@ def admin_delete_user(user_id):
     
     return redirect(url_for('admin_users'))
 
-with app.app_context():
-    db.create_all()
-    
-    # === ترحيل آمن: إضافة أعمدة system_settings إذا لم تكن موجودة ===
-    try:
-        with db.engine.connect() as conn:
-            dialect = conn.engine.dialect.name
-            if dialect == 'postgresql':
-                result = conn.execute(db.text("""
-                    SELECT column_name 
-                    FROM information_schema.columns 
-                    WHERE table_name='system_settings' 
-                    AND column_name IN ('bank_account_number', 'bank_account_name', 'bank_qr_text', 'subscription_week_price', 'active_gateway', 'gateway_1_name', 'gateway_2_name', 'gateway_url_1', 'gateway_url_2', 'whatsapp_token_2')
-                """))
-                existing_columns = {row[0] for row in result}
-            elif dialect == 'sqlite':
-                result = conn.execute(db.text("PRAGMA table_info(system_settings)"))
-                existing_columns = {row[1] for row in result}
-            else:
-                existing_columns = set()
-            
-            columns_to_add = [
-                ("bank_account_number", "VARCHAR(50) DEFAULT ''"),
-                ("bank_account_name", "VARCHAR(100) DEFAULT ''"),
-                ("bank_qr_text", "TEXT DEFAULT ''"),
-                ("subscription_week_price", "INTEGER DEFAULT 5"),
-                ("active_gateway", "VARCHAR(10) DEFAULT '1'"),
-                ("gateway_1_name", "VARCHAR(100) DEFAULT 'البوابة الأولى'"),
-                ("gateway_2_name", "VARCHAR(100) DEFAULT 'البوابة الثانية'"),
-                ("gateway_url_1", "VARCHAR(255) DEFAULT 'https://wats-enzn.onrender.com/api/v1/send'"),
-                ("gateway_url_2", "VARCHAR(255) DEFAULT 'https://whatsapp.tkwin.com.sa/api/v1/send'"),
-                ("whatsapp_token_2", "VARCHAR(255) DEFAULT '7a203d6ba6f4325ed3261ea87f6b2e751250ad97'")
-            ]
-            
-            for col_name, col_type in columns_to_add:
-                if col_name not in existing_columns:
-                    try:
-                        with conn.begin() as trans:
-                            conn.execute(db.text(f"ALTER TABLE system_settings ADD COLUMN {col_name} {col_type}"))
-                    except Exception as e:
-                        print(f"تعذر إضافة العمود {col_name}: {e}")
-    except Exception as e:
-        print(f"خطأ أثناء الترحيل: {e}")
+import traceback
 
-    db.create_all()
-    
-    if not SystemSettings.query.first():
-        db.session.add(SystemSettings())
-        db.session.commit()
-    if not AdminNotifySettings.query.first():
-        db.session.add(AdminNotifySettings())
-        db.session.commit()
+try:
+    with app.app_context():
+        db.create_all()
+        
+        # === ترحيل آمن: إضافة أعمدة system_settings إذا لم تكن موجودة ===
+        try:
+            from sqlalchemy import inspect
+            inspector = inspect(db.engine)
+            if 'system_settings' in inspector.get_table_names():
+                existing_columns = {col['name'] for col in inspector.get_columns('system_settings')}
+                
+                columns_to_add = [
+                    ("bank_account_number", "VARCHAR(50) DEFAULT ''"),
+                    ("bank_account_name", "VARCHAR(100) DEFAULT ''"),
+                    ("bank_qr_text", "TEXT DEFAULT ''"),
+                    ("subscription_week_price", "INTEGER DEFAULT 5"),
+                    ("active_gateway", "VARCHAR(10) DEFAULT '1'"),
+                    ("gateway_1_name", "VARCHAR(100) DEFAULT 'البوابة الأولى'"),
+                    ("gateway_2_name", "VARCHAR(100) DEFAULT 'البوابة الثانية'"),
+                    ("gateway_url_1", "VARCHAR(255) DEFAULT 'https://wats-enzn.onrender.com/api/v1/send'"),
+                    ("gateway_url_2", "VARCHAR(255) DEFAULT 'https://whatsapp.tkwin.com.sa/api/v1/send'"),
+                    ("whatsapp_token_2", "VARCHAR(255) DEFAULT '7a203d6ba6f4325ed3261ea87f6b2e751250ad97'")
+                ]
+                
+                for col_name, col_type in columns_to_add:
+                    if col_name not in existing_columns:
+                        try:
+                            db.session.execute(db.text(f"ALTER TABLE system_settings ADD COLUMN {col_name} {col_type}"))
+                            db.session.commit()
+                            logger.info(f"✅ تم إضافة العمود {col_name} بنجاح.")
+                        except Exception as alter_err:
+                            db.session.rollback()
+                            logger.error(f"❌ تعذر إضافة العمود {col_name}: {alter_err}")
+        except Exception as e:
+            logger.error(f"❌ خطأ أثناء الترحيل: {e}")
 
-with app.app_context():
-    for sub in Subscription.query.filter_by(status='active').all():
-        if sub.owner.is_active_account and (not sub.owner.account_expiration or sub.owner.account_expiration > datetime.datetime.now()):
-            start_thread_for_sub(sub)
+        db.create_all()
+        
+        if not SystemSettings.query.first():
+            db.session.add(SystemSettings())
+            db.session.commit()
+        if not AdminNotifySettings.query.first():
+            db.session.add(AdminNotifySettings())
+            db.session.commit()
+
+    with app.app_context():
+        for sub in Subscription.query.filter_by(status='active').all():
+            if sub.owner.is_active_account and (not sub.owner.account_expiration or sub.owner.account_expiration > datetime.datetime.now()):
+                start_thread_for_sub(sub)
+except Exception as startup_err:
+    logger.error(f"❌ خطأ فادح أثناء تشغيل/بدء التطبيق: {startup_err}")
+    logger.error(traceback.format_exc())
+    raise startup_err
 
 # ================= SEO: robots.txt و sitemap.xml =================
 @app.route('/robots.txt')
