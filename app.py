@@ -132,7 +132,8 @@ def log_whatsapp_attempt(to_number, success, response_data, message_text=""):
             "to": to_number,
             "success": success,
             "response": response_data,
-            "message_preview": message_text[:50] + "..." if len(message_text) > 50 else message_text
+            "message_preview": message_text[:50] + "..." if len(message_text) > 50 else message_text,
+            "message_text": message_text
         })
         if len(logs) > 1000:
             logs = logs[-1000:]
@@ -555,6 +556,32 @@ def admin_clear_whatsapp_logs():
     except Exception as e:
         flash(f'❌ حدث خطأ أثناء حذف السجلات: {str(e)}', 'danger')
     
+    return redirect(url_for('admin_whatsapp_logs'))
+
+# ================= مسار إعادة إرسال رسالة من السجل =================
+@app.route('/admin/resend_whatsapp', methods=['POST'])
+@login_required
+def admin_resend_whatsapp():
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+    
+    to_number = request.form.get('to')
+    message_text = request.form.get('message')
+    
+    if not to_number or not message_text:
+        flash('❌ رقم الهاتف أو نص الرسالة غير مكتمل.', 'danger')
+        return redirect(url_for('admin_whatsapp_logs'))
+    
+    settings = SystemSettings.query.first()
+    token = settings.active_whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
+    url = settings.active_whatsapp_url if settings else "https://wats-enzn.onrender.com/api/v1/send"
+    
+    success = send_whatsapp(create_session(), token, to_number, message_text, url=url)
+    if success:
+        flash('✅ تم إعادة إرسال الرسالة بنجاح! 🚀', 'success')
+    else:
+        flash('❌ فشل إعادة إرسال الرسالة، يرجى مراجعة سجل الأخطاء.', 'danger')
+        
     return redirect(url_for('admin_whatsapp_logs'))
 
 # ================= مسار حذف الأرشيف =================
