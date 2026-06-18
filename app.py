@@ -169,13 +169,14 @@ def daily_background_tasks():
             try:
                 now = get_ksa_time()
                 settings = SystemSettings.query.first()
-                token = settings.whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
+                token = settings.active_whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
+                url = settings.active_whatsapp_url if settings else "https://wats-enzn.onrender.com/api/v1/send"
                 notify = AdminNotifySettings.query.first()
                 if notify and notify.admin_phone:
                     if now.hour >= 23 and notify.last_report_date < now.date():
                         ds = get_daily_stats()
                         msg = f"📊 تقرير نهاية اليوم لمنصة (راصد حراج):\n\n👥 زوار بشريين: {ds['visitors']}\n🤖 زيارات الروبوت: {ds['bot_visits']}\n🆕 تسجيلات جديدة: {ds['registrations']}\n💬 رسائل أُرسلت: {ds['messages_sent']}\n\nيعطيك العافية 🚀"
-                        send_whatsapp(create_session(), token, notify.admin_phone, msg)
+                        send_whatsapp(create_session(), token, notify.admin_phone, msg, url=url)
                         notify.last_report_date = now.date()
                         db.session.commit()
                 if now.hour >= 16:
@@ -190,7 +191,7 @@ def daily_background_tasks():
                             uid_str = str(u.id)
                             if sent_reminders.get(uid_str) != exp_date_str:
                                 msg = f"🌸 مرحباً {u.username},\n\nنذكرك بحب أن اشتراكك في **راصد حراج** سينتهي غداً {u.account_expiration.strftime('%Y-%m-%d')}. 🗓️\n\nنتمنى أن تكون استمتعت بخدمتنا، ولضمان استمرار رصد صيداتك الموفقة بدون انقطاع، يمكنك التواصل معنا لتجديد الاشتراك. نحن هنا لخدمتك دائماً! 💙\n\nشكراً لثقتك بنا."
-                                if send_whatsapp(create_session(), token, u.phone, msg):
+                                if send_whatsapp(create_session(), token, u.phone, msg, url=url):
                                     sent_reminders[uid_str] = exp_date_str
                                     with open(REMINDERS_FILE, 'w') as f: json.dump(sent_reminders, f)
             except Exception as e:
@@ -222,11 +223,12 @@ def monitor_threads_health():
                             del ACTIVE_THREADS[sub.id]
                         start_thread_for_sub(sub)
                         settings = SystemSettings.query.first()
-                        token = settings.whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
+                        token = settings.active_whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
+                        url = settings.active_whatsapp_url if settings else "https://wats-enzn.onrender.com/api/v1/send"
                         notify = AdminNotifySettings.query.first()
                         if notify and notify.admin_phone:
                             msg = f"🔄 تم إعادة تشغيل رادار المستخدم {sub.owner.username} (الاشتراك {sub.id}) تلقائياً."
-                            send_whatsapp(create_session(), token, notify.admin_phone, msg)
+                            send_whatsapp(create_session(), token, notify.admin_phone, msg, url=url)
             except Exception as e:
                 logger.error(f"خطأ في مراقبة الخيوط: {str(e)}")
 
@@ -265,6 +267,25 @@ class SystemSettings(db.Model):
     bank_account_name = db.Column(db.String(100), default="")
     bank_qr_text = db.Column(db.Text, default="")
     subscription_week_price = db.Column(db.Integer, default=5)
+    # إعدادات البوابات المتعددة
+    active_gateway = db.Column(db.String(10), default="1")
+    gateway_1_name = db.Column(db.String(100), default="البوابة الأولى")
+    gateway_2_name = db.Column(db.String(100), default="البوابة الثانية")
+    gateway_url_1 = db.Column(db.String(255), default="https://wats-enzn.onrender.com/api/v1/send")
+    gateway_url_2 = db.Column(db.String(255), default="https://whatsapp.tkwin.com.sa/api/v1/send")
+    whatsapp_token_2 = db.Column(db.String(255), default="7a203d6ba6f4325ed3261ea87f6b2e751250ad97")
+
+    @property
+    def active_whatsapp_token(self):
+        if self.active_gateway == '2':
+            return self.whatsapp_token_2 or "7a203d6ba6f4325ed3261ea87f6b2e751250ad97"
+        return self.whatsapp_token or "sau11zbtz1ruma8o2k5tt"
+
+    @property
+    def active_whatsapp_url(self):
+        if self.active_gateway == '2':
+            return self.gateway_url_2 or "https://whatsapp.tkwin.com.sa/api/v1/send"
+        return self.gateway_url_1 or "https://wats-enzn.onrender.com/api/v1/send"
 
 class AdminNotifySettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -394,8 +415,7 @@ def extract_ads(html_bytes, base_url):
     return list(dict.fromkeys(ads))
 
 # ================= دالة إرسال الواتساب =================
-def send_whatsapp(req_session, token, to_msisdn, text, max_retries=3):
-    url = "https://wats-enzn.onrender.com/api/v1/send"
+def send_whatsapp(req_session, token, to_msisdn, text, url="https://wats-enzn.onrender.com/api/v1/send", max_retries=3):
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     
     logger.info(f"📤 محاولة إرسال واتساب إلى {to_msisdn} - نص الرسالة: {text[:50]}...")
@@ -603,8 +623,11 @@ class MonitorThread(threading.Thread):
                             if sub.status == 'active': 
                                 sub.status = 'paused'
                                 db.session.commit()
+                                settings = SystemSettings.query.first()
+                                current_token = settings.active_whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
+                                current_url = settings.active_whatsapp_url if settings else "https://wats-enzn.onrender.com/api/v1/send"
                                 exp_msg = f"🌸 مرحباً {user.username},\n\nنأمل أن تكون أيامك مليئة بالصيدات الموفقة! مع الأسف، اشتراكك في **راصد حراج** قد انتهى اليوم. 📅\n\nلكن لا تقلق، رادارك ما زال محفوظاً وجاهزاً للاستئناف فور تجديد الاشتراك. نحن هنا لخدمتك دائماً ونسعد بعودتك إلينا. 💙\n\nإذا كان لديك أي استفسار، تواصل معنا بكل حب.\n\nشكراً لثقتك، وإلى لقاء قريب بإذن الله 🌹"
-                                send_whatsapp(self.req_session, self.cfg.get('token', ''), self.cfg['recipients'], exp_msg)
+                                send_whatsapp(self.req_session, current_token, self.cfg['recipients'], exp_msg, url=current_url)
                             logger.info(f"الاشتراك {self.cfg['id']} غير نشط أو منتهي. إيقاف الخيط.")
                             break
                         
@@ -624,18 +647,19 @@ class MonitorThread(threading.Thread):
                         # نستمر بالإعدادات القديمة دون إنهاء الخيط
                     
                     settings = SystemSettings.query.first()
-                    current_token = settings.whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
+                    current_token = settings.active_whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
+                    current_url = settings.active_whatsapp_url if settings else "https://wats-enzn.onrender.com/api/v1/send"
                     
                     currently_quiet = is_quiet_now(self.cfg['quiet_enabled'], self.cfg['q_sh'], self.cfg['q_sm'], self.cfg['q_eh'], self.cfg['q_em'])
 
                     if not currently_quiet and self.queued_ads:
                         wake_msg = "🌅 انتهت فترة الهدوء!\nإليك الإعلانات التي تم رصدها وتخزينها أثناء فترة توقف الإشعارات:"
-                        send_whatsapp(self.req_session, current_token, self.cfg['recipients'], wake_msg)
+                        send_whatsapp(self.req_session, current_token, self.cfg['recipients'], wake_msg, url=current_url)
                         time.sleep(3)
                         for ad in self.queued_ads:
                             if self.stop_evt.is_set(): break
                             msg = f"إعلان ({ad['kw']}):\n{ad['title']}\n{ad['url']}\n\n⚙️ تذكير لطيف: تقدر تتحكم بإعدادات الرصد ومتابعة أرشيف إعلاناتك بكل سهولة من هنا:\n🔗 https://haraj-saas.onrender.com"
-                            send_whatsapp(self.req_session, current_token, self.cfg['recipients'], msg)
+                            send_whatsapp(self.req_session, current_token, self.cfg['recipients'], msg, url=current_url)
                             time.sleep(random.uniform(5, 10))
                         
                         self.queued_ads = []
@@ -680,7 +704,7 @@ class MonitorThread(threading.Thread):
                                                 delay = random.uniform(30, 60)
                                                 time.sleep(delay)
                                                 msg = f"إعلان جديد ({kw}):\n{title}\n{ad_url}\n\n⚙️ تذكير لطيف: تقدر تتحكم بإعدادات الرصد ومتابعة أرشيف إعلاناتك بكل سهولة من هنا:\n🔗 https://haraj-saas.onrender.com"
-                                                send_whatsapp(self.req_session, current_token, self.cfg['recipients'], msg)
+                                                send_whatsapp(self.req_session, current_token, self.cfg['recipients'], msg, url=current_url)
                                                 
                                             with app.app_context():
                                                 log_sub = Subscription.query.get(self.cfg['id'])
@@ -791,10 +815,11 @@ def register():
         session['otp'] = otp
         
         settings = SystemSettings.query.first()
-        current_token = settings.whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
+        current_token = settings.active_whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
+        current_url = settings.active_whatsapp_url if settings else "https://wats-enzn.onrender.com/api/v1/send"
         
         otp_msg = f"مرحباً بك في راصد حراج! 🎯\n\nكود التفعيل الخاص بك هو: *{otp}*\n\nيرجى إدخاله في الموقع لإكمال التسجيل."
-        send_whatsapp(create_session(), current_token, phone, otp_msg)
+        send_whatsapp(create_session(), current_token, phone, otp_msg, url=current_url)
         
         return redirect(url_for('verify'))
     return render_template('register.html')
@@ -826,9 +851,10 @@ def verify():
             
             notify = AdminNotifySettings.query.first()
             if notify and notify.admin_phone and new_user.role != 'admin':
-                admin_token = settings.whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
+                admin_token = settings.active_whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
+                admin_url = settings.active_whatsapp_url if settings else "https://wats-enzn.onrender.com/api/v1/send"
                 admin_msg = f"🔔 عميل جديد سجل بالمنصة!\n\n👤 الاسم: {new_user.username}\n📱 الجوال: {new_user.phone}"
-                send_whatsapp(create_session(), admin_token, notify.admin_phone, admin_msg)
+                send_whatsapp(create_session(), admin_token, notify.admin_phone, admin_msg, url=admin_url)
             
             login_user(new_user)
             session.pop('temp_user', None)
@@ -852,9 +878,10 @@ def forgot_password():
             session['reset_otp'] = otp
             
             settings = SystemSettings.query.first()
-            current_token = settings.whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
+            current_token = settings.active_whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
+            current_url = settings.active_whatsapp_url if settings else "https://wats-enzn.onrender.com/api/v1/send"
             reset_msg = f"أهلاً بك 🛡️\n\nكود استعادة كلمة المرور لحسابك هو: *{otp}*"
-            send_whatsapp(create_session(), current_token, phone, reset_msg)
+            send_whatsapp(create_session(), current_token, phone, reset_msg, url=current_url)
             
             return redirect(url_for('reset_password'))
         flash('رقم الجوال غير مسجل بالنظام!', 'danger')
@@ -867,9 +894,10 @@ def forgot_username():
         user = User.query.filter_by(phone=phone).first()
         if user:
             settings = SystemSettings.query.first()
-            current_token = settings.whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
+            current_token = settings.active_whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
+            current_url = settings.active_whatsapp_url if settings else "https://wats-enzn.onrender.com/api/v1/send"
             username_msg = f"أهلاً بك في راصد حراج 🛡️\n\nاسم المستخدم الخاص بك هو: *{user.username}*\n\nيمكنك الآن تسجيل الدخول بكل سهولة. إذا واجهت أي مشكلة، تواصل مع الدعم."
-            if send_whatsapp(create_session(), current_token, phone, username_msg):
+            if send_whatsapp(create_session(), current_token, phone, username_msg, url=current_url):
                 flash('تم إرسال اسم المستخدم إلى رقم جوالك المسجل.', 'success')
             else:
                 flash('تعذر إرسال اسم المستخدم حالياً، حاول مرة أخرى لاحقاً.', 'warning')
@@ -957,7 +985,8 @@ def user_dashboard():
         }
         
         settings = SystemSettings.query.first()
-        current_token = settings.whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
+        current_token = settings.active_whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
+        current_url = settings.active_whatsapp_url if settings else "https://wats-enzn.onrender.com/api/v1/send"
 
         if sub:
             # إذا كان الاشتراك منتهياً، نجبر الحالة على 'paused' بغض النظر عن القيمة المرسلة
@@ -1024,7 +1053,7 @@ def user_dashboard():
             exp_text = current_user.account_expiration.strftime('%Y-%m-%d') if current_user.account_expiration else "مفتوح"
             welcome_msg = f"مرحباً بك في راصد حراج! 🎯\nتم تفعيل الرادار الخاص بك بنجاح.\n\nالاسم: {name}\nتاريخ الانتهاء: {exp_text}\n\nنتمنى لك صيدات موفقة! 🚀"
             if not is_expired:
-                send_whatsapp(create_session(), current_token, current_user.phone, welcome_msg)
+                send_whatsapp(create_session(), current_token, current_user.phone, welcome_msg, url=current_url)
 
             log_audit_async(current_user.id, 'create_subscription', audit_details, request.remote_addr)
             flash('تم حفظ الاشتراك وبدأ الرصد!' if not is_expired else 'تم حفظ الاشتراك. لا يمكن تشغيل الرادار حتى يتم تجديد الاشتراك.', 'success')
@@ -1087,11 +1116,12 @@ def renew_subscription():
         
         # إرسال إشعار للإدارة
         settings = SystemSettings.query.first()
-        token = settings.whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
+        token = settings.active_whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
+        url = settings.active_whatsapp_url if settings else "https://wats-enzn.onrender.com/api/v1/send"
         notify = AdminNotifySettings.query.first()
         if notify and notify.admin_phone:
             admin_msg = f"🔔 طلب تجديد جديد:\n👤 المستخدم: {current_user.username}\n📱 الجوال: {current_user.phone}\n📆 عدد الأسابيع: {weeks}\n💰 المبلغ: {amount} ريال\n📎 إثبات: {'مرفق' if proof_filename else 'غير مرفق'}"
-            send_whatsapp(create_session(), token, notify.admin_phone, admin_msg)
+            send_whatsapp(create_session(), token, notify.admin_phone, admin_msg, url=url)
         
         log_audit_async(current_user.id, 'renewal_request', {'نوع الحدث': 'طلب تجديد', 'الأسابيع': weeks, 'المبلغ': amount}, request.remote_addr)
         flash('تم استلام طلب التجديد بنجاح. سنقوم بمراجعة الحوالة وتفعيل اشتراكك قريباً.', 'success')
@@ -1124,7 +1154,8 @@ def process_renewal(req_id, action):
     
     user = User.query.get(req.user_id)
     settings = SystemSettings.query.first()
-    token = settings.whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
+    token = settings.active_whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
+    url = settings.active_whatsapp_url if settings else "https://wats-enzn.onrender.com/api/v1/send"
     
     if action == 'approve':
         # تحديث تاريخ انتهاء الاشتراك
@@ -1168,7 +1199,7 @@ def process_renewal(req_id, action):
         # إرسال إشعار للمستخدم
         exp_date_str = user.account_expiration.strftime('%Y-%m-%d')
         user_msg = f"🎉 مبروك! تم تجديد اشتراكك في راصد حراج بنجاح.\n\n📆 المدة: {req.weeks} أسابيع\n📅 تاريخ الانتهاء الجديد: {exp_date_str}\n\nرادارك نشط الآن، نتمنى لك صيدات موفقة! 🚀"
-        send_whatsapp(create_session(), token, user.phone, user_msg)
+        send_whatsapp(create_session(), token, user.phone, user_msg, url=url)
         
         log_audit_async(current_user.id, 'approve_renewal', {'نوع الحدث': 'قبول طلب تجديد', 'المستخدم': user.username, 'الأسابيع': req.weeks}, request.remote_addr)
         flash(f'تمت الموافقة على طلب {user.username} وتمديد الاشتراك.', 'success')
@@ -1425,6 +1456,14 @@ def admin_settings():
         settings.bank_qr_text = request.form.get('bank_qr_text', '')
         settings.subscription_week_price = int(request.form.get('subscription_week_price', 5))
         
+        # إعدادات البوابات المتعددة
+        settings.active_gateway = request.form.get('active_gateway', '1')
+        settings.gateway_1_name = request.form.get('gateway_1_name', 'البوابة الأولى')
+        settings.gateway_2_name = request.form.get('gateway_2_name', 'البوابة الثانية')
+        settings.gateway_url_1 = request.form.get('gateway_url_1', 'https://wats-enzn.onrender.com/api/v1/send')
+        settings.gateway_url_2 = request.form.get('gateway_url_2', 'https://whatsapp.tkwin.com.sa/api/v1/send')
+        settings.whatsapp_token_2 = request.form.get('whatsapp_token_2', '')
+        
         if notify:
             notify.admin_phone = request.form.get('admin_phone', '')
             
@@ -1471,10 +1510,11 @@ def admin_add_user():
         db.session.commit()
 
         settings = SystemSettings.query.first()
-        current_token = settings.whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
+        current_token = settings.active_whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
+        current_url = settings.active_whatsapp_url if settings else "https://wats-enzn.onrender.com/api/v1/send"
         exp_text = exp_date.strftime('%Y-%m-%d') if exp_date else "مفتوح"
         welcome_msg = f"مرحباً بك في راصد حراج! 🎯\nتم إنشاء حسابك وتفعيل الرادار بنجاح من قبل الإدارة.\n\nتاريخ الانتهاء: {exp_text}\n\nنتمنى لك صيدات موفقة! 🚀"
-        send_whatsapp(create_session(), current_token, phone, welcome_msg)
+        send_whatsapp(create_session(), current_token, phone, welcome_msg, url=current_url)
 
         if keywords:
             end_ts = exp_date.isoformat() if exp_date else ""
@@ -1646,7 +1686,7 @@ with app.app_context():
                     SELECT column_name 
                     FROM information_schema.columns 
                     WHERE table_name='system_settings' 
-                    AND column_name IN ('bank_account_number', 'bank_account_name', 'bank_qr_text', 'subscription_week_price')
+                    AND column_name IN ('bank_account_number', 'bank_account_name', 'bank_qr_text', 'subscription_week_price', 'active_gateway', 'gateway_1_name', 'gateway_2_name', 'gateway_url_1', 'gateway_url_2', 'whatsapp_token_2')
                 """))
                 existing_columns = {row[0] for row in result}
             elif dialect == 'sqlite':
@@ -1659,7 +1699,13 @@ with app.app_context():
                 ("bank_account_number", "VARCHAR(50) DEFAULT ''"),
                 ("bank_account_name", "VARCHAR(100) DEFAULT ''"),
                 ("bank_qr_text", "TEXT DEFAULT ''"),
-                ("subscription_week_price", "INTEGER DEFAULT 5")
+                ("subscription_week_price", "INTEGER DEFAULT 5"),
+                ("active_gateway", "VARCHAR(10) DEFAULT '1'"),
+                ("gateway_1_name", "VARCHAR(100) DEFAULT 'البوابة الأولى'"),
+                ("gateway_2_name", "VARCHAR(100) DEFAULT 'البوابة الثانية'"),
+                ("gateway_url_1", "VARCHAR(255) DEFAULT 'https://wats-enzn.onrender.com/api/v1/send'"),
+                ("gateway_url_2", "VARCHAR(255) DEFAULT 'https://whatsapp.tkwin.com.sa/api/v1/send'"),
+                ("whatsapp_token_2", "VARCHAR(255) DEFAULT '7a203d6ba6f4325ed3261ea87f6b2e751250ad97'")
             ]
             
             for col_name, col_type in columns_to_add:

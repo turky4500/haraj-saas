@@ -12,11 +12,50 @@
     </div>
 
     <form method="POST">
-        <!-- توكن الواتساب -->
+        <!-- البوابة النشطة -->
         <div class="mb-4">
-            <label class="form-label fw-bold"><i class="fab fa-whatsapp text-success ms-1"></i> توكن الواتساب</label>
-            <input type="text" name="whatsapp_token" class="form-control" dir="ltr" value="{{ settings.whatsapp_token if settings else '' }}" required>
-            <small class="text-muted">مفتاح API الخاص بخدمة إرسال الواتساب.</small>
+            <label class="form-label fw-bold"><i class="fas fa-toggle-on text-success ms-1"></i> اختيار البوابة النشطة للإرسال</label>
+            <select name="active_gateway" class="form-select form-control text-center fw-bold" style="border: 2px solid var(--primary); border-radius: 10px; background-color: rgba(0,0,0,0.2); color: white;">
+                <option value="1" {% if settings and settings.active_gateway == '1' %}selected{% endif %}>{{ settings.gateway_1_name if settings else 'البوابة الأولى' }} (البوابة 1)</option>
+                <option value="2" {% if settings and settings.active_gateway == '2' %}selected{% endif %}>{{ settings.gateway_2_name if settings else 'البوابة الثانية' }} (البوابة 2)</option>
+            </select>
+            <small class="text-muted">سيتم استخدام البوابة النشطة المحددة هنا لإرسال جميع رسائل النظام.</small>
+        </div>
+
+        <hr class="my-4" style="border-top: 1px dashed rgba(255,255,255,0.2);">
+
+        <!-- إعدادات البوابة الأولى -->
+        <div class="card p-3 mb-4" style="border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; background: rgba(255, 255, 255, 0.03);">
+            <h5 class="fw-bold mb-3 text-success"><i class="fab fa-whatsapp ms-1"></i> إعدادات البوابة الأولى (1)</h5>
+            <div class="mb-3">
+                <label class="small text-muted fw-bold">اسم البوابة</label>
+                <input type="text" name="gateway_1_name" class="form-control" value="{{ settings.gateway_1_name if settings else 'البوابة الأولى' }}" required>
+            </div>
+            <div class="mb-3">
+                <label class="small text-muted fw-bold">رابط الإرسال (API URL)</label>
+                <input type="text" name="gateway_url_1" class="form-control" dir="ltr" value="{{ settings.gateway_url_1 if settings else 'https://wats-enzn.onrender.com/api/v1/send' }}" required>
+            </div>
+            <div class="mb-0">
+                <label class="small text-muted fw-bold">التوكن (Token)</label>
+                <input type="text" name="whatsapp_token" class="form-control" dir="ltr" value="{{ settings.whatsapp_token if settings else '' }}" required>
+            </div>
+        </div>
+
+        <!-- إعدادات البوابة الثانية -->
+        <div class="card p-3 mb-4" style="border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; background: rgba(255, 255, 255, 0.03);">
+            <h5 class="fw-bold mb-3 text-info"><i class="fab fa-whatsapp ms-1"></i> إعدادات البوابة الثانية (2)</h5>
+            <div class="mb-3">
+                <label class="small text-muted fw-bold">اسم البوابة</label>
+                <input type="text" name="gateway_2_name" class="form-control" value="{{ settings.gateway_2_name if settings else 'البوابة الثانية' }}" required>
+            </div>
+            <div class="mb-3">
+                <label class="small text-muted fw-bold">رابط الإرسال (API URL)</label>
+                <input type="text" name="gateway_url_2" class="form-control" dir="ltr" value="{{ settings.gateway_url_2 if settings else 'https://whatsapp.tkwin.com.sa/api/v1/send' }}" required>
+            </div>
+            <div class="mb-0">
+                <label class="small text-muted fw-bold">التوكن (Token)</label>
+                <input type="text" name="whatsapp_token_2" class="form-control" dir="ltr" value="{{ settings.whatsapp_token_2 if settings else '' }}">
+            </div>
         </div>
 
         <!-- أيام التجربة -->
