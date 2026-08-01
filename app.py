@@ -177,7 +177,7 @@ def daily_background_tasks():
                 now = get_ksa_time()
                 settings = SystemSettings.query.first()
                 token = settings.active_whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
-                url = settings.active_whatsapp_url if settings else "https://wats-enzn.onrender.com/api/v1/send"
+                url = settings.active_whatsapp_url if settings else "http://127.0.0.1:3000/api/v1/send"
                 notify = AdminNotifySettings.query.first()
                 if notify and notify.admin_phone:
                     if now.hour >= 23 and notify.last_report_date < now.date():
@@ -231,7 +231,7 @@ def monitor_threads_health():
                         start_thread_for_sub(sub)
                         settings = SystemSettings.query.first()
                         token = settings.active_whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
-                        url = settings.active_whatsapp_url if settings else "https://wats-enzn.onrender.com/api/v1/send"
+                        url = settings.active_whatsapp_url if settings else "http://127.0.0.1:3000/api/v1/send"
                         notify = AdminNotifySettings.query.first()
                         if notify and notify.admin_phone:
                             msg = f"🔄 تم إعادة تشغيل رادار المستخدم {sub.owner.username} (الاشتراك {sub.id}) تلقائياً."
@@ -278,7 +278,7 @@ class SystemSettings(db.Model):
     active_gateway = db.Column(db.String(10), default="1")
     gateway_1_name = db.Column(db.String(100), default="البوابة الأولى")
     gateway_2_name = db.Column(db.String(100), default="البوابة الثانية")
-    gateway_url_1 = db.Column(db.String(255), default="https://wats-enzn.onrender.com/api/v1/send")
+    gateway_url_1 = db.Column(db.String(255), default="http://127.0.0.1:3000/api/v1/send")
     gateway_url_2 = db.Column(db.String(255), default="https://whatsapp.tkwin.com.sa/api/v1/send")
     whatsapp_token_2 = db.Column(db.String(255), default="7a203d6ba6f4325ed3261ea87f6b2e751250ad97")
 
@@ -292,7 +292,7 @@ class SystemSettings(db.Model):
     def active_whatsapp_url(self):
         if self.active_gateway == '2':
             return self.gateway_url_2 or "https://whatsapp.tkwin.com.sa/api/v1/send"
-        return self.gateway_url_1 or "https://wats-enzn.onrender.com/api/v1/send"
+        return self.gateway_url_1 or "http://127.0.0.1:3000/api/v1/send"
 
 class AdminNotifySettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -422,7 +422,7 @@ def extract_ads(html_bytes, base_url):
     return list(dict.fromkeys(ads))
 
 # ================= دالة إرسال الواتساب =================
-def send_whatsapp(req_session, token, to_msisdn, text, url="https://wats-enzn.onrender.com/api/v1/send", max_retries=3):
+def send_whatsapp(req_session, token, to_msisdn, text, url="http://127.0.0.1:3000/api/v1/send", max_retries=3):
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     
     logger.info(f"📤 محاولة إرسال واتساب إلى {to_msisdn} - نص الرسالة: {text[:50]}...")
@@ -580,7 +580,7 @@ def admin_resend_whatsapp():
     
     settings = SystemSettings.query.first()
     token = settings.active_whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
-    url = settings.active_whatsapp_url if settings else "https://wats-enzn.onrender.com/api/v1/send"
+    url = settings.active_whatsapp_url if settings else "http://127.0.0.1:3000/api/v1/send"
     
     success = send_whatsapp(create_session(), token, to_number, message_text, url=url)
     if success:
@@ -658,7 +658,7 @@ class MonitorThread(threading.Thread):
                                 db.session.commit()
                                 settings = SystemSettings.query.first()
                                 current_token = settings.active_whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
-                                current_url = settings.active_whatsapp_url if settings else "https://wats-enzn.onrender.com/api/v1/send"
+                                current_url = settings.active_whatsapp_url if settings else "http://127.0.0.1:3000/api/v1/send"
                                 exp_msg = f"🌸 مرحباً {user.username},\n\nنأمل أن تكون أيامك مليئة بالصيدات الموفقة! مع الأسف، اشتراكك في **راصد حراج** قد انتهى اليوم. 📅\n\nلكن لا تقلق، رادارك ما زال محفوظاً وجاهزاً للاستئناف فور تجديد الاشتراك. نحن هنا لخدمتك دائماً ونسعد بعودتك إلينا. 💙\n\nإذا كان لديك أي استفسار، تواصل معنا بكل حب.\n\nشكراً لثقتك، وإلى لقاء قريب بإذن الله 🌹"
                                 send_whatsapp(self.req_session, current_token, self.cfg['recipients'], exp_msg, url=current_url)
                             logger.info(f"الاشتراك {self.cfg['id']} غير نشط أو منتهي. إيقاف الخيط.")
@@ -681,7 +681,7 @@ class MonitorThread(threading.Thread):
                     
                     settings = SystemSettings.query.first()
                     current_token = settings.active_whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
-                    current_url = settings.active_whatsapp_url if settings else "https://wats-enzn.onrender.com/api/v1/send"
+                    current_url = settings.active_whatsapp_url if settings else "http://127.0.0.1:3000/api/v1/send"
                     
                     currently_quiet = is_quiet_now(self.cfg['quiet_enabled'], self.cfg['q_sh'], self.cfg['q_sm'], self.cfg['q_eh'], self.cfg['q_em'])
 
@@ -691,7 +691,7 @@ class MonitorThread(threading.Thread):
                         time.sleep(3)
                         for ad in self.queued_ads:
                             if self.stop_evt.is_set(): break
-                            msg = f"إعلان ({ad['kw']}):\n{ad['title']}\n{ad['url']}\n\n⚙️ تذكير لطيف: تقدر تتحكم بإعدادات الرصد ومتابعة أرشيف إعلاناتك بكل سهولة من هنا:\n🔗 https://haraj-saas.onrender.com"
+                            msg = f"إعلان ({ad['kw']}):\n{ad['title']}\n{ad['url']}\n\n⚙️ تذكير لطيف: تقدر تتحكم بإعدادات الرصد ومتابعة أرشيف إعلاناتك بكل سهولة من هنا:\n🔗 https://haraj-saas.duckdns.org"
                             send_whatsapp(self.req_session, current_token, self.cfg['recipients'], msg, url=current_url)
                             time.sleep(random.uniform(5, 10))
                         
@@ -736,7 +736,7 @@ class MonitorThread(threading.Thread):
                                             else:
                                                 delay = random.uniform(30, 60)
                                                 time.sleep(delay)
-                                                msg = f"إعلان جديد ({kw}):\n{title}\n{ad_url}\n\n⚙️ تذكير لطيف: تقدر تتحكم بإعدادات الرصد ومتابعة أرشيف إعلاناتك بكل سهولة من هنا:\n🔗 https://haraj-saas.onrender.com"
+                                                msg = f"إعلان جديد ({kw}):\n{title}\n{ad_url}\n\n⚙️ تذكير لطيف: تقدر تتحكم بإعدادات الرصد ومتابعة أرشيف إعلاناتك بكل سهولة من هنا:\n🔗 https://haraj-saas.duckdns.org"
                                                 send_whatsapp(self.req_session, current_token, self.cfg['recipients'], msg, url=current_url)
                                                 
                                             with app.app_context():
@@ -849,7 +849,7 @@ def register():
         
         settings = SystemSettings.query.first()
         current_token = settings.active_whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
-        current_url = settings.active_whatsapp_url if settings else "https://wats-enzn.onrender.com/api/v1/send"
+        current_url = settings.active_whatsapp_url if settings else "http://127.0.0.1:3000/api/v1/send"
         
         otp_msg = f"مرحباً بك في راصد حراج! 🎯\n\nكود التفعيل الخاص بك هو: *{otp}*\n\nيرجى إدخاله في الموقع لإكمال التسجيل."
         send_whatsapp(create_session(), current_token, phone, otp_msg, url=current_url)
@@ -885,7 +885,7 @@ def verify():
             notify = AdminNotifySettings.query.first()
             if notify and notify.admin_phone and new_user.role != 'admin':
                 admin_token = settings.active_whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
-                admin_url = settings.active_whatsapp_url if settings else "https://wats-enzn.onrender.com/api/v1/send"
+                admin_url = settings.active_whatsapp_url if settings else "http://127.0.0.1:3000/api/v1/send"
                 admin_msg = f"🔔 عميل جديد سجل بالمنصة!\n\n👤 الاسم: {new_user.username}\n📱 الجوال: {new_user.phone}"
                 send_whatsapp(create_session(), admin_token, notify.admin_phone, admin_msg, url=admin_url)
             
@@ -912,7 +912,7 @@ def forgot_password():
             
             settings = SystemSettings.query.first()
             current_token = settings.active_whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
-            current_url = settings.active_whatsapp_url if settings else "https://wats-enzn.onrender.com/api/v1/send"
+            current_url = settings.active_whatsapp_url if settings else "http://127.0.0.1:3000/api/v1/send"
             reset_msg = f"أهلاً بك 🛡️\n\nكود استعادة كلمة المرور لحسابك هو: *{otp}*"
             send_whatsapp(create_session(), current_token, phone, reset_msg, url=current_url)
             
@@ -928,7 +928,7 @@ def forgot_username():
         if user:
             settings = SystemSettings.query.first()
             current_token = settings.active_whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
-            current_url = settings.active_whatsapp_url if settings else "https://wats-enzn.onrender.com/api/v1/send"
+            current_url = settings.active_whatsapp_url if settings else "http://127.0.0.1:3000/api/v1/send"
             username_msg = f"أهلاً بك في راصد حراج 🛡️\n\nاسم المستخدم الخاص بك هو: *{user.username}*\n\nيمكنك الآن تسجيل الدخول بكل سهولة. إذا واجهت أي مشكلة، تواصل مع الدعم."
             if send_whatsapp(create_session(), current_token, phone, username_msg, url=current_url):
                 flash('تم إرسال اسم المستخدم إلى رقم جوالك المسجل.', 'success')
@@ -1019,7 +1019,7 @@ def user_dashboard():
         
         settings = SystemSettings.query.first()
         current_token = settings.active_whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
-        current_url = settings.active_whatsapp_url if settings else "https://wats-enzn.onrender.com/api/v1/send"
+        current_url = settings.active_whatsapp_url if settings else "http://127.0.0.1:3000/api/v1/send"
 
         if sub:
             # إذا كان الاشتراك منتهياً، نجبر الحالة على 'paused' بغض النظر عن القيمة المرسلة
@@ -1150,7 +1150,7 @@ def renew_subscription():
         # إرسال إشعار للإدارة
         settings = SystemSettings.query.first()
         token = settings.active_whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
-        url = settings.active_whatsapp_url if settings else "https://wats-enzn.onrender.com/api/v1/send"
+        url = settings.active_whatsapp_url if settings else "http://127.0.0.1:3000/api/v1/send"
         notify = AdminNotifySettings.query.first()
         if notify and notify.admin_phone:
             admin_msg = f"🔔 طلب تجديد جديد:\n👤 المستخدم: {current_user.username}\n📱 الجوال: {current_user.phone}\n📆 عدد الأسابيع: {weeks}\n💰 المبلغ: {amount} ريال\n📎 إثبات: {'مرفق' if proof_filename else 'غير مرفق'}"
@@ -1188,7 +1188,7 @@ def process_renewal(req_id, action):
     user = User.query.get(req.user_id)
     settings = SystemSettings.query.first()
     token = settings.active_whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
-    url = settings.active_whatsapp_url if settings else "https://wats-enzn.onrender.com/api/v1/send"
+    url = settings.active_whatsapp_url if settings else "http://127.0.0.1:3000/api/v1/send"
     
     if action == 'approve':
         # تحديث تاريخ انتهاء الاشتراك
@@ -1493,7 +1493,7 @@ def admin_settings():
         settings.active_gateway = request.form.get('active_gateway', '1')
         settings.gateway_1_name = request.form.get('gateway_1_name', 'البوابة الأولى')
         settings.gateway_2_name = request.form.get('gateway_2_name', 'البوابة الثانية')
-        settings.gateway_url_1 = request.form.get('gateway_url_1', 'https://wats-enzn.onrender.com/api/v1/send')
+        settings.gateway_url_1 = request.form.get('gateway_url_1', 'http://127.0.0.1:3000/api/v1/send')
         settings.gateway_url_2 = request.form.get('gateway_url_2', 'https://whatsapp.tkwin.com.sa/api/v1/send')
         settings.whatsapp_token_2 = request.form.get('whatsapp_token_2', '')
         
@@ -1544,7 +1544,7 @@ def admin_add_user():
 
         settings = SystemSettings.query.first()
         current_token = settings.active_whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
-        current_url = settings.active_whatsapp_url if settings else "https://wats-enzn.onrender.com/api/v1/send"
+        current_url = settings.active_whatsapp_url if settings else "http://127.0.0.1:3000/api/v1/send"
         exp_text = exp_date.strftime('%Y-%m-%d') if exp_date else "مفتوح"
         welcome_msg = f"مرحباً بك في راصد حراج! 🎯\nتم إنشاء حسابك وتفعيل الرادار بنجاح من قبل الإدارة.\n\nتاريخ الانتهاء: {exp_text}\n\nنتمنى لك صيدات موفقة! 🚀"
         send_whatsapp(create_session(), current_token, phone, welcome_msg, url=current_url)
@@ -1728,7 +1728,7 @@ try:
                     ("active_gateway", "VARCHAR(10) DEFAULT '1'"),
                     ("gateway_1_name", "VARCHAR(100) DEFAULT 'البوابة الأولى'"),
                     ("gateway_2_name", "VARCHAR(100) DEFAULT 'البوابة الثانية'"),
-                    ("gateway_url_1", "VARCHAR(255) DEFAULT 'https://wats-enzn.onrender.com/api/v1/send'"),
+                    ("gateway_url_1", "VARCHAR(255) DEFAULT 'http://127.0.0.1:3000/api/v1/send'"),
                     ("gateway_url_2", "VARCHAR(255) DEFAULT 'https://whatsapp.tkwin.com.sa/api/v1/send'"),
                     ("whatsapp_token_2", "VARCHAR(255) DEFAULT '7a203d6ba6f4325ed3261ea87f6b2e751250ad97'")
                 ]
@@ -1782,7 +1782,7 @@ Disallow: /delete_sub
 Disallow: /impersonate
 Disallow: /revert_impersonate
 
-Sitemap: https://haraj-saas.onrender.com/sitemap.xml
+Sitemap: https://haraj-saas.duckdns.org/sitemap.xml
 """
     return robots_content, 200, {'Content-Type': 'text/plain; charset=utf-8'}
 
@@ -1791,19 +1791,19 @@ def sitemap_xml():
     sitemap_content = """<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://haraj-saas.onrender.com/</loc>
+    <loc>https://haraj-saas.duckdns.org/</loc>
     <lastmod>2026-06-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://haraj-saas.onrender.com/login</loc>
+    <loc>https://haraj-saas.duckdns.org/login</loc>
     <lastmod>2026-06-03</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://haraj-saas.onrender.com/register</loc>
+    <loc>https://haraj-saas.duckdns.org/register</loc>
     <lastmod>2026-06-03</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>

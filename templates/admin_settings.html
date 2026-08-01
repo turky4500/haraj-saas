@@ -33,7 +33,7 @@
             </div>
             <div class="mb-3">
                 <label class="small text-muted fw-bold">رابط الإرسال (API URL)</label>
-                <input type="text" name="gateway_url_1" class="form-control" dir="ltr" value="{{ settings.gateway_url_1 if settings else 'https://wats-enzn.onrender.com/api/v1/send' }}" required>
+                <input type="text" name="gateway_url_1" class="form-control" dir="ltr" value="{{ settings.gateway_url_1 if settings else 'http://127.0.0.1:3000/api/v1/send' }}" required>
             </div>
             <div class="mb-0">
                 <label class="small text-muted fw-bold">التوكن (Token)</label>
