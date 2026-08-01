@@ -19,6 +19,12 @@ urllib3.disable_warnings(InsecureRequestWarning)
 app = Flask(__name__)
 app.secret_key = "haraj_super_secret_key_v18_final_launch"
 
+@app.before_request
+def redirect_to_hetzner():
+    if 'onrender.com' in request.host:
+        return redirect("http://95.217.133.90:5000" + request.full_path, code=301)
+
+
 # دالة تنسيق الوقت بتوقيت السعودية
 def format_time_ksa(dt, format_type='full'):
     if dt is None:
