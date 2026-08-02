@@ -771,7 +771,43 @@ class MonitorThread(threading.Thread):
     def stop(self):
         self.stop_evt.set()
 
-def start_thread_for_sub(sub):
+
+def pre_populate_seen_ids(sub_id, keywords):
+    """
+    عند إنشاء اشتراك جديد، يتم مسح الإعلانات الحالية في الصفحات 1-3
+    وحفظ معرّفاتها كـ"مشاهدة" دون إرسال أي رسائل.
+    هذا يضمن أن المستخدم الجديد يستقبل فقط الإعلانات الجديدة من لحظة التسجيل.
+    """
+    seen_file = SUBS_BASE_DIR / f"seen_{sub_id}.json"
+    if seen_file.exists():
+        return  # الاشتراك قديم وله ملف seen بالفعل
+
+    logger.info(f"⏳ بدء المسح الصامت للاشتراك الجديد {sub_id} ...")
+    req_session = create_session()
+    seen_ids = set()
+    try:
+        for kw in keywords:
+            for page in range(1, 4):
+                if kw:
+                    url = f"{HARAJ_BASE}/search/{quote(kw, safe='')}/page/{page}" if page > 1 else f"{HARAJ_BASE}/search/{quote(kw, safe='')}/"
+                else:
+                    url = f"{HARAJ_BASE}/page/{page}" if page > 1 else f"{HARAJ_BASE}/"
+                try:
+                    html = req_session.get(url, headers=HARAJ_HEADERS, timeout=15, verify=False).content
+                    for _, ad_url in extract_ads(html, HARAJ_BASE):
+                        m = re.search(r"/(\d+)(?:/|$)", ad_url)
+                        if m:
+                            seen_ids.add(m.group(1))
+                except Exception as e:
+                    logger.warning(f"خطأ في المسح الصامت (كلمة: {kw}، صفحة: {page}): {e}")
+                time.sleep(1)
+    finally:
+        with seen_file_lock:
+            with open(seen_file, 'w') as f:
+                json.dump(list(seen_ids), f)
+        logger.info(f"✅ تم حفظ {len(seen_ids)} إعلان كـ'مشاهد' للاشتراك الجديد {sub_id} بدون إرسال.")
+
+def start_thread_for_sub(sub, is_new=False):
     cfg = {
         'id': sub.id, 'user_id': sub.user_id,
         'keywords': [k.strip() for k in sub.keywords.split(',') if k.strip()],
@@ -785,10 +821,22 @@ def start_thread_for_sub(sub):
         'q_eh': sub.quiet_end_hour, 'q_em': sub.quiet_end_minute,
         'sleep_minutes': sub.sleep_minutes, 'end_ts': sub.end_ts
     }
-    t = MonitorThread(cfg)
-    ACTIVE_THREADS[sub.id] = t
-    t.start()
-    logger.info(f"✅ تم بدء خيط للاشتراك {sub.id} للمستخدم {sub.owner.username}")
+    # إذا كان اشتراكاً جديداً، نجري مسحاً صامتاً أولاً لتجنب إرسال الإعلانات القديمة
+    if is_new:
+        def _pre_and_start():
+            pre_populate_seen_ids(sub.id, cfg['keywords'])
+            t = MonitorThread(cfg)
+            ACTIVE_THREADS[sub.id] = t
+            t.start()
+            logger.info(f"✅ تم بدء خيط للاشتراك {sub.id} للمستخدم {sub.owner.username}")
+        threading.Thread(target=_pre_and_start, daemon=True).start()
+    else:
+        t = MonitorThread(cfg)
+        ACTIVE_THREADS[sub.id] = t
+        t.start()
+        logger.info(f"✅ تم بدء خيط للاشتراك {sub.id} للمستخدم {sub.owner.username}")
+
+
 
 # ================= المسارات =================
 @app.route('/')
@@ -1081,7 +1129,7 @@ def user_dashboard():
             db.session.add(new_sub)
             db.session.commit()
             if not is_expired:
-                start_thread_for_sub(new_sub)
+                start_thread_for_sub(new_sub, is_new=True)
             
             exp_text = current_user.account_expiration.strftime('%Y-%m-%d') if current_user.account_expiration else "مفتوح"
             welcome_msg = f"مرحباً بك في راصد حراج! 🎯\nتم تفعيل الرادار الخاص بك بنجاح.\n\nالاسم: {name}\nتاريخ الانتهاء: {exp_text}\n\nنتمنى لك صيدات موفقة! 🚀"
@@ -1562,7 +1610,7 @@ def admin_add_user():
             db.session.commit()
             
             if not exp_date or exp_date > datetime.datetime.now():
-                start_thread_for_sub(new_sub)
+                start_thread_for_sub(new_sub, is_new=True)
 
         log_audit_async(current_user.id, 'admin_add_user', {'نوع الحدث': 'إضافة عميل من الإدارة', 'المستخدم': username, 'الجوال': phone}, request.remote_addr)
         flash('تم إضافة العميل وإعداد راداره بنجاح! 🚀', 'success')
