@@ -807,34 +807,49 @@ def pre_populate_seen_ids(sub_id, keywords):
                 json.dump(list(seen_ids), f)
         logger.info(f"✅ تم حفظ {len(seen_ids)} إعلان كـ'مشاهد' للاشتراك الجديد {sub_id} بدون إرسال.")
 
+# قفل لمنع بدء خيطين للاشتراك نفسه في وقت واحد
+_thread_start_lock = threading.Lock()
+
 def start_thread_for_sub(sub, is_new=False):
-    cfg = {
-        'id': sub.id, 'user_id': sub.user_id,
-        'keywords': [k.strip() for k in sub.keywords.split(',') if k.strip()],
-        'recipients': sub.recipients.split(',')[0].strip(),
-        'cities': [c.strip() for c in sub.cities.split(',') if c.strip()],
-        'city_filter_enabled': sub.city_filter_enabled,
-        'excluded_words': [e.strip() for e in sub.excluded_words.split(',') if e.strip()],
-        'exclude_enabled': sub.exclude_enabled,
-        'quiet_enabled': sub.quiet_enabled,
-        'q_sh': sub.quiet_start_hour, 'q_sm': sub.quiet_start_minute,
-        'q_eh': sub.quiet_end_hour, 'q_em': sub.quiet_end_minute,
-        'sleep_minutes': sub.sleep_minutes, 'end_ts': sub.end_ts
-    }
-    # إذا كان اشتراكاً جديداً، نجري مسحاً صامتاً أولاً لتجنب إرسال الإعلانات القديمة
-    if is_new:
-        def _pre_and_start():
-            pre_populate_seen_ids(sub.id, cfg['keywords'])
+    with _thread_start_lock:
+        # ✅ منع التكرار: إذا كان الخيط موجوداً وحياً، لا تبدأ خيطاً جديداً
+        existing = ACTIVE_THREADS.get(sub.id)
+        if existing and existing.is_alive():
+            logger.info(f"⚠️ الاشتراك {sub.id} لديه خيط نشط بالفعل - تم تجاهل الطلب")
+            return
+
+        cfg = {
+            'id': sub.id, 'user_id': sub.user_id,
+            'keywords': [k.strip() for k in sub.keywords.split(',') if k.strip()],
+            'recipients': sub.recipients.split(',')[0].strip(),
+            'cities': [c.strip() for c in sub.cities.split(',') if c.strip()],
+            'city_filter_enabled': sub.city_filter_enabled,
+            'excluded_words': [e.strip() for e in sub.excluded_words.split(',') if e.strip()],
+            'exclude_enabled': sub.exclude_enabled,
+            'quiet_enabled': sub.quiet_enabled,
+            'q_sh': sub.quiet_start_hour, 'q_sm': sub.quiet_start_minute,
+            'q_eh': sub.quiet_end_hour, 'q_em': sub.quiet_end_minute,
+            'sleep_minutes': sub.sleep_minutes, 'end_ts': sub.end_ts
+        }
+
+        if is_new:
+            # ✅ ضع placeholder فوراً في ACTIVE_THREADS لمنع health monitor من بدء خيط ثانٍ أثناء pre-scan
+            placeholder = threading.Thread(target=lambda: None, daemon=True)
+            placeholder.start()
+            ACTIVE_THREADS[sub.id] = placeholder
+
+            def _pre_and_start():
+                pre_populate_seen_ids(sub.id, cfg['keywords'])
+                t = MonitorThread(cfg)
+                ACTIVE_THREADS[sub.id] = t
+                t.start()
+                logger.info(f"✅ تم بدء خيط للاشتراك {sub.id} للمستخدم {sub.owner.username}")
+            threading.Thread(target=_pre_and_start, daemon=True).start()
+        else:
             t = MonitorThread(cfg)
             ACTIVE_THREADS[sub.id] = t
             t.start()
             logger.info(f"✅ تم بدء خيط للاشتراك {sub.id} للمستخدم {sub.owner.username}")
-        threading.Thread(target=_pre_and_start, daemon=True).start()
-    else:
-        t = MonitorThread(cfg)
-        ACTIVE_THREADS[sub.id] = t
-        t.start()
-        logger.info(f"✅ تم بدء خيط للاشتراك {sub.id} للمستخدم {sub.owner.username}")
 
 
 
@@ -1860,9 +1875,7 @@ def sitemap_xml():
     return sitemap_content, 200, {'Content-Type': 'application/xml; charset=utf-8'}
 
 if __name__ == '__main__':
-    with app.app_context():
-        for sub in Subscription.query.filter_by(status='active').all():
-            if sub.owner.is_active_account and (not sub.owner.account_expiration or sub.owner.account_expiration > datetime.datetime.now()):
-                start_thread_for_sub(sub)
+    # ملاحظة: بدء الخيوط يحدث تلقائياً عند تهيئة التطبيق أعلاه (سطر 1808)
+    # لا نكررها هنا تجنباً للتكرار
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
