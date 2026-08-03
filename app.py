@@ -269,6 +269,7 @@ class SystemSettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     whatsapp_token = db.Column(db.String(255), default="sau11zbtz1ruma8o2k5tt")
     trial_days = db.Column(db.Integer, default=2)
+    referral_reward_days = db.Column(db.Integer, default=7) # أيام مكافأة الدعوة
     # إعدادات الدفع البنكي
     bank_account_number = db.Column(db.String(50), default="")
     bank_account_name = db.Column(db.String(100), default="")
@@ -308,6 +309,13 @@ class User(UserMixin, db.Model):
     role = db.Column(db.String(20), default='user')
     is_active_account = db.Column(db.Boolean, default=True)
     account_expiration = db.Column(db.DateTime, nullable=True)
+    
+    # نظام الدعوات والأيام المجانية (Referral System)
+    referral_code = db.Column(db.String(20), unique=True, nullable=True)
+    referred_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    referral_rewarded = db.Column(db.Boolean, default=False)
+    referred_by = db.relationship('User', remote_side=[id], backref='referrals', foreign_keys=[referred_by_id])
+
     subscription = db.relationship('Subscription', backref='owner', uselist=False, lazy=True)
     logs = db.relationship('AdLog', backref='owner', lazy=True)
     renewal_requests = db.relationship('RenewalRequest', backref='owner', lazy=True)
@@ -853,6 +861,57 @@ def start_thread_for_sub(sub, is_new=False):
 
 
 
+# ================= دوال نظام الإحالات والجوائز =================
+def generate_referral_code(username):
+    """توليد كود دعوة فريد للمستخدم"""
+    clean_name = re.sub(r'[^A-Za-z0-9]', '', username).upper()
+    if len(clean_name) < 3:
+        clean_name = "USER"
+    prefix = clean_name[:4]
+    for _ in range(50):
+        rand_num = random.randint(1000, 9999)
+        code = f"{prefix}{rand_num}"
+        if not User.query.filter_by(referral_code=code).first():
+            return code
+    return f"REF{random.randint(100000, 999999)}"
+
+def apply_referral_reward_if_eligible(user):
+    """منح الداعي أيامه المجانية إذا قام العميل الجديد بالتفعيل/السداد"""
+    try:
+        if not user or not user.referred_by_id or user.referral_rewarded:
+            return False
+        
+        referrer = User.query.get(user.referred_by_id)
+        if not referrer:
+            return False
+            
+        settings = SystemSettings.query.first()
+        reward_days = settings.referral_reward_days if (settings and settings.referral_reward_days) else 7
+        if reward_days <= 0:
+            return False
+
+        now = datetime.datetime.now()
+        current_exp = referrer.account_expiration if (referrer.account_expiration and referrer.account_expiration > now) else now
+        referrer.account_expiration = current_exp + datetime.timedelta(days=reward_days)
+        user.referral_rewarded = True
+        db.session.commit()
+        
+        # إرسال رسالة واتساب للداعي بمكافأة الدعوة
+        try:
+            current_token = settings.active_whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
+            current_url = settings.active_whatsapp_url if settings else "http://127.0.0.1:3000/api/v1/send"
+            exp_date_str = referrer.account_expiration.strftime('%Y-%m-%d')
+            msg = f"🎁 مبروك {referrer.username}!\n\nقام أحد أصدقائك المنضمين عن طريق رابطك بتفعيل اشتراكه 🚀\n\nتم تمديد اشتراكك بـ *{reward_days} أيام مجانية* لحسابك هديّةً منا! 💙\n📅 تاريخ انتهاء اشتراكك الجديد: {exp_date_str}"
+            send_whatsapp(create_session(), current_token, referrer.phone, msg, url=current_url)
+        except Exception as e:
+            logger.error(f"خطأ إرسال رسالة مكافأة الإحالة: {e}")
+            
+        logger.info(f"✅ تم منح {reward_days} يوماً مجانياً للمستخدم {referrer.username} بسبب إحالة العميل {user.username}")
+        return True
+    except Exception as err:
+        logger.error(f"خطأ في تطبيق مكافأة الإحالة: {err}")
+        return False
+
 # ================= المسارات =================
 @app.route('/')
 def index():
@@ -890,10 +949,18 @@ def login():
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    # التقاط كود الدعوة من رابط الصفحة أو النموذج
+    ref_code = request.args.get('ref') or request.form.get('referral_code')
+    if ref_code:
+        session['ref_code'] = ref_code.strip()
+
     if request.method == 'POST':
         username = request.form.get('username')
         phone = request.form.get('phone')
         password = request.form.get('password')
+        form_ref = request.form.get('referral_code', '').strip()
+        if form_ref:
+            session['ref_code'] = form_ref
         
         existing_user = User.query.filter(
             (User.username == username) | (User.phone == phone)
@@ -918,7 +985,9 @@ def register():
         send_whatsapp(create_session(), current_token, phone, otp_msg, url=current_url)
         
         return redirect(url_for('verify'))
-    return render_template('register.html')
+    
+    current_ref = session.get('ref_code') or request.args.get('ref', '')
+    return render_template('register.html', ref_code=current_ref)
 
 @app.route('/verify', methods=['GET', 'POST'])
 def verify():
@@ -931,6 +1000,16 @@ def verify():
                 password=temp['password']
             )
             
+            # توليد كود دعوة فريد للمستخدم الجديد
+            new_user.referral_code = generate_referral_code(new_user.username)
+
+            # فحص إذا تم التسجيل عبر كود دعوة مستخدم آخر
+            ref_code = session.get('ref_code')
+            if ref_code:
+                referrer = User.query.filter_by(referral_code=ref_code).first()
+                if referrer:
+                    new_user.referred_by_id = referrer.id
+
             settings = SystemSettings.query.first()
             trial_days = settings.trial_days if settings else 2
 
@@ -945,16 +1024,20 @@ def verify():
             
             update_daily_stat('registrations')
             
+            # إشعار الأدمن بالعميل الجديد (تنسيق ثابت دون تغيّر)
             notify = AdminNotifySettings.query.first()
             if notify and notify.admin_phone and new_user.role != 'admin':
                 admin_token = settings.active_whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
                 admin_url = settings.active_whatsapp_url if settings else "http://127.0.0.1:3000/api/v1/send"
                 admin_msg = f"🔔 عميل جديد سجل بالمنصة!\n\n👤 الاسم: {new_user.username}\n📱 الجوال: {new_user.phone}"
+                if ref_code:
+                    admin_msg += f"\n🎁 كود الدعوة: {ref_code}"
                 send_whatsapp(create_session(), admin_token, notify.admin_phone, admin_msg, url=admin_url)
             
             login_user(new_user)
             session.pop('temp_user', None)
             session.pop('otp', None)
+            session.pop('ref_code', None)
             
             log_audit_async(new_user.id, 'register', {'نوع الحدث': 'تسجيل جديد', 'المستخدم': new_user.username, 'الجوال': new_user.phone}, request.remote_addr)
             flash('تم التسجيل والدخول بنجاح! مرحباً بك 🚀', 'success')
@@ -1156,7 +1239,22 @@ def user_dashboard():
             
         return redirect(url_for('user_dashboard'))
         
-    return render_template('user.html', sub=sub, logs=logs, is_expired=is_expired)
+    # توليد كود الدعوة للمستخدم إذا لم يكن موجوداً
+    if not current_user.referral_code:
+        current_user.referral_code = generate_referral_code(current_user.username)
+        db.session.commit()
+
+    total_referrals = User.query.filter_by(referred_by_id=current_user.id).count()
+    successful_referrals = User.query.filter_by(referred_by_id=current_user.id, referral_rewarded=True).count()
+    settings_obj = SystemSettings.query.first()
+    reward_days_setting = settings_obj.referral_reward_days if (settings_obj and settings_obj.referral_reward_days) else 7
+    total_earned_days = successful_referrals * reward_days_setting
+
+    return render_template('user.html', sub=sub, logs=logs, is_expired=is_expired,
+                           total_referrals=total_referrals,
+                           successful_referrals=successful_referrals,
+                           total_earned_days=total_earned_days,
+                           reward_days_setting=reward_days_setting)
 
 # ================= مسار تجديد الاشتراك =================
 @app.route('/renew_subscription', methods=['GET', 'POST'])
@@ -1265,6 +1363,9 @@ def process_renewal(req_id, action):
         req.status = 'approved'
         req.processed_at = datetime.datetime.utcnow()
         db.session.commit()
+
+        # تطبيق مكافأة الإحالة إذا كان العميل مدعواً من قبل مستخدم آخر ولم تكافأ إحالته بعد
+        apply_referral_reward_if_eligible(user)
         
         # إذا كان الاشتراك موجوداً وموقوفاً، نعيد تشغيله
         if user.subscription:
@@ -1546,6 +1647,7 @@ def admin_settings():
     if request.method == 'POST':
         settings.whatsapp_token = request.form.get('whatsapp_token')
         settings.trial_days = int(request.form.get('trial_days', 2))
+        settings.referral_reward_days = int(request.form.get('referral_reward_days', 7))
         # إعدادات البنك
         settings.bank_account_number = request.form.get('bank_account_number', '')
         settings.bank_account_name = request.form.get('bank_account_name', '')
@@ -1793,7 +1895,8 @@ try:
                     ("gateway_2_name", "VARCHAR(100) DEFAULT 'البوابة الثانية'"),
                     ("gateway_url_1", "VARCHAR(255) DEFAULT 'http://127.0.0.1:3000/api/v1/send'"),
                     ("gateway_url_2", "VARCHAR(255) DEFAULT 'https://whatsapp.tkwin.com.sa/api/v1/send'"),
-                    ("whatsapp_token_2", "VARCHAR(255) DEFAULT '7a203d6ba6f4325ed3261ea87f6b2e751250ad97'")
+                    ("whatsapp_token_2", "VARCHAR(255) DEFAULT '7a203d6ba6f4325ed3261ea87f6b2e751250ad97'"),
+                    ("referral_reward_days", "INTEGER DEFAULT 7")
                 ]
                 
                 for col_name, col_type in columns_to_add:
@@ -1805,6 +1908,23 @@ try:
                         except Exception as alter_err:
                             db.session.rollback()
                             logger.error(f"❌ تعذر إضافة العمود {col_name}: {alter_err}")
+
+            if 'user' in inspector.get_table_names():
+                user_existing_columns = {col['name'] for col in inspector.get_columns('user')}
+                user_cols_to_add = [
+                    ("referral_code", "VARCHAR(20) UNIQUE"),
+                    ("referred_by_id", "INTEGER REFERENCES \"user\"(id)"),
+                    ("referral_rewarded", "BOOLEAN DEFAULT FALSE")
+                ]
+                for col_name, col_type in user_cols_to_add:
+                    if col_name not in user_existing_columns:
+                        try:
+                            db.session.execute(db.text(f"ALTER TABLE \"user\" ADD COLUMN {col_name} {col_type}"))
+                            db.session.commit()
+                            logger.info(f"✅ تم إضافة العمود {col_name} إلى جدول المستخدمين بنجاح.")
+                        except Exception as alter_err:
+                            db.session.rollback()
+                            logger.error(f"❌ تعذر إضافة العمود {col_name} إلى جدول المستخدمين: {alter_err}")
         except Exception as e:
             logger.error(f"❌ خطأ أثناء الترحيل: {e}")
 

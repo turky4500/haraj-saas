@@ -54,6 +54,16 @@
                         {% if user.role == 'admin' %}
                             <span class="badge bg-warning text-dark d-inline-block me-1">مدير</span>
                         {% endif %}
+                        {% if user.referral_code %}
+                            <div style="font-size: 11px;" class="text-success mt-1">
+                                <i class="fas fa-gift ms-1"></i> كود الدعوة: <code class="bg-light px-1 rounded">{{ user.referral_code }}</code>
+                            </div>
+                        {% endif %}
+                        {% if user.referred_by %}
+                            <div style="font-size: 11px;" class="text-muted">
+                                <i class="fas fa-user-friends ms-1"></i> دُعيَ بواسطة: {{ user.referred_by.username }}
+                            </div>
+                        {% endif %}
                     </td>
                     <td dir="ltr">{{ user.phone }}</td>
                     <td>

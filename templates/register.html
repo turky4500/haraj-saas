@@ -176,9 +176,14 @@
                 <label class="form-label fw-bold small text-muted">رقم الواتساب (للاستلام)</label>
                 <input type="text" name="phone" class="form-control" required placeholder="9665xxxxxxxx" dir="ltr">
             </div>
-            <div class="mb-4">
+            <div class="mb-3">
                 <label class="form-label fw-bold small text-muted">كلمة المرور</label>
                 <input type="password" name="password" class="form-control" required placeholder="اختر كلمة مرور قوية">
+            </div>
+            <div class="mb-4">
+                <label class="form-label fw-bold small text-muted"><i class="fas fa-gift text-warning ms-1"></i> كود الدعوة (اختياري)</label>
+                <input type="text" name="referral_code" class="form-control text-uppercase" placeholder="مثال: TURK1234" value="{{ ref_code or '' }}" dir="ltr">
+                <small class="text-muted" style="font-size: 11px;">إذا دُعيت من قِبل صديق، أدخل كوده لتحصلوا على مكافآت مجانية.</small>
             </div>
             <button type="submit" class="btn-register mb-3">
                 <i class="fas fa-paper-plane ms-2"></i> إرسال كود التحقق

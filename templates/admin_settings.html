@@ -58,11 +58,18 @@
             </div>
         </div>
 
-        <!-- أيام التجربة -->
-        <div class="mb-4">
-            <label class="form-label fw-bold"><i class="fas fa-gift text-warning ms-1"></i> أيام التجربة المجانية</label>
-            <input type="number" name="trial_days" class="form-control text-center" value="{{ settings.trial_days if settings else 2 }}" min="0" required>
-            <small class="text-muted">عدد أيام التجربة للعميل الجديد.</small>
+        <!-- أيام التجربة وأيام مكافأة الدعوة -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-6">
+                <label class="form-label fw-bold"><i class="fas fa-gift text-warning ms-1"></i> أيام التجربة المجانية</label>
+                <input type="number" name="trial_days" class="form-control text-center" value="{{ settings.trial_days if settings else 2 }}" min="0" required>
+                <small class="text-muted">عدد أيام التجربة للعميل الجديد.</small>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-bold"><i class="fas fa-user-plus text-success ms-1"></i> أيام مكافأة كود الدعوة</label>
+                <input type="number" name="referral_reward_days" class="form-control text-center" value="{{ settings.referral_reward_days if settings else 7 }}" min="0" required>
+                <small class="text-muted">عدد الأيام المجانية الممنوحة لمُصمّم الدعوة عند تفعيل العميل الجُديد.</small>
+            </div>
         </div>
 
         <!-- إعدادات الدفع البنكي -->

@@ -299,6 +299,58 @@
             {% endif %}
         {% endwith %}
 
+        <!-- كارد نظام الإحالة والجوائز المجانية -->
+        <div class="glass-card mb-4 p-4" style="background: linear-gradient(135deg, rgba(26,188,156,0.1) 0%, rgba(52,152,219,0.1) 100%); border: 1px solid rgba(26,188,156,0.3); border-radius: 20px;">
+            <div class="row align-items-center">
+                <div class="col-md-7 mb-3 mb-md-0">
+                    <h5 class="fw-bold mb-2 text-dark d-flex align-items-center">
+                        <i class="fas fa-gift text-warning me-2 fa-lg"></i>
+                        ادعُ أصدقاءك واكسب أياماً مجانية! 🎁
+                    </h5>
+                    <p class="text-muted small mb-3">
+                        لكل صديق يسجل بكود دعوتك ويفعل اشتراكه، ستحصل تلقائياً على 
+                        <strong class="text-success">{{ reward_days_setting }} أيام مجانية</strong> تُضاف إلى حسابك!
+                    </p>
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <div class="bg-white px-3 py-2 rounded-pill shadow-sm border border-success fw-bold text-success font-monospace fs-5">
+                            {{ current_user.referral_code or '—' }}
+                        </div>
+                        <button type="button" class="btn btn-primary-custom rounded-pill px-3 py-2 btn-sm fw-bold" onclick="copyReferralLink()">
+                            <i class="fas fa-copy ms-1"></i> نسخ رابط الدعوة
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-5">
+                    <div class="row text-center g-2">
+                        <div class="col-6">
+                            <div class="bg-white p-3 rounded-4 shadow-sm border">
+                                <div class="text-muted small fw-bold mb-1">المُنضمين عن طريقك</div>
+                                <div class="fs-4 fw-bold text-primary">{{ total_referrals }}</div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="bg-white p-3 rounded-4 shadow-sm border">
+                                <div class="text-muted small fw-bold mb-1">الأيام المجانية الكسبانة</div>
+                                <div class="fs-4 fw-bold text-success">+{{ total_earned_days }} يوم</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            function copyReferralLink() {
+                const code = "{{ current_user.referral_code }}";
+                const refLink = window.location.origin + "/register?ref=" + code;
+                navigator.clipboard.writeText(refLink).then(() => {
+                    alert("✅ تم نسخ رابط الدعوة الخاص بك بنجاح:\n" + refLink);
+                }).catch(err => {
+                    prompt("انسخ رابط الدعوة الخاص بك:", refLink);
+                });
+            }
+        </script>
+
         <div class="row g-4">
             <!-- العمود الأيمن: إعدادات الرصد -->
             <div class="col-lg-5">
