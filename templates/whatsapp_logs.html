@@ -14,46 +14,51 @@
 
     {% if logs %}
         {% for log in logs %}
-        <div class="log-entry mb-3 p-3 border rounded">
-            <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="log-entry mb-3 p-3 border rounded shadow-sm bg-white" style="word-break: break-word; overflow-wrap: anywhere;">
+            <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
                 <div>
-                    <strong dir="ltr">{{ log.to }}</strong>
+                    <strong dir="ltr" class="fs-6">{{ log.to }}</strong>
                     {% if log.success %}
-                        <span class="badge bg-success me-2">نجاح</span>
+                        <span class="badge bg-success me-2 fs-6">نجاح</span>
                     {% else %}
-                        <span class="badge bg-danger me-2">فشل</span>
+                        <span class="badge bg-danger me-2 fs-6">فشل</span>
                     {% endif %}
                 </div>
                 <small class="text-muted" dir="ltr">{{ log.timestamp }}</small>
             </div>
-            {% if log.message_preview %}
-            <div class="mb-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <div style="flex: 1; min-width: 200px;">
-                    <small class="text-muted">الرسالة: {{ log.message_text if log.message_text else log.message_preview }}</small>
+
+            {% if log.message_preview or log.message_text %}
+            <div class="mb-3 p-2.5 bg-light rounded border">
+                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                    <div style="flex: 1; min-width: 240px; word-break: break-word; overflow-wrap: anywhere;">
+                        <small class="text-secondary fw-bold d-block mb-1">نص الرسالة:</small>
+                        <div class="text-dark small" style="white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere;">{{ (log.message_text if log.message_text else log.message_preview) | unquote_url }}</div>
+                    </div>
+                    <form action="{{ url_for('admin_resend_whatsapp') }}" method="POST" class="ms-auto">
+                        <input type="hidden" name="to" value="{{ log.to }}">
+                        <input type="hidden" name="message" value="{{ log.message_text if log.message_text else log.message_preview }}">
+                        <button type="submit" class="btn btn-success btn-sm py-1 px-3 fw-bold rounded-3 text-nowrap shadow-sm">
+                            <i class="fas fa-paper-plane ms-1"></i> إعادة إرسال
+                        </button>
+                    </form>
                 </div>
-                <form action="{{ url_for('admin_resend_whatsapp') }}" method="POST" class="d-inline">
-                    <input type="hidden" name="to" value="{{ log.to }}">
-                    <input type="hidden" name="message" value="{{ log.message_text if log.message_text else log.message_preview }}">
-                    <button type="submit" class="btn btn-success btn-sm py-1 px-3" style="border-radius: 8px; font-weight: 600;">
-                        <i class="fas fa-paper-plane ms-1"></i> إعادة إرسال
-                    </button>
-                </form>
             </div>
             {% endif %}
-            <div class="response-json bg-light p-2 rounded" style="font-family: monospace; font-size: 0.8rem; max-height: 150px; overflow-y: auto; direction: ltr; text-align: left;">
-                <strong>رد المزود:</strong><br>
+
+            <div class="response-json p-2 rounded border" style="background-color: #f8fafc; font-family: monospace; font-size: 0.82rem; max-height: 200px; overflow-y: auto; direction: ltr; text-align: left;">
+                <strong class="text-secondary d-block mb-1" dir="rtl" style="text-align: right;">رد المزود:</strong>
                 {% if log.response %}
                     {% if log.response.json %}
-                        <pre style="margin:0; white-space: pre-wrap;">{{ log.response.json | tojson(indent=2) if log.response.json is not none else 'null' }}</pre>
+                        <pre class="m-0 text-dark" style="white-space: pre-wrap; word-break: break-word;">{{ log.response.json | pretty_json }}</pre>
                     {% elif log.response.text %}
-                        {{ log.response.text }}
+                        <div class="text-dark" style="white-space: pre-wrap; word-break: break-word;">{{ log.response.text | unquote_url }}</div>
                     {% elif log.response.error %}
-                        خطأ: {{ log.response.error }}
+                        <div class="text-danger">خطأ: {{ log.response.error }}</div>
                     {% else %}
-                        {{ log.response }}
+                        <div class="text-dark" style="white-space: pre-wrap; word-break: break-word;">{{ log.response | pretty_json }}</div>
                     {% endif %}
                 {% else %}
-                    لا يوجد رد
+                    <span class="text-muted">لا يوجد رد</span>
                 {% endif %}
             </div>
         </div>

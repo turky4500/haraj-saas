@@ -97,6 +97,26 @@ ACTIVE_THREADS = {}
 seen_file_lock = threading.Lock()
 audit_log_lock = threading.Lock()  # قفل لسجل التدقيق
 
+@app.template_filter('pretty_json')
+def pretty_json_filter(val):
+    if val is None:
+        return 'null'
+    try:
+        if isinstance(val, str):
+            val = json.loads(val)
+        return json.dumps(val, ensure_ascii=False, indent=2)
+    except Exception:
+        return str(val)
+
+@app.template_filter('unquote_url')
+def unquote_url_filter(val):
+    if not val or not isinstance(val, str):
+        return val
+    try:
+        return urllib.parse.unquote(val)
+    except Exception:
+        return val
+
 def get_ksa_time():
     return datetime.datetime.utcnow() + datetime.timedelta(hours=3)
 
