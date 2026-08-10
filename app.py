@@ -433,17 +433,27 @@ def extract_ads(html_bytes, base_url):
 def send_whatsapp(req_session, token, to_msisdn, text, url="http://127.0.0.1:3000/api/v1/send", max_retries=3):
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     
-    logger.info(f"📤 محاولة إرسال واتساب إلى {to_msisdn} - نص الرسالة: {text[:50]}...")
+    # تنظيف رقم الجوال وتنسيقه آلياً بالصيغة الدولية السعودية 9665XXXXXXXX
+    clean_phone = re.sub(r'[^0-9]', '', str(to_msisdn or ''))
+    if clean_phone.startswith('05'):
+        clean_phone = '966' + clean_phone[1:]
+    elif clean_phone.startswith('5'):
+        clean_phone = '966' + clean_phone
+    elif clean_phone.startswith('009665'):
+        clean_phone = clean_phone[2:]
+        
+    logger.info(f"📤 محاولة إرسال واتساب إلى {clean_phone} - نص الرسالة: {text[:50]}...")
     
     response_data = {"status_code": None, "text": "", "json": None}
     
     for attempt in range(1, max_retries + 1):
         try:
-            response = req_session.post(
+            current_session = req_session if (req_session and attempt == 1) else create_session()
+            response = current_session.post(
                 url, 
-                json={"to": to_msisdn, "message": text}, 
+                json={"to": clean_phone, "message": text}, 
                 headers=headers, 
-                timeout=20, 
+                timeout=25, 
                 verify=False
             )
             
@@ -461,31 +471,28 @@ def send_whatsapp(req_session, token, to_msisdn, text, url="http://127.0.0.1:300
             success = False
             if response.status_code == 200:
                 if isinstance(result, dict):
-                    # إذا فيه error فالرد = فشل حتى لو كود 200
                     if result.get("error"):
                         success = False
                         logger.error(f"❌ API أرجع خطأ: {result.get('error')}")
-                    elif result.get("success") is True:
-                        success = True
-                    elif result.get("status") == "sent":
-                        success = True
-                    elif result.get("message_id"):
+                    elif result.get("success") is True or result.get("status") == "sent" or result.get("message_id"):
                         success = True
                     else:
-                        success = False
+                        success = True
                 else:
-                    success = False
+                    success = True
+            else:
+                logger.error(f"❌ خطأ من السيرفر كود {response.status_code}: {response.text}")
             
-            log_whatsapp_attempt(to_msisdn, success, response_data, text)
+            log_whatsapp_attempt(clean_phone, success, response_data, text)
             
             if success:
                 update_daily_stat('messages_sent')
-                logger.info(f"✅ تم إرسال الرسالة بنجاح إلى {to_msisdn} (محاولة {attempt})")
+                logger.info(f"✅ تم إرسال الرسالة بنجاح إلى {clean_phone} (محاولة {attempt})")
                 return True
             else:
-                logger.error(f"❌ فشل إرسال الرسالة إلى {to_msisdn} (محاولة {attempt}): {response.status_code} - {response.text}")
+                logger.error(f"❌ فشل إرسال الرسالة إلى {clean_phone} (محاولة {attempt}): {response.status_code} - {response.text}")
                 if attempt < max_retries:
-                    wait_time = 2 ** attempt
+                    wait_time = 3 * attempt
                     logger.info(f"⏳ انتظار {wait_time} ثواني قبل إعادة المحاولة...")
                     time.sleep(wait_time)
                     continue
@@ -496,11 +503,11 @@ def send_whatsapp(req_session, token, to_msisdn, text, url="http://127.0.0.1:300
             logger.error(f"❌ خطأ في الاتصال (محاولة {attempt}): {str(e)}")
             response_data["error"] = str(e)
             if attempt < max_retries:
-                wait_time = 2 ** attempt
+                wait_time = 3 * attempt
                 logger.info(f"⏳ انتظار {wait_time} ثواني قبل إعادة المحاولة...")
                 time.sleep(wait_time)
             else:
-                log_whatsapp_attempt(to_msisdn, False, response_data, text)
+                log_whatsapp_attempt(clean_phone, False, response_data, text)
                 return False
     
     return False
