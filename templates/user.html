@@ -237,13 +237,21 @@
             border-color: #1abc9c;
         }
 
-        /* ===== Mobile Responsive Optimization ===== */
+        /* ===== Ultra Mobile Responsive Optimization ===== */
+        html, body {
+            overflow-x: hidden !important;
+            width: 100%;
+        }
         @media (max-width: 768px) {
+            .container {
+                padding-left: 12px !important;
+                padding-right: 12px !important;
+            }
             .navbar-custom {
-                padding: 0.6rem 0.8rem;
+                padding: 0.6rem 0.5rem;
             }
             .navbar-brand {
-                font-size: 1.2rem !important;
+                font-size: 1.15rem !important;
             }
             .nav-actions {
                 flex-wrap: wrap;
@@ -251,14 +259,15 @@
                 justify-content: flex-end;
             }
             .nav-actions .btn {
-                padding: 0.25rem 0.6rem !important;
+                padding: 0.25rem 0.5rem !important;
                 font-size: 11px !important;
                 border-radius: 20px !important;
             }
             .glass-card {
-                padding: 1.2rem !important;
+                padding: 1.1rem !important;
                 border-radius: 14px !important;
                 margin-bottom: 1rem !important;
+                overflow-x: hidden !important;
             }
             .form-control, select, textarea {
                 font-size: 16px !important; /* Prevents iOS Safari auto-zoom */
@@ -266,9 +275,31 @@
             .section-title {
                 font-size: 1.05rem !important;
             }
+            .table-responsive {
+                width: 100% !important;
+                overflow-x: auto !important;
+                -webkit-overflow-scrolling: touch;
+            }
             .table-custom th, .table-custom td {
-                padding: 0.7rem 0.5rem !important;
+                padding: 0.6rem 0.4rem !important;
                 font-size: 12px !important;
+                white-space: normal !important;
+            }
+            .input-group {
+                flex-direction: column !important;
+            }
+            .input-group .form-control {
+                border-radius: 12px !important;
+                width: 100% !important;
+                margin-bottom: 6px !important;
+            }
+            .input-group .btn {
+                width: 100% !important;
+                border-radius: 12px !important;
+            }
+            .ref-copy-btn {
+                width: 100% !important;
+                justify-content: center !important;
             }
         }
     </style>
