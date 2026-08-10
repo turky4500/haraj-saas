@@ -236,32 +236,69 @@
             color: #a7f3d0;
             border-color: #1abc9c;
         }
+
+        /* ===== Mobile Responsive Optimization ===== */
+        @media (max-width: 768px) {
+            .navbar-custom {
+                padding: 0.6rem 0.8rem;
+            }
+            .navbar-brand {
+                font-size: 1.2rem !important;
+            }
+            .nav-actions {
+                flex-wrap: wrap;
+                gap: 4px !important;
+                justify-content: flex-end;
+            }
+            .nav-actions .btn {
+                padding: 0.25rem 0.6rem !important;
+                font-size: 11px !important;
+                border-radius: 20px !important;
+            }
+            .glass-card {
+                padding: 1.2rem !important;
+                border-radius: 14px !important;
+                margin-bottom: 1rem !important;
+            }
+            .form-control, select, textarea {
+                font-size: 16px !important; /* Prevents iOS Safari auto-zoom */
+            }
+            .section-title {
+                font-size: 1.05rem !important;
+            }
+            .table-custom th, .table-custom td {
+                padding: 0.7rem 0.5rem !important;
+                font-size: 12px !important;
+            }
+        }
     </style>
 </head>
 <body>
     <!-- شريط التنقل -->
-    <nav class="navbar navbar-custom mb-4">
-        <div class="container d-flex align-items-center">
-            <button id="darkModeToggle" class="btn btn-outline-light me-3" style="border-radius: 30px;">
-                <i class="fas fa-moon"></i>
-            </button>
-            <a class="navbar-brand" href="#">
-                <i class="fas fa-satellite-dish"></i> راصد حراج
-            </a>
-            <div class="ms-auto d-flex align-items-center gap-2">
+    <nav class="navbar navbar-custom mb-3 sticky-top">
+        <div class="container d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center">
+                <a class="navbar-brand me-2" href="/user_dashboard">
+                    <i class="fas fa-satellite-dish"></i> راصد حراج
+                </a>
+                <button id="darkModeToggle" class="btn btn-outline-light btn-sm rounded-circle p-1 px-2 me-2" title="النمط الليلي">
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+            <div class="nav-actions d-flex align-items-center gap-1">
                 {% if session.get('admin_impersonating') %}
                     <a href="/revert_impersonate" class="btn btn-warning btn-sm fw-bold">
-                        <i class="fas fa-crown"></i> عودة للإدارة
+                        <i class="fas fa-crown"></i> الإدارة
                     </a>
                 {% endif %}
                 <a href="/renew_subscription" class="btn btn-outline-success btn-sm">
-                    <i class="fas fa-sync-alt"></i> تجديد الاشتراك
+                    <i class="fas fa-sync-alt"></i> تجديد
                 </a>
                 <a href="/user_profile" class="btn btn-outline-light btn-sm">
-                    <i class="fas fa-user-cog"></i> حسابي
+                    <i class="fas fa-user"></i> حسابي
                 </a>
                 <a href="/logout" class="btn btn-outline-danger btn-sm">
-                    <i class="fas fa-sign-out-alt"></i> خروج
+                    <i class="fas fa-sign-out-alt"></i>
                 </a>
             </div>
         </div>

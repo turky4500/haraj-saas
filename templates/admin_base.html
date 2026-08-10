@@ -197,10 +197,28 @@
             margin-bottom: 1.5rem;
             display: inline-block;
         }
-        /* في وضع الجوال، يختفي الهامش الجانبي */
+        /* في وضع الجوال، يختفي الهامش الجانبي وتتحسن الرؤية */
         @media (max-width: 768px) {
             .main-content {
                 margin-right: 0 !important;
+                padding: 1rem 0.8rem !important;
+            }
+            .glass-card {
+                padding: 1.1rem !important;
+                border-radius: 12px !important;
+            }
+            .stat-card {
+                padding: 1rem !important;
+                border-radius: 12px !important;
+            }
+            .stat-value {
+                font-size: 1.4rem !important;
+            }
+            .stat-icon {
+                font-size: 1.8rem !important;
+            }
+            .form-control, select, textarea {
+                font-size: 16px !important; /* Prevents iOS auto-zoom */
             }
         }
         /* Dark mode support */

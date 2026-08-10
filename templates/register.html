@@ -26,7 +26,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 20px;
+            padding: 16px;
         }
         .auth-card {
             background: rgba(255,255,255,0.9);
@@ -39,6 +39,11 @@
             max-width: 500px;
             position: relative;
             overflow: hidden;
+        }
+        @media (max-width: 576px) {
+            .auth-card { padding: 1.5rem 1.2rem; border-radius: 20px; }
+            .auth-header i { font-size: 2.5rem; }
+            .form-control { font-size: 16px !important; }
         }
         .auth-header {
             text-align: center;
