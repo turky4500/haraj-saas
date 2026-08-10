@@ -191,18 +191,35 @@ def daily_background_tasks():
                         with open(REMINDERS_FILE, 'r') as f: sent_reminders = json.load(f)
                     else:
                         sent_reminders = {}
+                    
                     users = User.query.filter(User.account_expiration.isnot(None)).all()
                     for u in users:
                         exp_date_str = u.account_expiration.strftime('%Y-%m-%d')
+                        uid_str = str(u.id)
+                        
+                        # 1. تذكير قبل الانتهاء بيوم واحد
                         if u.account_expiration.date() == now.date() + datetime.timedelta(days=1):
-                            uid_str = str(u.id)
-                            if sent_reminders.get(uid_str) != exp_date_str:
-                                msg = f"🌸 مرحباً {u.username},\n\nنذكرك بحب أن اشتراكك في **راصد حراج** سينتهي غداً {u.account_expiration.strftime('%Y-%m-%d')}. 🗓️\n\nنتمنى أن تكون استمتعت بخدمتنا، ولضمان استمرار رصد صيداتك الموفقة بدون انقطاع، يمكنك التواصل معنا لتجديد الاشتراك. نحن هنا لخدمتك دائماً! 💙\n\nشكراً لثقتك بنا."
+                            rem_key = f"rem_1day_{uid_str}"
+                            if sent_reminders.get(rem_key) != exp_date_str:
+                                msg = f"🌸 مرحباً {u.username},\n\nنذكرك بحب أن اشتراكك في **راصد حراج** سينتهي غداً ({exp_date_str}). 🗓️\n\nنتمنى أن تكون استمتعت بخدمتنا، ولضمان استمرار رصد صيداتك الموفقة بدون انقطاع، يمكنك التواصل معنا لتجديد الاشتراك. نحن هنا لخدمتك دائماً! 💙\n\nشكراً لثقتك بنا."
                                 if send_whatsapp(create_session(), token, u.phone, msg, url=url):
-                                    sent_reminders[uid_str] = exp_date_str
+                                    sent_reminders[rem_key] = exp_date_str
+                                    with open(REMINDERS_FILE, 'w') as f: json.dump(sent_reminders, f)
+
+                        # 2. إشعار الانتهاء الفعلي عند الانتهاء وتوقيف الحساب
+                        if u.account_expiration <= now:
+                            exp_key = f"exp_done_{uid_str}"
+                            if sent_reminders.get(exp_key) != exp_date_str:
+                                exp_msg = f"🌸 مرحباً {u.username},\n\nنأمل أن تكون أيامك مليئة بالصيدات الموفقة! مع الأسف، اشتراكك في **راصد حراج** قد انتهى اليوم ({exp_date_str}). 📅\n\nلكن لا تقلق، رادارك ما زال محفوظاً وجاهزاً للاستئناف فور تجديد الاشتراك. نحن هنا لخدمتك دائماً ونسعد بعودتك إلينا. 💙\n\nإذا كان لديك أي استفسار، تواصل معنا بكل حب.\n\nشكراً لثقتك، وإلى لقاء قريب بإذن الله 🌹"
+                                # توقيف اشتراكات المستخدم
+                                if u.subscription and u.subscription.status == 'active':
+                                    u.subscription.status = 'paused'
+                                    db.session.commit()
+                                if send_whatsapp(create_session(), token, u.phone, exp_msg, url=url):
+                                    sent_reminders[exp_key] = exp_date_str
                                     with open(REMINDERS_FILE, 'w') as f: json.dump(sent_reminders, f)
             except Exception as e:
-                logger.error(f"خطأ في المهام الخلفية: {str(e)}")
+                logger.error(f"خطأ في المهام الخلفية للتذكيرات: {str(e)}")
 
 threading.Thread(target=cleanup_old_logs, daemon=True).start()
 threading.Thread(target=daily_background_tasks, daemon=True).start()
