@@ -197,19 +197,34 @@
             margin-bottom: 1.5rem;
             display: inline-block;
         }
-        /* في وضع الجوال، يختفي الهامش الجانبي وتتحسن الرؤية */
+        /* ===== Mobile Backdrop Overlay & Responsive Optimizations ===== */
+        .sidebar-backdrop {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(2px);
+            z-index: 1015;
+            transition: opacity 0.3s ease;
+        }
+        .sidebar-backdrop.show {
+            display: block;
+        }
         @media (max-width: 768px) {
             .main-content {
                 margin-right: 0 !important;
-                padding: 1rem 0.8rem !important;
+                padding: 0.8rem 0.6rem !important;
             }
             .glass-card {
                 padding: 1.1rem !important;
-                border-radius: 12px !important;
+                border-radius: 14px !important;
             }
             .stat-card {
                 padding: 1rem !important;
-                border-radius: 12px !important;
+                border-radius: 14px !important;
             }
             .stat-value {
                 font-size: 1.4rem !important;
@@ -219,6 +234,14 @@
             }
             .form-control, select, textarea {
                 font-size: 16px !important; /* Prevents iOS auto-zoom */
+            }
+            .admin-header-flex {
+                flex-direction: column !important;
+                align-items: stretch !important;
+                gap: 10px !important;
+            }
+            .admin-header-flex .btn {
+                width: 100% !important;
             }
         }
         /* Dark mode support */
@@ -346,6 +369,9 @@
         {% block content %}{% endblock %}
     </div>
 
+    <!-- Sidebar Backdrop for Mobile -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
@@ -353,18 +379,16 @@
         const sidebar = document.getElementById('sidebar');
         const mainContent = document.getElementById('mainContent');
         const toggleBtn = document.getElementById('sidebarToggle');
+        const sidebarBackdrop = document.getElementById('sidebarBackdrop');
 
         // استرجاع حالة القائمة من localStorage (خاصية الطي/التوسيع)
         let sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
 
         function updateSidebar() {
             if (window.innerWidth <= 768) {
-                // في وضع الجوال: التعامل مع إظهار/إخفاء باستخدام كلاس 'show'
-                // نضمن أن القائمة لا تحتوي على كلاس 'collapsed' في الجوال
                 sidebar.classList.remove('collapsed');
                 mainContent.classList.remove('expanded');
             } else {
-                // وضع سطح المكتب: التعامل مع الطي/التوسيع
                 if (sidebarCollapsed) {
                     sidebar.classList.add('collapsed');
                     mainContent.classList.add('expanded');
@@ -372,34 +396,39 @@
                     sidebar.classList.remove('collapsed');
                     mainContent.classList.remove('expanded');
                 }
-                // إزالة كلاس 'show' إذا كان موجوداً من وضع الجوال
                 sidebar.classList.remove('show');
+                sidebarBackdrop.classList.remove('show');
             }
         }
 
-        // تطبيق الحالة عند التحميل وعند تغيير حجم النافذة
         updateSidebar();
         window.addEventListener('resize', updateSidebar);
 
         // حدث الضغط على زر الهامبرغر
         toggleBtn.addEventListener('click', () => {
             if (window.innerWidth <= 768) {
-                // في الجوال: toggle كلاس 'show'
                 sidebar.classList.toggle('show');
+                sidebarBackdrop.classList.toggle('show');
             } else {
-                // في سطح المكتب: toggle حالة الطي
                 sidebarCollapsed = !sidebarCollapsed;
                 localStorage.setItem('sidebarCollapsed', sidebarCollapsed);
                 updateSidebar();
             }
         });
 
-        // إغلاق القائمة الجانبية في الجوال عند النقر على أي رابط داخلها (اختياري، لتحسين التجربة)
+        // إغلاق القائمة عند النقر على الخلفية المعتمة
+        sidebarBackdrop.addEventListener('click', () => {
+            sidebar.classList.remove('show');
+            sidebarBackdrop.classList.remove('show');
+        });
+
+        // إغلاق القائمة الجانبية في الجوال عند النقر على أي رابط داخلها
         if (window.innerWidth <= 768) {
             const navLinks = sidebar.querySelectorAll('.nav-link');
             navLinks.forEach(link => {
                 link.addEventListener('click', () => {
                     sidebar.classList.remove('show');
+                    sidebarBackdrop.classList.remove('show');
                 });
             });
         }
