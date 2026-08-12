@@ -1716,6 +1716,32 @@ def admin_settings():
         
     return render_template('admin_settings.html', settings=settings, notify=notify)
 
+@app.route('/admin/send_test_daily_report')
+@login_required
+def admin_send_test_daily_report():
+    if current_user.role != 'admin':
+        return redirect(url_for('user_dashboard'))
+    
+    notify = AdminNotifySettings.query.first()
+    if not notify or not notify.admin_phone:
+        flash('يرجى كتابة رقم جوال الإدارة في الإعدادات وحفظه أولاً!', 'danger')
+        return redirect(url_for('admin_settings'))
+    
+    settings = SystemSettings.query.first()
+    token = settings.active_whatsapp_token if settings else "sau11zbtz1ruma8o2k5tt"
+    url = settings.active_whatsapp_url if settings else "http://127.0.0.1:3000/api/v1/send"
+    
+    ds = get_daily_stats()
+    msg = f"📊 [تقرير تجريبي] تقرير اليوم لمنصة (راصد حراج):\n\n👥 زوار بشريين: {ds['visitors']}\n🤖 زيارات الروبوت: {ds['bot_visits']}\n🆕 تسجيلات جديدة: {ds['registrations']}\n💬 رسائل أُرسلت: {ds['messages_sent']}\n\nيعطيك العافية 🚀"
+    
+    success = send_whatsapp(create_session(), token, notify.admin_phone, msg, url=url)
+    if success:
+        flash(f'✅ تم إرسال التقرير اليومي التجريبي بنجاح إلى جوال الإدارة ({notify.admin_phone}).', 'success')
+    else:
+        flash('❌ تعذر إرسال التقرير. تأكد من تفعيل وتجهيز بوابة الواتساب.', 'danger')
+        
+    return redirect(url_for('admin_settings'))
+
 @app.route('/admin_add_user', methods=['GET', 'POST'])
 @login_required
 def admin_add_user():

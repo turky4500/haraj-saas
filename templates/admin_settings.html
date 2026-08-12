@@ -98,9 +98,12 @@
 
         <!-- رقم جوال الإدارة -->
         <div class="mb-4">
-            <label class="form-label fw-bold"><i class="fas fa-mobile-alt text-primary ms-1"></i> رقم جوال الإدارة (للإشعارات)</label>
-            <input type="text" name="admin_phone" class="form-control" dir="ltr" placeholder="9665xxxxxxxx" value="{{ notify.admin_phone if notify else '' }}">
-            <small class="text-muted">سيتم إرسال إشعارات تسجيل العملاء والتقارير اليومية لهذا الرقم.</small>
+            <label class="form-label fw-bold"><i class="fas fa-mobile-alt text-primary ms-1"></i> رقم جوال الإدارة (للإشعارات والتقارير اليومية)</label>
+            <input type="text" name="admin_phone" class="form-control mb-1" dir="ltr" placeholder="9665xxxxxxxx" value="{{ notify.admin_phone if notify else '' }}">
+            <small class="text-muted d-block mb-2">سيتم إرسال إشعارات تسجيل العملاء والتقارير اليومية لهذا الرقم تلقائياً الساعة 11 مساءً.</small>
+            <a href="{{ url_for('admin_send_test_daily_report') }}" class="btn btn-outline-success btn-sm fw-bold rounded-pill px-3">
+                <i class="fab fa-whatsapp ms-1"></i> تجربة إرسال تقرير اليوم بالواتساب الآن 📲
+            </a>
         </div>
 
         <div class="d-grid">
