@@ -451,11 +451,20 @@ def is_quiet_now(enabled, sh, sm, eh, em):
     if start_min < end_min: return start_min <= now_min < end_min
     return (now_min >= start_min) or (now_min < end_min)
 
+import cloudscraper
+
 def create_session():
-    req_session = requests.Session()
-    retries = Retry(total=3, backoff_factor=1.0, status_forcelist=(429, 500, 502, 503, 504))
-    req_session.mount("https://", HTTPAdapter(max_retries=retries))
-    return req_session
+    try:
+        scraper = cloudscraper.create_scraper(
+            browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True}
+        )
+        return scraper
+    except Exception as e:
+        logger.error(f"خطأ في إنشاء جلسة cloudscraper: {e}")
+        req_session = requests.Session()
+        retries = Retry(total=3, backoff_factor=1.0, status_forcelist=(429, 500, 502, 503, 504))
+        req_session.mount("https://", HTTPAdapter(max_retries=retries))
+        return req_session
 
 def extract_ads(html_bytes, base_url):
     soup = BeautifulSoup(html_bytes, "html.parser")
