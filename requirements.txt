@@ -4,6 +4,7 @@ Flask-Login==0.6.2
 Werkzeug==2.3.4
 requests==2.31.0
 beautifulsoup4==4.12.2
+cloudscraper==1.2.71
 psycopg2-binary==2.9.9
 gunicorn==22.0.0
 setuptools

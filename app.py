@@ -17,7 +17,7 @@ from urllib3.exceptions import InsecureRequestWarning
 urllib3.disable_warnings(InsecureRequestWarning)
 
 app = Flask(__name__)
-app.secret_key = "haraj_super_secret_key_v18_final_launch"
+app.secret_key = os.environ.get("SECRET_KEY", "haraj_super_secret_key_v18_final_launch")
 
 @app.before_request
 def redirect_to_hetzner():
